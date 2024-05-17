@@ -1,0 +1,1 @@
+<a href="https://buy.stripe.com/7sI17G4dQc1Q6yY7ss" class="underline">Donate now.</a>

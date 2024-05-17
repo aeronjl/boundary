@@ -5,7 +5,9 @@
 <div class="mx-auto max-w-[600px] px-4">
 	<div class="mt-4 flex flex-row items-center justify-between text-sm">
 		<svg class="h-4 w-4 text-black" viewBox="0 0 100 100">
-			<circle cx="50" cy="50" r="40" fill="currentColor" />
+			<a href="/">
+				<circle cx="50" cy="50" r="40" fill="currentColor" />
+			</a>
 		</svg>
 		<ul class="flew-row flex gap-x-2 underline">
 			<li><a href="/">home</a></li>
@@ -14,7 +16,8 @@
 		</ul>
 	</div>
 	<div class="mt-24">
-	<slot></slot>
+		<slot></slot>
+	</div>
 </div>
-</div>
+
 <style></style>

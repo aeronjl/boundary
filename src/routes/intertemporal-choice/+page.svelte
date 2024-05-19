@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { LayerCake } from 'layercake';
+    import Timer from '$lib/components/Timer.svelte';
 
 	// Define some data
 	const points = [
@@ -12,9 +13,7 @@
 </script>
 
 <div class="flex flex-col gap-2">
-    <div class="w-full rounded-lg border border-black-400">
-        <div class="bg-black rounded-lg h-2 transition-all duration-300" style="width: 50%"></div>
-    </div>
+    <Timer />
     <p class="text-xs font-mono">Current wealth: 1,000 points</p>
 	<div class="border border-black p-1">
 		<p class="font-mono text-xs">Income: 600 points, time penalty: 2 seconds</p>

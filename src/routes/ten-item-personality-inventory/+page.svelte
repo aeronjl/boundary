@@ -1,14 +1,55 @@
 <script lang="ts">
-    let ratings = [1, 2, 3, 4, 5, 6, 7];
+	import { slide } from 'svelte/transition';
+    import TenItemPersonalityInventory from "$lib/components/ten-item-personality-inventory/Logic.svelte";
+	let showLiteratureReview = false;
+
+	function toggleLiteratureReview() {
+		showLiteratureReview = !showLiteratureReview;
+	}
 </script>
-<p class="text-xs font-mono"><span class="font-light text-gray-400">I see myself as</span> extroverted, enthusiastic.</p>
-<div class="my-12">
-{#each ratings as rating}
-<button class="font-mono w-12 h-12 border rounded mr-2">{rating}</button>
-{/each}
-<p class="text-xs font-mono my-2">1 = Strongly disagree, 7 = Strongly agree</p>
+<TenItemPersonalityInventory />
+<div class="my-4 flex flex-col gap-y-1">
+	<h3 class="font-serif text-xl">Results</h3>
+	<hr />
 </div>
 
-<div class="my-4 flex flex-col gap-y-1">
-    <h3 class="text-xl font-serif">Results</h3>
+<div class="my-4 flex flex-col gap-y-2">
+	<h3 on:click={toggleLiteratureReview} class="font-serif text-xl hover:cursor-pointer">Literature Review</h3>
+	{#if showLiteratureReview}
+	<div in:slide={{axis: 'y', duration: 500}} out:slide={{axis: 'y', duration: 200}} class="flex flex-col gap-y-2">
+	<p class="text-sm">
+		The Ten Item Personality Inventory (TIPI) is a concise measure developed by Gosling, Rentfrow,
+		and Swann (2003) to assess the Big Five personality traits: openness, conscientiousness,
+		extraversion, agreeableness, and emotional stability. This inventory was designed to address the
+		need for a brief, efficient tool that could be used in settings where time constraints or survey
+		length limitations preclude the use of longer instruments like the NEO-PI-R or the Big Five
+		Inventory (BFI). The TIPI consists of 10 items, each a pair of descriptors, rated on a 7-point
+		Likert scale. Despite its brevity, the TIPI has been shown to possess adequate levels of
+		reliability and validity, making it a useful tool for large-scale research where extensive
+		personality assessment is impractical.
+	</p>
+	<p class="text-sm">
+		The TIPI's development was rooted in balancing the need for brevity with the need for
+		psychometric robustness. Gosling et al. (2003) conducted several studies to validate the TIPI,
+		demonstrating that it retains a significant degree of the predictive power and validity of
+		longer measures. While it does not capture the full nuance of the Big Five dimensions, it
+		provides a reliable approximation, particularly for research contexts where detailed personality
+		data is not essential. Subsequent research has reinforced these findings, with studies
+		confirming that the TIPI's factor structure, convergent validity, and test-retest reliability
+		are satisfactory for most research purposes.
+	</p>
+	<p class="text-sm">
+		However, the TIPI is not without its limitations. Critics argue that the reduced number of items
+		inevitably leads to a loss of detail and subtlety in measuring complex personality traits. Some
+		studies have noted lower internal consistency for the TIPI compared to more comprehensive
+		instruments, which can be particularly problematic for certain traits like agreeableness and
+		openness. Nonetheless, the TIPI's convenience and efficiency make it an attractive option for
+		large-scale surveys and preliminary studies where quick personality assessments are necessary.
+		Overall, while the TIPI may not replace more detailed inventories in clinical or highly detailed
+		psychological research, it remains a valuable tool for personality assessment in a variety of
+		contexts.
+	</p>
+</div>
+	{/if}
+	<hr />
 </div>

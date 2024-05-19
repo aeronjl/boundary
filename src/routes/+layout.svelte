@@ -39,7 +39,7 @@
 		<ul class="flew-row flex gap-x-2 underline">
 			<li><a href="/">home</a></li>
 			<li><a href="/about">about</a></li>
-			<li><a href="/donate">donate</a></li>
+			<li><a href="https://buy.stripe.com/7sI17G4dQc1Q6yY7ss" target="_blank">donate</a></li>
 		</ul>
 	</div>
 </div>

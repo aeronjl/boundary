@@ -4,7 +4,7 @@
 	export let selectedQuestion: string;
     export let trialNumber: number;
 
-    let selectedOption: string[]: [];
+    let selectedOption: string[] = [];
 
     let introduction = true;
     let askingQuestions = false;

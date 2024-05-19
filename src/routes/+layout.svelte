@@ -48,11 +48,11 @@
 		<div class="my-4 h-[50px]">
 			{#if $page.url.pathname != '/'}
 			<div class="flex flex-row items-center gap-2 font-mono text-xs" in:fly={{ x: -10, duration: 200 }} out:fly={{ y: 10, duration: 200 }}>
-				<button on:click={goBack} class="rounded-sm bg-gray-100 px-2 py-1">
+				<button on:click={goBack} class="rounded-sm bg-gray-100 px-2 py-1 h-[24px]">
 					&#x2190; Go back
 				</button>
 				<p class="text-gray-400">›</p>
-				<button class="rounded-sm px-2 py-1">{currentPage}</button>
+				<button class="rounded-sm px-2 py-1 truncate h-[24px] w-[120px]">{currentPage}</button>
 			</div>
 			{/if}
 		</div>

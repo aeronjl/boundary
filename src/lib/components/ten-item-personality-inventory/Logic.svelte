@@ -42,6 +42,7 @@
     let randomOrder = [];
     let currentIndex = 0;
     let selectedQuestion = '';
+    let finishExperiment = false;
 
     const dispatch = createEventDispatcher();
 
@@ -64,6 +65,7 @@
             currentIndex++;
             trialNumber++;
         } else {
+            finishExperiment = true;
             dispatch('questionsCompleted');
         }
     }
@@ -80,4 +82,4 @@
 
 </script>
 
-<Display {selectedQuestion} {trialNumber} on:submit={handleRequestNewQuestion}/>
+<Display {selectedQuestion} {trialNumber} bind:triggerFunction={finishExperiment} on:submit={handleRequestNewQuestion}/>

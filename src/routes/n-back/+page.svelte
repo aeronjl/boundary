@@ -2,12 +2,6 @@
 	import NBack from '$lib/N-back.svelte';
 </script>
 
-<div class="flex flex-row font-serif items-center text-xs gap-x-2">
-    <button class="bg-gray-200 rounded p-1">← Back</button>
-    <p>›</p>
-    <p class="border p-1">N-back</p>
-</div>
-
 <div class="my-12">
 	<NBack />
 </div>

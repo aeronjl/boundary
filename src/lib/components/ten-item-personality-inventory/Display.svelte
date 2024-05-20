@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { createEventDispatcher } from 'svelte';
+    import { fade } from 'svelte/transition';
 
 	export let selectedQuestion: string;
 	export let trialNumber: number;
@@ -13,9 +14,18 @@
 	const dispatch = createEventDispatcher();
 
 	function handleSubmission() {
-		dispatch('submit');
+    if (!selectedValue) {
+        return;
+    } else {
+		dispatch('submit', selectedValue);
         selectedValue = '';
 	}
+}
+
+    function handleReset() {
+        dispatch('reset');
+        selectedValue = '';
+    }
 
     $: if (triggerFunction) {
         introduction = false;
@@ -24,7 +34,7 @@
     }
 </script>
 
-<div class="h-[300px]">
+<div class="h-[400px]">
 	{#if introduction}
 		<p class="my-4 font-mono text-xs">
 			This is a ten-item personality inventory. You will be presented with a series of statements
@@ -52,11 +62,13 @@
 		<form class="flex flex-col">
 			<div class="flex flex-col text-gray-400 my-4">
                 {#each [
-                    { id: "strongly-disagree", value: "Strongly disagree" },
-                    { id: "somewhat-disagree", value: "Somewhat disagree" },
+                    { id: "disagree-strongly", value: "Disagree strongly" },
+                    { id: "disagree-moderately", value: "Disagree moderately" },
+                    { id: "disagree-a-little", value: "Disagree a little" },
                     { id: "neither-agree-nor-disagree", value: "Neither agree nor disagree" },
-                    { id: "somewhat-agree", value: "Somewhat agree" },
-                    { id: "strongly-agree", value: "Strongly agree" }
+                    { id: "agree-a-little", value: "Agree a little" },
+                    { id: "agree-moderately", value: "Agree moderately" },
+                    { id: "agree-strongly", value: "Agree strongly" }
                 ] as option}
                     <div class="flew-row flex items-center gap-2 focus:text-black">
                         <input
@@ -64,10 +76,10 @@
                             id={option.id}
                             name="answer"
                             value={option.value}
-                            class="my-2 font-mono text-xs text-gray-400 focus:outline-none"
+                            class="my-2 font-mono text-xs text-gray-400 focus:outline-none hover:cursor-pointer"
                             bind:group={selectedValue}
                         />
-                        <label for={option.id} class="font-mono text-xs {selectedValue === option.value ? 'text-black' : 'text-gray-400'}">{option.value}</label>
+                        <label for={option.id} class="font-mono transition-all hover:cursor-pointer duration-300 text-xs {selectedValue === option.value ? 'text-black' : 'text-gray-400'}">{option.value}</label>
                     </div>
                 {/each}
 			</div>
@@ -82,9 +94,10 @@
     <p class="my-4 font-mono text-xs">You have completed the inventory.</p>
     <button
     on:click={() => {
-        introduction = false;
+        introduction = true;
         finished = false;
-        askingQuestions = true;
+        askingQuestions = false;
+        handleReset();
     }}
     class="w-1/4 border border-b-8 border-r-8 border-black p-1 font-mono text-xs active:bg-gray-50"
 >

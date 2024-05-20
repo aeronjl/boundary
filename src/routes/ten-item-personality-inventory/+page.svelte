@@ -3,13 +3,32 @@
     import TenItemPersonalityInventory from "$lib/components/ten-item-personality-inventory/Logic.svelte";
 	let showLiteratureReview = false;
 
+	let results = {
+		extroversion: 0,
+		agreeableness: 0,
+		conscientiousness: 0,
+		neuroticism: 0,
+		openness: 0
+	};
+
+	function handleSubmit(event) {
+		const { scale, score } = event.detail;
+		results[scale] += score;
+		console.log(event.detail)
+	}
+
 	function toggleLiteratureReview() {
 		showLiteratureReview = !showLiteratureReview;
 	}
 </script>
-<TenItemPersonalityInventory />
-<div class="my-4 flex flex-col gap-y-1">
+<TenItemPersonalityInventory on:submit={handleSubmit} />
+<div class="my-4 flex flex-col gap-y-1 text-sm">
 	<h3 class="font-serif text-xl">Results</h3>
+	<p>Extroversion: {results.extroversion}</p>
+	<p>Agreeableness: {results.agreeableness}</p>
+	<p>Conscientiousness: {results.conscientiousness}</p>
+	<p>Neuroticism: {results.neuroticism}</p>
+	<p>Openness: {results.openness}</p>
 	<hr />
 </div>
 

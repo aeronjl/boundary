@@ -3,7 +3,8 @@
 </script>
 
 <h1 class="mb-4 font-serif text-3xl leading-10">Boundary</h1>
-<p class="text-sm">The best people to research the human mind are the individuals with minds.</p>
+<p class="text-sm my-2">Everyone has a stake in the science of psychology.</p>
+<p class="text-sm my-2">The experiments made available on this website are transparent. The aim is to make clear how psychologists get from tests to inferences about mental qualities, cognitive abilities, and diagnoses.</p>
 
 <div class="my-4 flex flex-col gap-y-1">
 	<h3 class="font-serif text-lg">Recent Experiments</h3>

@@ -1,7 +1,0 @@
-<h1 class="font-serif text-3xl">Perception</h1>
-
-<div class="flex flex-row my-4">
-    <svg class="h-12 w-12" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-        <circle cx="50" cy="50" r="50" fill="black" />
-    </svg>
-</div>

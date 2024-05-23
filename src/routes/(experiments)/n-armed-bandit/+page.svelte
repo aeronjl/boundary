@@ -10,7 +10,3 @@
 <p class="font-mono text-xs">Current score: 0</p>
 <button>Left</button>
 <button>Right</button>
-
-<div class="my-4 flex flex-col gap-y-1">
-    <h3 class="text-xl font-serif">Results</h3>
-</div>

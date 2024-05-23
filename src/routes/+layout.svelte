@@ -27,7 +27,7 @@
 	}
 </script>
 
-<div class="mx-auto max-w-[800px] px-4 relative">
+<div class="mx-auto max-w-[600px] px-4 relative">
 	{#if $page.url.pathname === '/'}
 		<div transition:fade={{ duration: 200 }} class="absolute top-0 inset-x-0 right-4 left-4 flex flex-row items-center justify-between text-sm">
 				<svg class="h-4 w-4 text-black" viewBox="0 0 100 100">

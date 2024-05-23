@@ -1,5 +1,5 @@
 <script lang="ts">
-	import Grating from '$lib/Grating.svelte';
+	import Display from '$lib/components/orientation-discrimination/Display.svelte';
 </script>
 
-<Grating />
+<Display />

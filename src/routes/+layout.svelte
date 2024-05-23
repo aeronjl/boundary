@@ -27,19 +27,24 @@
 	}
 </script>
 
-<div class="mx-auto max-w-[600px] px-4 relative">
+<div class="relative mx-auto max-w-[600px] px-4">
 	{#if $page.url.pathname === '/'}
-		<div transition:fade={{ duration: 200 }} class="absolute top-0 inset-x-0 right-4 left-4 flex flex-row items-center justify-between text-sm">
-				<svg class="h-4 w-4 text-black" viewBox="0 0 100 100">
-					<a href="/">
-						<circle cx="50" cy="50" r="40" fill="currentColor" />
-					</a>
-				</svg>
-				<ul class="flew-row flex gap-x-2 underline">
-					<li><a href="/about">about</a></li>
-					<li><a href="https://buy.stripe.com/7sI17G4dQc1Q6yY7ss" target="_blank">donate</a></li>
-					<li><a href="/sign-in" class="text-blue-500 decoration-blue-500 underline hidden">sign in</a></li>
-				</ul>
+		<div
+			transition:fade={{ duration: 200 }}
+			class="absolute inset-x-0 left-4 right-4 top-0 flex flex-row items-center justify-between text-sm"
+		>
+			<svg class="h-4 w-4 text-black" viewBox="0 0 100 100">
+				<a href="/">
+					<circle cx="50" cy="50" r="40" fill="currentColor" />
+				</a>
+			</svg>
+			<ul class="flew-row flex gap-x-2 underline">
+				<li><a href="/about">about</a></li>
+				<li><a href="https://buy.stripe.com/7sI17G4dQc1Q6yY7ss" target="_blank">donate</a></li>
+				<li>
+					<a href="/sign-in" class="hidden text-blue-500 underline decoration-blue-500">sign in</a>
+				</li>
+			</ul>
 		</div>
 	{/if}
 	<div class="mt-24">

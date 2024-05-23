@@ -36,9 +36,9 @@
 					</a>
 				</svg>
 				<ul class="flew-row flex gap-x-2 underline">
-					<li><a href="/">home</a></li>
 					<li><a href="/about">about</a></li>
 					<li><a href="https://buy.stripe.com/7sI17G4dQc1Q6yY7ss" target="_blank">donate</a></li>
+					<li><a href="/sign-in" class="text-blue-500 decoration-blue-500 underline hidden">sign in</a></li>
 				</ul>
 		</div>
 	{/if}

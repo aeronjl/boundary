@@ -29,7 +29,9 @@
 </script>
 
 <div>
+    <div class="h-[500px]">
 	<slot></slot>
+</div>
 
 	<div class="my-4 flex flex-col gap-y-2 text-sm">
 		<button on:click={toggleResults} class="text-left font-serif text-base">Results</button>

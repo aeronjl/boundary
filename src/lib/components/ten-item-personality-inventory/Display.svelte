@@ -34,7 +34,7 @@
     }
 </script>
 
-<div class="h-[400px]">
+<div>
 	{#if introduction}
 		<p class="my-4 font-mono text-xs">
 			This is a ten-item personality inventory. You will be presented with a series of statements

@@ -25,7 +25,7 @@
 
 <svelte:window on:keydown={handleKeydown} />
 
-<div class="h-[500px] flex flex-col gap-y-6">
+<div class="flex flex-col gap-y-6">
 <div class="flex h-[400px] items-center justify-center">
 	<svg class="h-20 w-20" viewBox="0 0 100 100" style="transform: rotate({angle}deg);">
 		<pattern

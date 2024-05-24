@@ -16,7 +16,7 @@
 	let showResults: boolean = false;
 	let showLiteratureReview: boolean = false;
 
-	let ComponentsPromise: Promise<any>| null = null;
+	let ComponentsPromise: Promise<any> | null = null;
 
 	// Reactive statement to watch for changes in the page store
 	$: {
@@ -47,14 +47,35 @@
 	</div>
 
 	{#await ComponentsPromise}
-  <p>Loading component...</p>
-{:then components}
-  {#if components.LiteratureReview}
-    <svelte:component this={components.LiteratureReview} />
-  {/if}
-{:catch error}
-  <p>Error loading component: {error.message}</p>
-{/await}
+		<p>Loading component...</p>
+	{:then components}
+		{#if components.Results}
+			<div class="my-4 flex flex-col gap-y-2 text-sm">
+				<button on:click={toggleResults} class="text-left font-serif text-base">Results</button>
+				{#if showResults}
+					<div transition:slide={{ axis: 'y', duration: 200 }}>
+						<svelte:component this={components.Results} />
+					</div>
+				{/if}
+				<hr />
+			</div>
+		{/if}
+		{#if components.LiteratureReview}
+			<div class="my-4 flex flex-col gap-y-2 text-sm">
+				<button on:click={toggleLiteratureReview} class="text-left font-serif text-base">
+					Literature Review
+				</button>
+				{#if showLiteratureReview}
+					<div transition:slide={{ axis: 'y', duration: 200 }}>
+						<svelte:component this={components.LiteratureReview} />
+					</div>
+				{/if}
+				<hr />
+			</div>
+		{/if}
+	{:catch error}
+		<p>Error loading component: {error.message}</p>
+	{/await}
 
 	<!--
 	{#await import(`/src/lib/components${currentPath}/Results.svelte`) then Results}

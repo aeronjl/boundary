@@ -15,10 +15,10 @@
 <div in:fly={{ x: -10 }}>
 	<PageHeader title="Experiments" />
 
-	<div class="grid grid-cols-3 gap-2 font-mono text-sm">
+	<div class="grid md:grid-cols-3 grid-cols-2 gap-4 font-mono text-sm">
 		{#each experiments as experiment (experiment.path)}
 			<div animate:flip class="h-[200px] border p-2 shadow-md transition-all hover:border-black">
-				<a href="/{experiment.path}">
+				<a href="/{experiment.path}" class="block w-full h-full">
 					<p class="text-xs">{experiment.name}</p>
 				</a>
 			</div>

@@ -21,7 +21,10 @@
         The logic of psychological testing is simple: the tests measure some observable quality, and the scores on the tests are used to make inferences about unobservable qualities.
     </p>
     <p class="my-2 text-justify">
-        Historically, psychologists have used tests like the ones on this website only to support judgements made after a duration of observation and interaction with a patient. The workload of psychological professionals today is immense, and many no longer have the time to conduct such thorough assessments. Instead, they rely on the same tests you will encounter here. The Boundary project invites you to reflect on what the consequences of this might be. 
+        Historically, psychologists have used tests like the ones on this website only to support judgements made after a duration of observation and interaction with a patient. The workload of psychological professionals today is immense, and many no longer have the time to conduct such thorough assessments. Instead, they rely on the same tests you will encounter here.</p>
+    
+    <p class="my-2 text-justify">
+        The Boundary project invites you to reflect on what the consequences of this might be. 
     </p>
 
 </div>

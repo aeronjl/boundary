@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount, createEventDispatcher } from 'svelte';
 	import Display from "$lib/components/ten-item-personality-inventory/Display.svelte";
-	import PageHeader from "$lib/components/PageHeader.svelte";
 
 	export let data: { questions: Array<{ question: string; scale: string; scoring: string }> };
 

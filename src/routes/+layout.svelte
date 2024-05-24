@@ -47,7 +47,7 @@
 			</ul>
 		</div>
 	{/if}
-	<div class="mt-24">
+	<div class="sm:mt-24">
 		<div class="my-4 h-[50px]">
 			{#if $page.url.pathname != '/'}
 				<div

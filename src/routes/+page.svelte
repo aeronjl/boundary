@@ -3,13 +3,13 @@
 </script>
 
 <h1 class="mb-4 font-serif text-3xl leading-10">Boundary</h1>
-<p class="my-2 text-sm">Everyone has a stake in the science of psychology.</p>
-<p class="my-2 text-sm">
-	The experiments made available on this website are transparent. The aim is to make clear how
+<p class="my-2 text-sm text-justify">Everyone has a stake in the science of psychology.</p>
+<p class="my-2 text-sm text-justify">
+	The experiments made available on this website are transparent. You will see how every choice you make feeds into the final result. The aim is to make clear how
 	psychologists get from tests to inferences about mental qualities, cognitive abilities, and
 	diagnoses.
 </p>
-<p class="my-2 text-sm">
+<p class="my-2 text-sm text-justify">
 	You are invited to try these experiments for yourself.
 </p>
 

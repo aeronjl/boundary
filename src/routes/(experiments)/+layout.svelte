@@ -1,15 +1,16 @@
 <script lang="ts">
-	import { page } from '$app/stores';
-	import { slide, fade } from 'svelte/transition';
 	import { onMount } from 'svelte';
-	import type { SvelteComponent } from 'svelte';
-	import Literature from '$lib/components/ten-item-personality-inventory/Literature.svelte';
+	import { browser } from '$app/environment';
+	import { page } from '$app/stores';
+	import { slide } from 'svelte/transition';
 
 	let showResults: boolean = false;
 	let showLiteratureReview: boolean = false;
+	let currentPath: string;
 
-	let currentExperiment: string;
-	let LiteratureComponent: typeof SvelteComponent | null = null;
+	$: if (browser) {
+		currentPath = $page.url.pathname;
+	}
 
 	function toggleLiteratureReview() {
 		showLiteratureReview = !showLiteratureReview;
@@ -19,41 +20,37 @@
 		showResults = !showResults;
 	}
 
-	currentExperiment = $page.url.pathname;
-
-	const componentPath = `/src/lib/components${currentExperiment}/Literature.svelte`;
-
-	onMount(async () => {
-		LiteratureComponent = (await import(`${componentPath}`)).default;
-	});
+	onMount(() => {});
 </script>
 
 <div>
-    <div class="h-[500px]">
-	<slot></slot>
-</div>
-
-	<div class="my-4 flex flex-col gap-y-2 text-sm">
-		<button on:click={toggleResults} class="text-left font-serif text-base">Results</button>
-		{#if showResults}
-			<div in:slide={{ axis: 'y', duration: 500 }} out:slide={{ axis: 'y', duration: 200 }}>
-				<p class="my-2">Results are not yet available.</p>
-			</div>
-		{/if}
-		<hr />
+	<div class="h-[500px]">
+		<slot></slot>
 	</div>
 
-	<div class="my-4 flex flex-col gap-y-2 text-sm">
-		<button on:click={toggleLiteratureReview} class="text-left font-serif text-base">
-			Literature Review
-		</button>
-		{#if showLiteratureReview}
-			<div in:slide={{ axis: 'y', duration: 500 }} out:slide={{ axis: 'y', duration: 200 }}>
-				{#if LiteratureComponent}
-					<svelte:component this={LiteratureComponent} />
-				{/if}
-			</div>
-		{/if}
-		<hr />
-	</div>
+	{#await import(`/src/lib/components${currentPath}/Results.svelte`) then Results}
+		<div class="my-4 flex flex-col gap-y-2 text-sm">
+			<button on:click={toggleResults} class="text-left font-serif text-base">Results</button>
+			{#if showResults}
+				<div transition:slide={{ axis: 'y', duration: 200 }}>
+					<Results.default />
+				</div>
+			{/if}
+			<hr />
+		</div>
+	{/await}
+
+	{#await import(`/src/lib/components${currentPath}/LiteratureReview.svelte`) then LiteratureReview}
+		<div class="my-4 flex flex-col gap-y-2 text-sm">
+			<button on:click={toggleLiteratureReview} class="text-left font-serif text-base">
+				Literature Review
+			</button>
+			{#if showLiteratureReview}
+				<div transition:slide={{ axis: 'y', duration: 200 }}>
+					<LiteratureReview.default />
+				</div>
+			{/if}
+			<hr />
+		</div>
+	{/await}
 </div>

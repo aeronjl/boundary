@@ -1,9 +1,10 @@
 <script lang="ts">
     import { fly } from 'svelte/transition';
+    import PageHeader from '$lib/components/PageHeader.svelte';
 </script>
 <div in:fly={{x: -10, duration: 1000}} class="text-sm">
-	<h3 class="mb-4 font-serif text-3xl leading-10">About Boundary</h3>
-
+    <PageHeader title="About Boundary" />
+    
 	<p class="my-2 text-justify">
 		Boundary is a project which aims to raise the level of psychological education.
 	</p>

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { flip } from 'svelte/animate';
 	import { fly } from 'svelte/transition';
+	import PageHeader from '$lib/components/PageHeader.svelte';
 
 	let experiments = [
 		{ path: 'orientation-discrimination', name: 'Orientation discrimination' },
@@ -12,7 +13,7 @@
 </script>
 
 <div in:fly={{ x: -10 }}>
-	<h1 class="mb-4 font-serif text-3xl leading-10">Experiments</h1>
+	<PageHeader title="Experiments" />
 
 	<div class="grid grid-cols-3 gap-2 font-mono text-sm">
 		{#each experiments as experiment (experiment.path)}

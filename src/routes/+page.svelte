@@ -1,7 +1,8 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/PageHeader.svelte';
 </script>
 
-<h1 class="mb-4 font-serif text-3xl leading-10">Boundary</h1>
+<PageHeader title="Boundary" />
 <p class="my-2 text-sm text-justify">Everyone has a stake in the science of psychology.</p>
 <p class="my-2 text-sm text-justify">
 	The experiments made available on this website are transparent. You will see how every choice you make feeds into the final result. The aim is to make clear how

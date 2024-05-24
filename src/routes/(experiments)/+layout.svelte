@@ -12,29 +12,22 @@
 	import { get } from 'svelte/store';
 	import { browser } from '$app/environment';
 	import { slide } from 'svelte/transition';
-
+	import { loadComponent } from '$lib/loadComponent';
 	let showResults: boolean = false;
 	let showLiteratureReview: boolean = false;
-	let currentPath: string;
 
-	let LiteratureReview: any = null;
+	let LiteratureReviewPromise: Promise<any>| null = null;
 
 	// Reactive statement to watch for changes in the page store
 	$: {
 		if (browser) {
 			const currentPath = get(page).url.pathname;
-			importComponent(currentPath);
+			LiteratureReviewPromise = importComponent(currentPath);
 		}
 	}
 
 	async function importComponent(path: string) {
-		try {
-			LiteratureReview = (await import(`/src/lib/components${path}/LiteratureReview.svelte`))
-				.default;
-		} catch (error) {
-			console.error('Failed to load component:', error);
-			LiteratureReview = null;
-		}
+		return await loadComponent(path);
 	}
 
 	function toggleLiteratureReview() {
@@ -53,6 +46,16 @@
 		<slot></slot>
 	</div>
 
+	{#await LiteratureReviewPromise}
+  <p>Loading component...</p>
+{:then LiteratureReview}
+  {#if LiteratureReview}
+    <svelte:component this={LiteratureReview} />
+  {/if}
+{:catch error}
+  <p>Error loading component: {error.message}</p>
+{/await}
+
 	<!--
 	{#await import(`/src/lib/components${currentPath}/Results.svelte`) then Results}
 		<div class="my-4 flex flex-col gap-y-2 text-sm">
@@ -65,7 +68,7 @@
 			<hr />
 		</div>
 	{/await}
-	-->
+	
 
 	{#if LiteratureReview}
 		<div class="my-4 flex flex-col gap-y-2 text-sm">
@@ -80,5 +83,5 @@
 			<hr />
 		</div>
 	{/if}
-	
+	-->
 </div>

@@ -9,6 +9,9 @@
 	psychologists get from tests to inferences about mental qualities, cognitive abilities, and
 	diagnoses.
 </p>
+<p class="my-2 text-sm">
+	You are invited to try these experiments for yourself.
+</p>
 
 <div class="my-4 flex flex-col gap-y-1">
 	<h3 class="font-serif text-lg">Recent Experiments</h3>

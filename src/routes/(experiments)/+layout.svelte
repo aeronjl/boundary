@@ -12,22 +12,22 @@
 	import { get } from 'svelte/store';
 	import { browser } from '$app/environment';
 	import { slide } from 'svelte/transition';
-	import { loadComponent } from '$lib/loadComponent';
+	import { loadComponents } from '$lib/loadComponent';
 	let showResults: boolean = false;
 	let showLiteratureReview: boolean = false;
 
-	let LiteratureReviewPromise: Promise<any>| null = null;
+	let ComponentsPromise: Promise<any>| null = null;
 
 	// Reactive statement to watch for changes in the page store
 	$: {
 		if (browser) {
 			const currentPath = get(page).url.pathname;
-			LiteratureReviewPromise = importComponent(currentPath);
+			ComponentsPromise = importComponents(currentPath);
 		}
 	}
 
-	async function importComponent(path: string) {
-		return await loadComponent(path);
+	async function importComponents(path: string) {
+		return await loadComponents(path);
 	}
 
 	function toggleLiteratureReview() {
@@ -46,11 +46,11 @@
 		<slot></slot>
 	</div>
 
-	{#await LiteratureReviewPromise}
+	{#await ComponentsPromise}
   <p>Loading component...</p>
-{:then LiteratureReview}
-  {#if LiteratureReview}
-    <svelte:component this={LiteratureReview} />
+{:then components}
+  {#if components.LiteratureReview}
+    <svelte:component this={components.LiteratureReview} />
   {/if}
 {:catch error}
   <p>Error loading component: {error.message}</p>

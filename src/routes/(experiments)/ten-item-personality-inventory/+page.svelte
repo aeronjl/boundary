@@ -1,5 +1,5 @@
 <script lang="ts">
-    import TenItemPersonalityInventory from "$lib/components/ten-item-personality-inventory/Logic.svelte";
+    import Logic from "$lib/components/ten-item-personality-inventory/Logic.svelte";
 
 	let results = {
 		extroversion: 0,
@@ -17,4 +17,4 @@
 
 </script>
 
-<TenItemPersonalityInventory on:submit={handleSubmit} />
+<Logic on:submit={handleSubmit} />

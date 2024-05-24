@@ -1,5 +1,7 @@
 <script lang="ts">
     import Logic from "$lib/components/ten-item-personality-inventory/Logic.svelte";
+	import Display from "$lib/components/ten-item-personality-inventory/Display.svelte";
+	import PageHeader from "$lib/components/PageHeader.svelte";
 
 	let results = {
 		extroversion: 0,

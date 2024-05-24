@@ -14,8 +14,10 @@
 	import { slide } from 'svelte/transition';
 	import { loadComponents } from '$lib/loadComponent';
 	import { fade } from 'svelte/transition';
+	import PageHeader from '$lib/components/PageHeader.svelte';
 	let showResults: boolean = false;
 	let showLiteratureReview: boolean = false;
+	let pageTitle: string;
 
 	let ComponentsPromise: Promise<any> | null = null;
 
@@ -24,6 +26,7 @@
 		if (browser) {
 			const currentPath = get(page).url.pathname;
 			ComponentsPromise = importComponents(currentPath);
+			pageTitle = formatPathToTitle(currentPath);
 		}
 	}
 
@@ -39,10 +42,21 @@
 		showResults = !showResults;
 	}
 
-	onMount(() => {});
+	function formatPathToTitle(path: string): string {
+		// Remove the leading slash if present and then split the string by hyphens
+		const parts = path.replace(/^\//, '').split('-');
+
+		// Capitalize each part and join them with a space
+		const formattedTitle = parts
+			.map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+			.join(' ');
+
+		return formattedTitle;
+	}
 </script>
 
 <div>
+	<!-- <PageHeader title={pageTitle}/> -->
 	<div class="h-[500px]">
 		<slot></slot>
 	</div>

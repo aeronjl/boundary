@@ -1,0 +1,52 @@
+[
+	{
+		"question": "extroverted, enthusiastic",
+		"scale": "extroversion",
+		"scoring": "linear"
+	},
+	{
+		"question": "critical, quarrelsome",
+		"scale": "agreeableness",
+		"scoring": "reverse"
+	},
+	{
+		"question": "dependable, self-disciplined",
+		"scale": "conscientiousness",
+		"scoring": "linear"
+	},
+	{
+		"question": "anxious, easily upset",
+		"scale": "neuroticism",
+		"scoring": "reverse"
+	},
+	{
+		"question": "open to new experiences, complex",
+		"scale": "openness",
+		"scoring": "linear"
+	},
+	{
+		"question": "reserved, quiet",
+		"scale": "extroversion",
+		"scoring": "reverse"
+	},
+	{
+		"question": "sympathetic, warm",
+		"scale": "agreeableness",
+		"scoring": "linear"
+	},
+	{
+		"question": "disorganized, careless",
+		"scale": "conscientiousness",
+		"scoring": "reverse"
+	},
+	{
+		"question": "calm, emotionally stable",
+		"scale": "neuroticism",
+		"scoring": "linear"
+	},
+	{
+		"question": "conventional, uncreative",
+		"scale": "openness",
+		"scoring": "reverse"
+	}
+]

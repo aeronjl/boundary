@@ -32,4 +32,5 @@
 			<a href="/ten-item-personality-inventory" class="underline">Ten Item Personality Inventory</a>
 		</li>
 	</ul>
+	<a href="/experiments" class="text-sm underline my-2">View all experiments</a>
 </div>

@@ -1,5 +1,4 @@
-<script>
-	import sky from '$lib/assets/sky.png';
+<script lang="ts">
 </script>
 
 <h1 class="mb-4 font-serif text-3xl leading-10">Boundary</h1>

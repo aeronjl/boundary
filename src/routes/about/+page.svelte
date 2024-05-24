@@ -1,4 +1,7 @@
-<div class="text-sm">
+<script lang="ts">
+    import { fly } from 'svelte/transition';
+</script>
+<div in:fly={{x: -10, duration: 1000}} class="text-sm">
 	<h3 class="mb-4 font-serif text-3xl leading-10">About Boundary</h3>
 
 	<p class="my-2 text-justify">

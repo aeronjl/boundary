@@ -11,7 +11,11 @@
 	}
 
 	function goBack() {
-		window.history.back();
+		if (window.history.length <= 1) {
+			window.location.href = '/';
+		} else {
+			window.history.back();
+		}
 	}
 
 	function formatPathToTitle(path: string): string {

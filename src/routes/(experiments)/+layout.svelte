@@ -1,96 +1,90 @@
 <script context="module" lang="ts">
-	import type { LoadEvent } from '@sveltejs/kit';
+    import type { LoadEvent } from '@sveltejs/kit';
 
-	export async function load({ url }: LoadEvent) {
-		return { path: url.pathname };
-	}
+    export async function load({ url }: LoadEvent) {
+        return { path: url.pathname };
+    }
 </script>
 
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
-	import { get } from 'svelte/store';
-	import { browser } from '$app/environment';
-	import { slide } from 'svelte/transition';
-	import { loadComponents } from '$lib/loadComponent';
-	import { fade } from 'svelte/transition';
-	import PageHeader from '$lib/components/PageHeader.svelte';
-	let showResults: boolean = false;
-	let showLiteratureReview: boolean = false;
-	let pageTitle: string;
+    import { onMount } from 'svelte';
+    import { page } from '$app/stores';
+    import { get } from 'svelte/store';
+    import { browser } from '$app/environment';
+    import { slide } from 'svelte/transition';
+    import { loadComponents } from '$lib/loadComponent';
+    import { fade } from 'svelte/transition';
+    import PageHeader from '$lib/components/PageHeader.svelte';
+    let showResults: boolean = false;
+    let showLiteratureReview: boolean = false;
+    let pageTitle: string;
 
-	let ComponentsPromise: Promise<any> | null = null;
+    let ComponentsPromise: Promise<any> | null = null;
 
-	// Reactive statement to watch for changes in the page store
-	$: {
-		if (browser) {
-			const currentPath = get(page).url.pathname;
-			ComponentsPromise = importComponents(currentPath);
-			pageTitle = formatPathToTitle(currentPath);
-		}
-	}
+    // Reactive statement to watch for changes in the page store
+    $: {
+        if (browser) {
+            const currentPath = get(page).url.pathname;
+            ComponentsPromise = importComponents(currentPath);
+            pageTitle = formatPathToTitle(currentPath);
+        }
+    }
 
-	async function importComponents(path: string) {
-		return await loadComponents(path);
-	}
+    async function importComponents(path: string) {
+        return await loadComponents(path);
+    }
 
-	function toggleLiteratureReview() {
-		showLiteratureReview = !showLiteratureReview;
-	}
+    function toggleLiteratureReview() {
+        showLiteratureReview = !showLiteratureReview;
+    }
 
-	function toggleResults() {
-		showResults = !showResults;
-	}
+    function toggleResults() {
+        showResults = !showResults;
+    }
 
-	function formatPathToTitle(path: string): string {
-		// Remove the leading slash if present and then split the string by hyphens
-		const parts = path.replace(/^\//, '').split('-');
-
-		// Capitalize each part and join them with a space
-		const formattedTitle = parts
-			.map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-			.join(' ');
-
-		return formattedTitle;
-	}
+    function formatPathToTitle(path: string): string {
+        const parts = path.replace(/^\//, '').split('-');
+        return parts
+            .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+            .join(' ');
+    }
 </script>
 
 <div>
-	<!-- <PageHeader title={pageTitle}/> -->
-	<div class="h-[500px]">
-		<slot></slot>
-	</div>
+    <div class="h-[500px]">
+        <slot></slot>
+    </div>
 
-	{#await ComponentsPromise}
-		<p>Loading component...</p>
-	{:then components}
-	<div in:fade={{duration: 200}}>
-		{#if components.Results}
-			<div class="my-4 flex flex-col gap-y-2 text-sm">
-				<button on:click={toggleResults} class="text-left font-serif text-base">Results</button>
-				{#if showResults}
-					<div transition:slide={{ axis: 'y', duration: 200 }}>
-						<svelte:component this={components.Results} />
-					</div>
-				{/if}
-				<hr />
-			</div>
-		{/if}
-		{#if components.LiteratureReview}
-			<div class="my-4 flex flex-col gap-y-2 text-sm">
-				<button on:click={toggleLiteratureReview} class="text-left font-serif text-base">
-					Literature Review
-				</button>
-				{#if showLiteratureReview}
-					<div transition:slide={{ axis: 'y', duration: 200 }}>
-						<svelte:component this={components.LiteratureReview} />
-					</div>
-				{/if}
-				<hr />
-			</div>
-		{/if}
-		</div>
-	{:catch error}
-		<p>Error loading component: {error.message}</p>
-	{/await}
+    {#await ComponentsPromise}
+        <p>Loading components...</p>
+    {:then components}
+    <div in:fade={{duration: 200}}>
+        {#if components.Results}
+            <div class="my-4 flex flex-col gap-y-2 text-sm">
+                <button on:click={toggleResults} class="text-left font-serif text-base">Results</button>
+                {#if showResults}
+                    <div transition:slide={{ axis: 'y', duration: 200 }}>
+                        <svelte:component this={components.Results} />
+                    </div>
+                {/if}
+                <hr />
+            </div>
+        {/if}
+        {#if components.LiteratureReview}
+            <div class="my-4 flex flex-col gap-y-2 text-sm">
+                <button on:click={toggleLiteratureReview} class="text-left font-serif text-base">
+                    Literature Review
+                </button>
+                {#if showLiteratureReview}
+                    <div transition:slide={{ axis: 'y', duration: 200 }}>
+                        <svelte:component this={components.LiteratureReview} />
+                    </div>
+                {/if}
+                <hr />
+            </div>
+        {/if}
+        </div>
+    {:catch error}
+        <p>Error loading components: {error.message}</p>
+    {/await}
 </div>

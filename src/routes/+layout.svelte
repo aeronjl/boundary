@@ -45,11 +45,11 @@
     }
 </script>
 
-<div class="relative mx-auto px-4" style="max-width: {$maxWidth}px">
+<div class="relative mx-auto px-4 sm:px-12" style="max-width: {$maxWidth}px">
     {#if $page.url.pathname === '/'}
         <div
             transition:fade={{ duration: 200 }}
-            class="absolute inset-x-0 left-4 right-4 top-0 flex flex-row items-center justify-between text-sm"
+            class="absolute inset-x-0 sm:left-12 sm:right-12 left-12 right-12 top-0 flex flex-row items-center justify-between text-sm"
         >
             <svg class="h-4 w-4 text-black" viewBox="0 0 100 100">
                 <a href="/">

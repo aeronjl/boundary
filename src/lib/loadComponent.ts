@@ -5,26 +5,31 @@ const componentMap = import.meta.glob('/src/lib/components/**/LiteratureReview.s
 const resultsMap = import.meta.glob('/src/lib/components/**/Results.svelte');
 
 export async function loadComponents(path: string) {
-	try {
-		const literatureReviewPath = `/src/lib/components${path}/LiteratureReview.svelte`;
-		const resultsPath = `/src/lib/components${path}/Results.svelte`;
+    const components: { LiteratureReview: SvelteComponent | null; Results: SvelteComponent | null } = {
+        LiteratureReview: null,
+        Results: null
+    };
 
-		const LiteratureReview = componentMap[literatureReviewPath]
-			? ((await (componentMap[literatureReviewPath]() as Promise<{ default: unknown }>))
-					.default as SvelteComponent)
-			: null;
-		const Results = resultsMap[resultsPath]
-			? ((await (resultsMap[resultsPath]() as Promise<{ default: unknown }>))
-					.default as SvelteComponent)
-			: null;
+    const literatureReviewPath = `/src/lib/components${path}/LiteratureReview.svelte`;
+    const resultsPath = `/src/lib/components${path}/Results.svelte`;
 
-		if (!LiteratureReview || !Results) {
-			throw new Error('Component not found');
-		}
+    try {
+        if (componentMap[literatureReviewPath]) {
+            const module = await componentMap[literatureReviewPath]() as { default: SvelteComponent };
+            components.LiteratureReview = module.default;
+        }
+    } catch (error) {
+        console.error(`Failed to load LiteratureReview component for path ${path}:`, error);
+    }
 
-		return { LiteratureReview, Results };
-	} catch (error) {
-		console.error(`Failed to load components for path ${path}:`, error);
-		return { LiteratureReview: null, Results: null };
-	}
+    try {
+        if (resultsMap[resultsPath]) {
+            const module = await resultsMap[resultsPath]() as { default: SvelteComponent };
+            components.Results = module.default;
+        }
+    } catch (error) {
+        console.error(`Failed to load Results component for path ${path}:`, error);
+    }
+
+    return components;
 }

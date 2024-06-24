@@ -51,10 +51,12 @@
 </script>
 
 <div>
+	<div class="grid grid-cols-2 gap-12">
     <div class="h-[500px]">
         <slot></slot>
     </div>
 
+	<div>
     {#await ComponentsPromise}
         <p>Loading components...</p>
     {:then components}
@@ -87,4 +89,6 @@
     {:catch error}
         <p>Error loading components: {error.message}</p>
     {/await}
+</div>
+	</div>
 </div>

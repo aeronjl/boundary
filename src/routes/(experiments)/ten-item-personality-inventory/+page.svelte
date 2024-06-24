@@ -1,6 +1,11 @@
 <script lang="ts">
 	import { onMount, createEventDispatcher } from 'svelte';
+	import { fade, slide } from 'svelte/transition';
+
 	import Display from '$lib/components/ten-item-personality-inventory/Display.svelte';
+	import Results from '$lib/components/ten-item-personality-inventory/Results.svelte';
+	import LiteratureReview from '$lib/components/ten-item-personality-inventory/LiteratureReview.svelte';
+
 	import { results } from '$lib/stores/tenItemPersonalityInventory';
 
 	export let data: { questions: Array<{ question: string; scale: string; scoring: string }> };
@@ -26,8 +31,8 @@
 		question: string;
 		scale: string;
 		scoring: string;
-	}
-	
+	};
+
 	function shuffleQuestions(array: Question[]): Question[] {
 		for (let i = array.length - 1; i > 0; i--) {
 			const j = Math.floor(Math.random() * (i + 1));
@@ -122,20 +127,58 @@
 		randomOrder = shuffleQuestions([...questions]);
 		pickNextQuestion();
 	}
+
+	let showResults: boolean = false;
+	let showLiteratureReview: boolean = false;
+
+	function toggleResults() {
+		showResults = !showResults;
+	}
+
+	function toggleLiteratureReview() {
+		showLiteratureReview = !showLiteratureReview;
+	}
 </script>
 
-<Display
-	{selectedQuestion}
-	{trialNumber}
-	bind:triggerFunction={finishExperiment}
-	on:submit={handleRequestNewQuestion}
-	on:reset={resetExperiment}
-/>
+<div class="gap-12 md:grid md:grid-cols-2">
+	<div>
+		<Display
+			{selectedQuestion}
+			{trialNumber}
+			bind:triggerFunction={finishExperiment}
+			on:submit={handleRequestNewQuestion}
+			on:reset={resetExperiment}
+		/>
 
-<div class="my-6">
-	<p class="font-mono text-xs font-bold my-2">Options</p>
-	<div class="flex flex-row items-center gap-2">
-	<input type="checkbox" id="showScoringThemesToggle" />
-	<label for="showScoringThemesToggle" class="font-mono text-xs">Show scoring themes on questions</label>
-</div>
+		<div class="my-6">
+			<p class="my-2 font-mono text-xs font-bold">Options</p>
+			<div class="flex flex-row items-center gap-2">
+				<input type="checkbox" id="showScoringThemesToggle" />
+				<label for="showScoringThemesToggle" class="font-mono text-xs"
+					>Show scoring themes on questions</label
+				>
+			</div>
+		</div>
+	</div>
+
+	<div in:fade={{ duration: 200 }}>
+		<div class="my-4 flex flex-col gap-y-2 text-sm">
+			<button on:click={toggleResults} class="text-left font-serif text-base">Results</button>
+			{#if showResults}
+				<div transition:slide={{ axis: 'y', duration: 200 }}>
+					<Results />
+				</div>
+			{/if}
+			<hr />
+		</div>
+		<button on:click={toggleLiteratureReview} class="text-left font-serif text-base"
+			>Literature Review</button
+		>
+		{#if showLiteratureReview}
+			<div transition:slide={{ axis: 'y', duration: 200 }}>
+				<LiteratureReview />
+			</div>
+		{/if}
+		<hr />
+	</div>
 </div>

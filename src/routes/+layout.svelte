@@ -20,7 +20,7 @@
 
     // Create a tweened store for the max-width
     const maxWidth = tweened(600, {
-        duration: 300,
+        duration: 800,
         easing: cubicOut
     });
 

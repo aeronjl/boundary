@@ -51,7 +51,7 @@
 </script>
 
 <div>
-	<div class="grid grid-cols-2 gap-12">
+	<div class="md:grid md:grid-cols-2 gap-12">
     <div class="h-[500px]">
         <slot></slot>
     </div>

@@ -36,6 +36,12 @@ TURSO_DATABASE_URL=libsql://...
 TURSO_AUTH_TOKEN=...
 ```
 
+Set `ADMIN_TOKEN` to protect `/admin` and the export endpoints:
+
+```sh
+ADMIN_TOKEN=...
+```
+
 Apply production migrations and seed experiment definitions with:
 
 ```sh

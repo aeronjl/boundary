@@ -59,8 +59,7 @@
 		"@threlte/core": "^8.5.9",
 		"drizzle-orm": "^0.45.2",
 		"layercake": "^10.0.2",
-		"three": "^0.184.0",
-		"ws": "^8.20.0"
+		"three": "^0.184.0"
 	},
 	"overrides": {
 		"cookie": "0.7.2",

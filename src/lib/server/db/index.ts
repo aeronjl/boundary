@@ -1,8 +1,8 @@
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { drizzle } from 'drizzle-orm/libsql/web';
 import * as schema from './schema';
+import type { LibSQLDatabase } from 'drizzle-orm/libsql';
 
 const databaseAuthToken = process.env.TURSO_AUTH_TOKEN ?? process.env.DATABASE_AUTH_TOKEN;
 const localDatabasePath = process.env.DB_FILE_NAME ?? 'data/boundary.sqlite';
@@ -11,6 +11,7 @@ const configuredDatabaseUrl = process.env.TURSO_DATABASE_URL ?? process.env.DATA
 const hasProtocol = (value: string) => /^[a-z][a-z0-9+.-]*:/i.test(value);
 const toLocalFileUrl = (value: string) => (hasProtocol(value) ? value : `file:${value}`);
 const localLibsqlClientPackage = ['@libsql/client', 'node'].join('/');
+const localDrizzlePackage = ['drizzle-orm/libsql', 'node'].join('/');
 
 export const databaseUrl = configuredDatabaseUrl ?? toLocalFileUrl(localDatabasePath);
 export const isRemoteDatabase = !databaseUrl.startsWith('file:') && databaseUrl !== ':memory:';
@@ -34,8 +35,12 @@ if (localPath) {
 }
 
 const createClient = isRemoteDatabase
-	? (await import('@libsql/client/web')).createClient
+	? (await import('@libsql/client/http')).createClient
 	: (await import(/* @vite-ignore */ localLibsqlClientPackage)).createClient;
+
+const drizzle = isRemoteDatabase
+	? (await import('drizzle-orm/libsql/http')).drizzle
+	: (await import(/* @vite-ignore */ localDrizzlePackage)).drizzle;
 
 export const client = createClient({
 	url: databaseUrl,
@@ -47,7 +52,7 @@ if (!isRemoteDatabase) {
 	await client.execute('PRAGMA journal_mode = WAL;');
 }
 
-export const db = drizzle(client, { schema });
+export const db = drizzle(client, { schema }) as LibSQLDatabase<typeof schema>;
 
 export const closeDatabase = async () => {
 	client.close();

@@ -11,7 +11,7 @@
 	function generateSequence() {
 		sequence.set([]);
 		userSequence.set([]);
-		let newSequence = [];
+		let newSequence: number[] = [];
 		for (let i = 0; i < sequenceLength; i++) {
 			newSequence.push(Math.floor(Math.random() * squares.length));
 		}
@@ -50,11 +50,14 @@
 </script>
 
 <div class="grid">
-	{#each squares as square, index}
-		<div
+	{#each squares as square, index (index)}
+		<button
+			type="button"
+			aria-label="Select square {index + 1}"
+			aria-pressed={square}
 			class="square {square ? 'active' : ''} cursor-pointer"
 			on:click={() => selectSquare(index)}
-		></div>
+		></button>
 	{/each}
 </div>
 
@@ -65,8 +68,11 @@
 		gap: 0.5rem;
 	}
 	.square {
+		appearance: none;
 		width: 2rem;
 		height: 2rem;
+		padding: 0;
+		border: 0;
 		background-color: #ccc;
 		transition: background-color 0.3s;
 	}

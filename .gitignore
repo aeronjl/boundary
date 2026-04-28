@@ -3,6 +3,10 @@ node_modules
 /build
 /.svelte-kit
 /package
+/test-results
+/playwright-report
+/.vercel
+/data
 .env
 .env.*
 !.env.example

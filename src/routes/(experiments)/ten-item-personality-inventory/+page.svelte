@@ -1,117 +1,124 @@
 <script lang="ts">
-	import { onMount, createEventDispatcher } from 'svelte';
 	import Display from '$lib/components/ten-item-personality-inventory/Display.svelte';
+	import type { TipiQuestion, TipiResult, TipiRunState } from '$lib/experiments/tipi';
+	import { tipiResult } from '../../../stores/ten-item-personality-inventory/experimentData';
 
-	export let data: { questions: Array<{ question: string; scale: string; scoring: string }> };
-
-	let questions = data.questions;
-
+	let runId = '';
+	let currentQuestion: TipiQuestion | null = null;
 	let trialNumber = 0;
-
-	let randomOrder = [];
-	let currentIndex = 0;
-	let selectedQuestion = '';
+	let totalTrials = 0;
 	let finishExperiment = false;
+	let showScoringThemes = false;
+	let isBusy = false;
+	let errorMessage = '';
 
-	let results = {
-		extroversion: 0,
-		agreeableness: 0,
-		conscientiousness: 0,
-		neuroticism: 0,
-		openness: 0
-	};
+	type SubmitResponse =
+		| ({ completed: false } & TipiRunState)
+		| {
+				completed: true;
+				runId: string;
+				result: TipiResult;
+		  };
 
-	function handleSubmit(event) {
-		const { scale, score } = event.detail;
-		results[scale] += score;
-		console.log(event.detail);
-	}
+	async function parseJsonResponse<T>(response: Response): Promise<T> {
+		const body = (await response.json()) as T & { message?: string };
 
-	const dispatch = createEventDispatcher();
-
-	function pickRandomQuestion() {
-		const randomIndex = Math.floor(Math.random() * questions.length);
-		selectedQuestion = questions[randomIndex].question;
-	}
-
-	function shuffleArray(array) {
-		for (let i = array.length - 1; i > 0; i--) {
-			const j = Math.floor(Math.random() * (i + 1));
-			[array[i], array[j]] = [array[j], array[i]];
+		if (!response.ok) {
+			throw new Error(body.message ?? 'Request failed.');
 		}
-		return array;
+
+		return body;
 	}
 
-	function pickNextQuestion() {
-		if (currentIndex < randomOrder.length) {
-			selectedQuestion = randomOrder[currentIndex].question;
-			currentIndex++;
-			trialNumber++;
-		} else {
-			finishExperiment = true;
-			dispatch('questionsCompleted');
+	async function handleStart() {
+		isBusy = true;
+		errorMessage = '';
+		finishExperiment = false;
+		tipiResult.set(null);
+
+		try {
+			const response = await fetch('/api/experiments/tipi/runs', { method: 'POST' });
+			const run = await parseJsonResponse<TipiRunState>(response);
+
+			runId = run.runId;
+			currentQuestion = run.question;
+			trialNumber = run.trialNumber;
+			totalTrials = run.totalTrials;
+		} catch (error) {
+			errorMessage = error instanceof Error ? error.message : 'Could not start the inventory.';
+		} finally {
+			isBusy = false;
 		}
 	}
-	let formData: string = '';
 
-	function translateLikertRating(rating: string, mode: 'linear' | 'reversed'): number | null {
-		const linearMap: { [key: string]: number } = {
-			'Disagree strongly': 1,
-			'Disagree moderately': 2,
-			'Disagree a little': 3,
-			'Neither agree nor disagree': 4,
-			'Agree a little': 5,
-			'Agree moderately': 6,
-			'Agree strongly': 7
-		};
+	async function handleRequestNewQuestion(event: CustomEvent<string>) {
+		if (!runId || !currentQuestion) {
+			errorMessage = 'The inventory is not ready yet.';
+			return;
+		}
 
-		const reversedMap: { [key: string]: number } = {
-			'Disagree strongly': 7,
-			'Disagree moderately': 6,
-			'Disagree a little': 5,
-			'Neither agree nor disagree': 4,
-			'Agree a little': 3,
-			'Agree moderately': 2,
-			'Agree strongly': 1
-		};
+		isBusy = true;
+		errorMessage = '';
 
-		const map = mode === 'linear' ? linearMap : reversedMap;
-		return map[rating] || null;
-	}
+		try {
+			const response = await fetch(`/api/experiments/tipi/runs/${runId}/responses`, {
+				method: 'POST',
+				headers: {
+					'content-type': 'application/json'
+				},
+				body: JSON.stringify({
+					questionId: currentQuestion.id,
+					response: event.detail
+				})
+			});
+			const update = await parseJsonResponse<SubmitResponse>(response);
 
-	// Pick a random question when the component mounts
-	onMount(() => {
-		randomOrder = shuffleArray([...questions]);
-		pickNextQuestion();
-	});
-
-	function handleRequestNewQuestion(event: CustomEvent) {
-		const questionResult = {
-			scale: randomOrder[currentIndex - 1].scale,
-			score: translateLikertRating(event.detail, randomOrder[currentIndex - 1].scoring)
-		};
-		dispatch('submit', questionResult);
-		pickNextQuestion();
+			if (update.completed) {
+				currentQuestion = null;
+				finishExperiment = true;
+				tipiResult.set(update.result);
+			} else {
+				currentQuestion = update.question;
+				trialNumber = update.trialNumber;
+				totalTrials = update.totalTrials;
+			}
+		} catch (error) {
+			errorMessage = error instanceof Error ? error.message : 'Could not save your response.';
+		} finally {
+			isBusy = false;
+		}
 	}
 
 	function resetExperiment() {
-		currentIndex = 0;
+		runId = '';
+		currentQuestion = null;
 		trialNumber = 0;
+		totalTrials = 0;
 		finishExperiment = false;
-		randomOrder = shuffleArray([...questions]);
-		pickNextQuestion();
+		errorMessage = '';
+		tipiResult.set(null);
 	}
 </script>
 
 <div class="my-2 flex flex-row items-center gap-2">
-	<input type="checkbox" id="showScoringThemesToggle" />
+	<input type="checkbox" id="showScoringThemesToggle" bind:checked={showScoringThemes} />
 	<label for="showScoringThemesToggle" class="font-mono text-xs">Show scoring themes</label>
 </div>
 
+{#if showScoringThemes && currentQuestion}
+	<p class="my-2 font-mono text-xs text-gray-500">
+		Scale: {currentQuestion.scale}. Scoring: {currentQuestion.scoring}.
+	</p>
+{/if}
+
 <Display
-	{selectedQuestion}
+	selectedQuestion={currentQuestion?.question ?? ''}
 	{trialNumber}
+	{totalTrials}
+	disabled={isBusy}
+	{errorMessage}
 	bind:triggerFunction={finishExperiment}
+	on:start={handleStart}
 	on:submit={handleRequestNewQuestion}
 	on:reset={resetExperiment}
 />

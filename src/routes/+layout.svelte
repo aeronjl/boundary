@@ -2,7 +2,8 @@
 	import '../app.css';
 	import { page } from '$app/stores';
 	import { browser } from '$app/environment';
-	import { fly, slide, fade } from 'svelte/transition';
+	import { resolve } from '$app/paths';
+	import { fly, fade } from 'svelte/transition';
 
 	let currentPage: string = '';
 
@@ -12,7 +13,7 @@
 
 	function goBack() {
 		if (window.history.length <= 1) {
-			window.location.href = '/';
+			window.location.href = resolve('/');
 		} else {
 			window.history.back();
 		}
@@ -35,19 +36,16 @@
 	{#if $page.url.pathname === '/'}
 		<div
 			transition:fade={{ duration: 200 }}
-			class="absolute inset-x-0 left-4 right-4 top-0 flex flex-row items-center justify-between text-sm"
+			class="absolute inset-x-0 top-0 right-4 left-4 flex flex-row items-center justify-between text-sm"
 		>
-			<svg class="h-4 w-4 text-black" viewBox="0 0 100 100">
-				<a href="/">
+			<a href={resolve('/')} aria-label="Boundary home" class="text-black">
+				<svg class="h-4 w-4" viewBox="0 0 100 100" aria-hidden="true">
 					<circle cx="50" cy="50" r="40" fill="currentColor" />
-				</a>
-			</svg>
+				</svg>
+			</a>
 			<ul class="flew-row flex gap-x-2 underline">
-				<li><a href="/about">about</a></li>
+				<li><a href={resolve('/about')}>about</a></li>
 				<li><a href="https://buy.stripe.com/7sI17G4dQc1Q6yY7ss" target="_blank">donate</a></li>
-				<li>
-					<a href="/sign-in" class="hidden text-blue-500 underline decoration-blue-500">sign in</a>
-				</li>
 			</ul>
 		</div>
 	{/if}

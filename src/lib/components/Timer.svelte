@@ -4,7 +4,7 @@
 
 	const initialTime = 50000; // milliseconds
 	const time = writable(initialTime);
-	let interval: number;
+	let interval: ReturnType<typeof setInterval>;
 
 	onMount(() => {
 		interval = setInterval(() => {
@@ -22,26 +22,8 @@
 	onDestroy(() => {
 		clearInterval(interval);
 	});
-
-	function reset() {
-		time.set(initialTime);
-		clearInterval(interval);
-		interval = setInterval(() => {
-			time.update((n) => {
-				if (n > 0) {
-					return n - 10;
-				} else {
-					clearInterval(interval);
-					return 0;
-				}
-			});
-		}, 10);
-	}
 </script>
 
 <div class="border-black-400 w-full rounded-lg border">
-	<div
-		class="h-2 rounded-lg bg-black"
-		style="width: {($time / initialTime) * 100}%"
-	></div>
+	<div class="h-2 rounded-lg bg-black" style="width: {($time / initialTime) * 100}%"></div>
 </div>

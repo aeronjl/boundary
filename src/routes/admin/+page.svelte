@@ -94,6 +94,12 @@
 			<a class="rounded-sm bg-gray-100 px-3 py-2 text-xs" href={resolve('/admin/tipi/export.json')}>
 				JSON export
 			</a>
+			<a
+				class="rounded-sm bg-gray-100 px-3 py-2 text-xs"
+				href={resolve('/admin/experiments/export.json')}
+			>
+				All experiment JSON
+			</a>
 		</div>
 
 		<div class="overflow-x-auto border-t border-gray-200">

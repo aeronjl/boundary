@@ -1,6 +1,12 @@
 import { readFile } from 'node:fs/promises';
 import { eq } from 'drizzle-orm';
 import {
+	banditExperimentId,
+	banditExperimentSlug,
+	banditVersionId,
+	defaultBanditConfig
+} from '../src/lib/experiments/bandit';
+import {
 	isTipiScale,
 	isTipiScoringMode,
 	tipiExperimentId,
@@ -20,6 +26,44 @@ const now = Date.now();
 const questions = JSON.parse(
 	await readFile('static/experiments/ten-item-personality-inventory/questions.json', 'utf8')
 ) as SeedQuestion[];
+
+await db
+	.insert(experiments)
+	.values({
+		id: banditExperimentId,
+		slug: banditExperimentSlug,
+		name: 'n-armed bandit',
+		description: 'A repeated choice task for exploring reward learning and uncertainty.',
+		createdAt: now
+	})
+	.onConflictDoUpdate({
+		target: experiments.id,
+		set: {
+			slug: banditExperimentSlug,
+			name: 'n-armed bandit',
+			description: 'A repeated choice task for exploring reward learning and uncertainty.'
+		}
+	});
+
+await db
+	.insert(experimentVersions)
+	.values({
+		id: banditVersionId,
+		experimentId: banditExperimentId,
+		version: 1,
+		status: 'published',
+		configJson: JSON.stringify(defaultBanditConfig),
+		createdAt: now,
+		publishedAt: now
+	})
+	.onConflictDoUpdate({
+		target: experimentVersions.id,
+		set: {
+			status: 'published',
+			configJson: JSON.stringify(defaultBanditConfig),
+			publishedAt: now
+		}
+	});
 
 await db
 	.insert(experiments)
@@ -93,4 +137,5 @@ const seeded = await db
 	.where(eq(tipiQuestions.experimentVersionId, tipiVersionId));
 
 console.log(`Seeded ${seeded.length} TIPI questions.`);
+console.log(`Seeded ${defaultBanditConfig.armCount}-armed bandit config.`);
 await closeDatabase();

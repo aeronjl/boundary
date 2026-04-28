@@ -14,6 +14,18 @@ async function completeTipiRun(page: Page) {
 	await expect(page.getByText('You have completed the inventory.')).toBeVisible();
 }
 
+async function completeBanditRun(page: Page) {
+	await page.goto('/n-armed-bandit');
+	await page.getByRole('button', { name: 'Start' }).click();
+
+	for (let trial = 1; trial <= 20; trial++) {
+		await expect(page.getByText(`Trial ${trial} of 20`)).toBeVisible();
+		await page.getByRole('button', { name: 'Choose arm A' }).click();
+	}
+
+	await expect(page.getByRole('heading', { name: 'Bandit run complete' })).toBeVisible();
+}
+
 test('index page has expected h1', async ({ page }) => {
 	await page.goto('/');
 	await expect(page.getByRole('heading', { name: 'Boundary' })).toBeVisible();
@@ -41,6 +53,28 @@ test('ten item personality inventory records and displays results', async ({ pag
 	await expect(page.getByText('/ 7').first()).toBeVisible();
 });
 
+test('n-armed bandit records generic trial data', async ({ page }) => {
+	await completeBanditRun(page);
+
+	await page.goto('/admin');
+	await page.getByLabel('Admin token').fill('test-admin-token');
+	await page.getByRole('button', { name: 'Sign in' }).click();
+
+	const exportResponse = await page.request.get('/admin/experiments/export.json');
+	expect(exportResponse.status()).toBe(200);
+
+	const exportBody = await exportResponse.json();
+	const banditRun = exportBody.runs.find(
+		(run: { experimentVersionId: string; responses: unknown[] }) =>
+			run.experimentVersionId === 'n-armed-bandit-v1' && run.responses.length === 20
+	);
+
+	expect(banditRun).toBeTruthy();
+	expect(banditRun?.events.map((event: { eventType: string }) => event.eventType)).toEqual(
+		expect.arrayContaining(['run_started', 'arm_pulled', 'run_completed'])
+	);
+});
+
 test('admin can inspect and export ten item personality inventory data', async ({ page }) => {
 	await completeTipiRun(page);
 
@@ -52,6 +86,7 @@ test('admin can inspect and export ten item personality inventory data', async (
 	await expect(page.getByText('Ten Item Personality Inventory data')).toBeVisible();
 	await expect(page.getByRole('link', { name: 'CSV export' })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'JSON export' })).toBeVisible();
+	await expect(page.getByRole('link', { name: 'All experiment JSON' })).toBeVisible();
 
 	const csvResponse = await page.request.get('/admin/tipi/export.csv');
 	expect(csvResponse.status()).toBe(200);

@@ -13,6 +13,8 @@
 
 	$: completedRuns = data.runs.filter((run) => run.status === 'completed').length;
 	$: responseCount = data.runs.reduce((total, run) => total + run.responseCount, 0);
+	$: genericResponseCount = data.runs.reduce((total, run) => total + run.genericResponseCount, 0);
+	$: eventCount = data.runs.reduce((total, run) => total + run.eventCount, 0);
 </script>
 
 <svelte:head>
@@ -59,7 +61,7 @@
 			</button>
 		</form>
 	{:else}
-		<div class="grid grid-cols-3 gap-3">
+		<div class="grid grid-cols-2 gap-3 md:grid-cols-5">
 			<div class="border-t border-gray-200 py-3">
 				<p class="text-xs text-gray-500">Runs</p>
 				<p class="font-serif text-2xl">{data.runs.length}</p>
@@ -71,6 +73,14 @@
 			<div class="border-t border-gray-200 py-3">
 				<p class="text-xs text-gray-500">Responses</p>
 				<p class="font-serif text-2xl">{responseCount}</p>
+			</div>
+			<div class="border-t border-gray-200 py-3">
+				<p class="text-xs text-gray-500">Generic responses</p>
+				<p class="font-serif text-2xl">{genericResponseCount}</p>
+			</div>
+			<div class="border-t border-gray-200 py-3">
+				<p class="text-xs text-gray-500">Events</p>
+				<p class="font-serif text-2xl">{eventCount}</p>
 			</div>
 		</div>
 
@@ -94,6 +104,8 @@
 						<th class="py-2 pr-3 font-medium">Status</th>
 						<th class="py-2 pr-3 font-medium">Started</th>
 						<th class="py-2 pr-3 font-medium">Responses</th>
+						<th class="py-2 pr-3 font-medium">Generic</th>
+						<th class="py-2 pr-3 font-medium">Events</th>
 						<th class="py-2 pr-3 font-medium">Ext</th>
 						<th class="py-2 pr-3 font-medium">Agr</th>
 						<th class="py-2 pr-3 font-medium">Con</th>
@@ -112,6 +124,8 @@
 							<td class="py-2 pr-3">{run.status}</td>
 							<td class="py-2 pr-3">{formatDate(run.startedAt)}</td>
 							<td class="py-2 pr-3">{run.responseCount}</td>
+							<td class="py-2 pr-3">{run.genericResponseCount}</td>
+							<td class="py-2 pr-3">{run.eventCount}</td>
 							<td class="py-2 pr-3">{formatScore(run.scores.extroversion.average)}</td>
 							<td class="py-2 pr-3">{formatScore(run.scores.agreeableness.average)}</td>
 							<td class="py-2 pr-3">{formatScore(run.scores.conscientiousness.average)}</td>

@@ -9,6 +9,8 @@ const headers = [
 	'status',
 	'started_at',
 	'completed_at',
+	'generic_response_count',
+	'event_count',
 	'trial_index',
 	'item_number',
 	'question_id',
@@ -48,6 +50,8 @@ export const GET: RequestHandler = async ({ cookies }) => {
 						if (header === 'completed_at') {
 							return csvCell(run.completedAt ? new Date(run.completedAt).toISOString() : null);
 						}
+						if (header === 'generic_response_count') return csvCell(run.genericResponseCount);
+						if (header === 'event_count') return csvCell(run.eventCount);
 						return csvCell(null);
 					})
 					.join(',')
@@ -63,6 +67,8 @@ export const GET: RequestHandler = async ({ cookies }) => {
 					run.status,
 					new Date(run.startedAt).toISOString(),
 					run.completedAt ? new Date(run.completedAt).toISOString() : null,
+					run.genericResponseCount,
+					run.eventCount,
 					response.trialIndex,
 					response.itemNumber,
 					response.questionId,

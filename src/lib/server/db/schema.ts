@@ -57,6 +57,47 @@ export const experimentRuns = sqliteTable(
 	]
 );
 
+export const experimentEvents = sqliteTable(
+	'experiment_events',
+	{
+		id: text('id').primaryKey(),
+		runId: text('run_id')
+			.notNull()
+			.references(() => experimentRuns.id, { onDelete: 'cascade' }),
+		eventType: text('event_type').notNull(),
+		trialIndex: integer('trial_index'),
+		payloadJson: text('payload_json').notNull().default('{}'),
+		createdAt: integer('created_at').notNull()
+	},
+	(table) => [
+		index('experiment_events_run_idx').on(table.runId),
+		index('experiment_events_run_event_type_idx').on(table.runId, table.eventType),
+		index('experiment_events_run_trial_idx').on(table.runId, table.trialIndex)
+	]
+);
+
+export const experimentResponses = sqliteTable(
+	'experiment_responses',
+	{
+		id: text('id').primaryKey(),
+		runId: text('run_id')
+			.notNull()
+			.references(() => experimentRuns.id, { onDelete: 'cascade' }),
+		trialIndex: integer('trial_index').notNull(),
+		itemId: text('item_id'),
+		responseType: text('response_type').notNull(),
+		responseJson: text('response_json').notNull(),
+		scoreJson: text('score_json'),
+		metadataJson: text('metadata_json').notNull().default('{}'),
+		createdAt: integer('created_at').notNull()
+	},
+	(table) => [
+		index('experiment_responses_run_idx').on(table.runId),
+		index('experiment_responses_run_trial_idx').on(table.runId, table.trialIndex),
+		index('experiment_responses_run_item_idx').on(table.runId, table.itemId)
+	]
+);
+
 export const tipiQuestions = sqliteTable(
 	'tipi_questions',
 	{

@@ -20,6 +20,7 @@ import {
 	markExperimentRunCompleted,
 	parseExperimentRunItemOrder
 } from './lifecycle';
+import { recordExperimentEvent, recordExperimentResponse } from './records';
 
 type TipiQuestionRow = typeof tipiQuestions.$inferSelect;
 
@@ -85,6 +86,16 @@ export async function startTipiRun(
 		itemOrder: questionOrder
 	});
 
+	await recordExperimentEvent({
+		runId: run.id,
+		eventType: 'run_started',
+		payload: {
+			experimentVersionId: tipiVersionId,
+			itemOrder: questionOrder,
+			totalTrials: questionOrder.length
+		}
+	});
+
 	const firstQuestion = questions.find((question) => question.id === questionOrder[0]) ?? null;
 
 	return {
@@ -144,6 +155,7 @@ export async function submitTipiResponse(
 
 	const question = toTipiQuestion(questionRow);
 	const score = scoreTipiResponse(response, question.scoring);
+	const createdAt = Date.now();
 
 	await db.insert(tipiResponses).values({
 		id: crypto.randomUUID(),
@@ -152,7 +164,33 @@ export async function submitTipiResponse(
 		trialIndex,
 		response,
 		score,
-		createdAt: Date.now()
+		createdAt
+	});
+
+	await recordExperimentResponse({
+		runId,
+		trialIndex,
+		itemId: questionId,
+		responseType: 'tipi_likert',
+		response: { value: response },
+		score: {
+			value: score,
+			scale: question.scale,
+			scoring: question.scoring
+		},
+		createdAt
+	});
+
+	await recordExperimentEvent({
+		runId,
+		eventType: 'response_submitted',
+		trialIndex,
+		payload: {
+			questionId,
+			response,
+			score
+		},
+		createdAt
 	});
 
 	const nextQuestionId = questionOrder[trialIndex + 1];
@@ -256,6 +294,15 @@ async function completeTipiRun(runId: string): Promise<TipiResult> {
 		});
 
 	await markExperimentRunCompleted(runId, completedAt);
+
+	await recordExperimentEvent({
+		runId,
+		eventType: 'run_completed',
+		payload: {
+			result
+		},
+		createdAt: completedAt
+	});
 
 	return result;
 }

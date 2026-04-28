@@ -56,6 +56,13 @@ curl https://www.findboundary.com/health
 
 The health endpoint returns `200` only when the app can reach the configured database.
 
+Experiment runs share generic capture tables:
+
+- `experiment_events` records lifecycle and trial events as JSON payloads.
+- `experiment_responses` records normalized response payloads, optional scores, and metadata.
+
+Experiment-specific tables, such as `tipi_responses` and `tipi_results`, should be reserved for scoring and analysis fields that need typed columns.
+
 ## Building
 
 Create and preview a production build:

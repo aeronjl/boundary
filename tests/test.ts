@@ -59,7 +59,12 @@ test('admin can inspect and export ten item personality inventory data', async (
 
 	const jsonResponse = await page.request.get('/admin/tipi/export.json');
 	expect(jsonResponse.status()).toBe(200);
-	expect(await jsonResponse.json()).toMatchObject({ runs: expect.any(Array) });
+	const jsonExport = await jsonResponse.json();
+	expect(jsonExport).toMatchObject({ runs: expect.any(Array) });
+	expect(jsonExport.runs[0].genericResponses).toHaveLength(10);
+	expect(jsonExport.runs[0].events.map((event: { eventType: string }) => event.eventType)).toEqual(
+		expect.arrayContaining(['run_started', 'response_submitted', 'run_completed'])
+	);
 
 	await page
 		.getByRole('link', { name: /View run/ })

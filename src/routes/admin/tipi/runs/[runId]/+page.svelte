@@ -32,6 +32,14 @@
 			<p>{data.run.responseCount}</p>
 		</div>
 		<div class="border-t border-gray-200 py-3">
+			<p class="text-xs text-gray-500">Generic responses</p>
+			<p>{data.run.genericResponseCount}</p>
+		</div>
+		<div class="border-t border-gray-200 py-3">
+			<p class="text-xs text-gray-500">Events</p>
+			<p>{data.run.eventCount}</p>
+		</div>
+		<div class="border-t border-gray-200 py-3">
 			<p class="text-xs text-gray-500">Started</p>
 			<p>{formatDate(data.run.startedAt)}</p>
 		</div>
@@ -86,6 +94,30 @@
 							<td class="py-2 pr-3">{response.scoring}</td>
 							<td class="py-2 pr-3">{response.response}</td>
 							<td class="py-2 pr-3">{response.score}</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
+	</div>
+
+	<div>
+		<h2 class="font-serif text-xl">Events</h2>
+		<div class="mt-2 overflow-x-auto border-t border-gray-200">
+			<table class="w-full min-w-[560px] text-left text-xs">
+				<thead class="text-gray-500">
+					<tr>
+						<th class="py-2 pr-3 font-medium">Time</th>
+						<th class="py-2 pr-3 font-medium">Trial</th>
+						<th class="py-2 pr-3 font-medium">Type</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each data.run.events as event (event.id)}
+						<tr class="border-t border-gray-100">
+							<td class="py-2 pr-3">{formatDate(event.createdAt)}</td>
+							<td class="py-2 pr-3">{event.trialIndex === null ? '—' : event.trialIndex + 1}</td>
+							<td class="py-2 pr-3 font-mono">{event.eventType}</td>
 						</tr>
 					{/each}
 				</tbody>

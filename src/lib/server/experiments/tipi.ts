@@ -1,4 +1,4 @@
-import { and, asc, eq } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
 import {
 	isTipiLikertResponse,
 	isTipiScale,
@@ -12,14 +12,14 @@ import {
 	type TipiScale
 } from '$lib/experiments/tipi';
 import { db } from '$lib/server/db';
+import { tipiQuestions, tipiResponses, tipiResults } from '$lib/server/db/schema';
 import {
-	experimentRuns,
-	experimentVersions,
-	participantSessions,
-	tipiQuestions,
-	tipiResponses,
-	tipiResults
-} from '$lib/server/db/schema';
+	createExperimentRun,
+	getExperimentRun,
+	getPublishedExperimentVersion,
+	markExperimentRunCompleted,
+	parseExperimentRunItemOrder
+} from './lifecycle';
 
 type TipiQuestionRow = typeof tipiQuestions.$inferSelect;
 
@@ -57,16 +57,7 @@ function shuffle<T>(items: T[]): T[] {
 }
 
 async function getPublishedTipiQuestions(): Promise<TipiQuestion[]> {
-	const [version] = await db
-		.select()
-		.from(experimentVersions)
-		.where(
-			and(eq(experimentVersions.id, tipiVersionId), eq(experimentVersions.status, 'published'))
-		);
-
-	if (!version) {
-		throw new Error('TIPI experiment version has not been seeded.');
-	}
+	await getPublishedExperimentVersion(tipiVersionId);
 
 	const rows = await db
 		.select()
@@ -74,53 +65,30 @@ async function getPublishedTipiQuestions(): Promise<TipiQuestion[]> {
 		.where(eq(tipiQuestions.experimentVersionId, tipiVersionId))
 		.orderBy(asc(tipiQuestions.itemNumber));
 
+	if (rows.length === 0) {
+		throw new Error('TIPI experiment questions have not been seeded.');
+	}
+
 	return rows.map(toTipiQuestion);
-}
-
-async function ensureParticipantSession(id: string, userAgent: string | null): Promise<void> {
-	const now = Date.now();
-
-	await db
-		.insert(participantSessions)
-		.values({
-			id,
-			userAgent,
-			createdAt: now,
-			lastSeenAt: now
-		})
-		.onConflictDoUpdate({
-			target: participantSessions.id,
-			set: {
-				userAgent,
-				lastSeenAt: now
-			}
-		});
 }
 
 export async function startTipiRun(
 	participantSessionId: string,
 	userAgent: string | null
 ): Promise<TipiRunState> {
-	await ensureParticipantSession(participantSessionId, userAgent);
-
 	const questions = await getPublishedTipiQuestions();
 	const questionOrder = shuffle(questions.map((question) => question.id));
-	const runId = crypto.randomUUID();
-	const now = Date.now();
-
-	await db.insert(experimentRuns).values({
-		id: runId,
+	const run = await createExperimentRun({
 		participantSessionId,
+		userAgent,
 		experimentVersionId: tipiVersionId,
-		status: 'started',
-		questionOrderJson: JSON.stringify(questionOrder),
-		startedAt: now
+		itemOrder: questionOrder
 	});
 
 	const firstQuestion = questions.find((question) => question.id === questionOrder[0]) ?? null;
 
 	return {
-		runId,
+		runId: run.id,
 		trialNumber: 1,
 		totalTrials: questionOrder.length,
 		question: firstQuestion
@@ -136,7 +104,7 @@ export async function submitTipiResponse(
 		throw new Error('Invalid TIPI response.');
 	}
 
-	const [run] = await db.select().from(experimentRuns).where(eq(experimentRuns.id, runId));
+	const run = await getExperimentRun(runId, tipiVersionId);
 
 	if (!run) {
 		throw new Error('Experiment run not found.');
@@ -152,7 +120,7 @@ export async function submitTipiResponse(
 		return { completed: true, runId, result };
 	}
 
-	const questionOrder = JSON.parse(run.questionOrderJson) as string[];
+	const questionOrder = parseExperimentRunItemOrder(run);
 	const existingResponses = await db
 		.select()
 		.from(tipiResponses)
@@ -287,13 +255,7 @@ async function completeTipiRun(runId: string): Promise<TipiResult> {
 			}
 		});
 
-	await db
-		.update(experimentRuns)
-		.set({
-			status: 'completed',
-			completedAt
-		})
-		.where(eq(experimentRuns.id, runId));
+	await markExperimentRunCompleted(runId, completedAt);
 
 	return result;
 }

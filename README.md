@@ -48,6 +48,14 @@ Apply production migrations and seed experiment definitions with:
 TURSO_DATABASE_URL=... TURSO_AUTH_TOKEN=... bun run db:deploy
 ```
 
+Check deployment readiness with:
+
+```sh
+curl https://www.findboundary.com/health
+```
+
+The health endpoint returns `200` only when the app can reach the configured database.
+
 ## Building
 
 Create and preview a production build:

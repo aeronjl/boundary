@@ -19,6 +19,21 @@ test('index page has expected h1', async ({ page }) => {
 	await expect(page.getByRole('heading', { name: 'Boundary' })).toBeVisible();
 });
 
+test('health endpoint reports readiness', async ({ request }) => {
+	const response = await request.get('/health');
+
+	expect(response.status()).toBe(200);
+	expect(response.headers()['cache-control']).toContain('no-store');
+	expect(await response.json()).toMatchObject({
+		ok: true,
+		checkedAt: expect.any(String),
+		database: {
+			ok: true,
+			remote: false
+		}
+	});
+});
+
 test('ten item personality inventory records and displays results', async ({ page }) => {
 	await completeTipiRun(page);
 	await page.getByRole('button', { name: 'Results' }).click();

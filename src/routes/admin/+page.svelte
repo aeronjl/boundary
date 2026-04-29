@@ -87,8 +87,11 @@
 		<div class="flex gap-2">
 			<a
 				class="rounded-sm bg-black px-3 py-2 text-xs text-white"
-				href={resolve('/admin/tipi/export.csv')}
+				href={resolve('/admin/experiments')}
 			>
+				Experiment runs
+			</a>
+			<a class="rounded-sm bg-gray-100 px-3 py-2 text-xs" href={resolve('/admin/tipi/export.csv')}>
 				CSV export
 			</a>
 			<a class="rounded-sm bg-gray-100 px-3 py-2 text-xs" href={resolve('/admin/tipi/export.json')}>

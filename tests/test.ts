@@ -73,6 +73,18 @@ test('n-armed bandit records generic trial data', async ({ page }) => {
 	expect(banditRun?.events.map((event: { eventType: string }) => event.eventType)).toEqual(
 		expect.arrayContaining(['run_started', 'arm_pulled', 'run_completed'])
 	);
+
+	await page.getByRole('link', { name: 'Experiment runs' }).click();
+	await expect(page.getByRole('heading', { name: 'Experiment runs' })).toBeVisible();
+	await expect(page.getByRole('cell', { name: 'n-armed bandit' }).first()).toBeVisible();
+	await expect(page.getByText('bandit_arm_pull').first()).toBeVisible();
+
+	await page
+		.getByRole('link', { name: /View run/ })
+		.first()
+		.click();
+	await expect(page.getByRole('heading', { name: 'Bandit summary' })).toBeVisible();
+	await expect(page.getByText('arm_pulled').first()).toBeVisible();
 });
 
 test('admin can inspect and export ten item personality inventory data', async ({ page }) => {
@@ -87,6 +99,7 @@ test('admin can inspect and export ten item personality inventory data', async (
 	await expect(page.getByRole('link', { name: 'CSV export' })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'JSON export' })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'All experiment JSON' })).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Experiment runs' })).toBeVisible();
 
 	const csvResponse = await page.request.get('/admin/tipi/export.csv');
 	expect(csvResponse.status()).toBe(200);

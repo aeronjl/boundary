@@ -1,0 +1,187 @@
+<script lang="ts">
+	import { resolve } from '$app/paths';
+
+	export let data;
+
+	const formatDate = (value: number | null) =>
+		value
+			? new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(value)
+			: '-';
+
+	const formatJson = (value: unknown) => JSON.stringify(value, null, 2) ?? 'undefined';
+</script>
+
+<svelte:head>
+	<title>Experiment Run | Boundary</title>
+</svelte:head>
+
+<section class="flex flex-col gap-6 pb-12 text-sm">
+	<div>
+		<a href={resolve('/admin/experiments')} class="font-mono text-xs underline">Experiment runs</a>
+		<h1 class="mt-2 font-serif text-3xl">Run detail</h1>
+		<p class="mt-1 font-mono text-xs break-all text-gray-500">{data.run.id}</p>
+	</div>
+
+	<div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+		<div class="border-t border-gray-200 py-3">
+			<p class="text-xs text-gray-500">Experiment</p>
+			<p>{data.run.experimentName}</p>
+		</div>
+		<div class="border-t border-gray-200 py-3">
+			<p class="text-xs text-gray-500">Version</p>
+			<p class="font-mono text-xs">{data.run.experimentVersionId}</p>
+		</div>
+		<div class="border-t border-gray-200 py-3">
+			<p class="text-xs text-gray-500">Status</p>
+			<p>{data.run.status}</p>
+		</div>
+		<div class="border-t border-gray-200 py-3">
+			<p class="text-xs text-gray-500">Participant</p>
+			<p class="font-mono text-xs break-all">{data.run.participantSessionId}</p>
+		</div>
+		<div class="border-t border-gray-200 py-3">
+			<p class="text-xs text-gray-500">Started</p>
+			<p>{formatDate(data.run.startedAt)}</p>
+		</div>
+		<div class="border-t border-gray-200 py-3">
+			<p class="text-xs text-gray-500">Completed</p>
+			<p>{formatDate(data.run.completedAt)}</p>
+		</div>
+		<div class="border-t border-gray-200 py-3">
+			<p class="text-xs text-gray-500">Responses</p>
+			<p>{data.run.responseCount}</p>
+		</div>
+		<div class="border-t border-gray-200 py-3">
+			<p class="text-xs text-gray-500">Events</p>
+			<p>{data.run.eventCount}</p>
+		</div>
+	</div>
+
+	{#if data.run.banditSummary}
+		<div>
+			<h2 class="font-serif text-xl">Bandit summary</h2>
+			<div class="mt-2 grid grid-cols-2 gap-3 md:grid-cols-4">
+				<div class="border-t border-gray-200 py-3">
+					<p class="text-xs text-gray-500">Trials</p>
+					<p>{data.run.banditSummary.totalTrials}</p>
+				</div>
+				<div class="border-t border-gray-200 py-3">
+					<p class="text-xs text-gray-500">Reward</p>
+					<p>{data.run.banditSummary.totalReward}</p>
+				</div>
+				<div class="border-t border-gray-200 py-3">
+					<p class="text-xs text-gray-500">Best arm</p>
+					<p>{data.run.banditSummary.bestArmId ?? '-'}</p>
+				</div>
+			</div>
+			<div class="mt-2 overflow-x-auto border-t border-gray-200">
+				<table class="w-full min-w-[560px] text-left text-xs">
+					<thead class="text-gray-500">
+						<tr>
+							<th class="py-2 pr-3 font-medium">Arm</th>
+							<th class="py-2 pr-3 font-medium">Hidden probability</th>
+							<th class="py-2 pr-3 font-medium">Pulls</th>
+							<th class="py-2 pr-3 font-medium">Reward</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each data.run.banditSummary.arms as arm (arm.id)}
+							<tr class="border-t border-gray-100">
+								<td class="py-2 pr-3">{arm.label}</td>
+								<td class="py-2 pr-3">
+									{arm.rewardProbability === null ? '-' : arm.rewardProbability.toFixed(3)}
+								</td>
+								<td class="py-2 pr-3">{arm.pulls}</td>
+								<td class="py-2 pr-3">{arm.reward}</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
+		</div>
+	{/if}
+
+	<div>
+		<h2 class="font-serif text-xl">Responses</h2>
+		<div class="mt-2 overflow-x-auto border-t border-gray-200">
+			<table class="w-full min-w-[760px] text-left text-xs">
+				<thead class="text-gray-500">
+					<tr>
+						<th class="py-2 pr-3 font-medium">Trial</th>
+						<th class="py-2 pr-3 font-medium">Item</th>
+						<th class="py-2 pr-3 font-medium">Type</th>
+						<th class="py-2 pr-3 font-medium">Response</th>
+						<th class="py-2 pr-3 font-medium">Score</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each data.run.responses as response (response.id)}
+						<tr class="border-t border-gray-100 align-top">
+							<td class="py-2 pr-3">{response.trialIndex + 1}</td>
+							<td class="py-2 pr-3 font-mono">{response.itemId ?? '-'}</td>
+							<td class="py-2 pr-3 font-mono">{response.responseType}</td>
+							<td class="py-2 pr-3">
+								<pre
+									class="max-w-sm overflow-auto font-mono text-xs whitespace-pre-wrap">{formatJson(
+										response.response
+									)}</pre>
+							</td>
+							<td class="py-2 pr-3">
+								<pre
+									class="max-w-sm overflow-auto font-mono text-xs whitespace-pre-wrap">{formatJson(
+										response.score
+									)}</pre>
+							</td>
+						</tr>
+					{:else}
+						<tr>
+							<td class="py-4 text-gray-500" colspan="5">No generic responses recorded.</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
+	</div>
+
+	<div>
+		<h2 class="font-serif text-xl">Events</h2>
+		<div class="mt-2 overflow-x-auto border-t border-gray-200">
+			<table class="w-full min-w-[760px] text-left text-xs">
+				<thead class="text-gray-500">
+					<tr>
+						<th class="py-2 pr-3 font-medium">Time</th>
+						<th class="py-2 pr-3 font-medium">Trial</th>
+						<th class="py-2 pr-3 font-medium">Type</th>
+						<th class="py-2 pr-3 font-medium">Payload</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each data.run.events as event (event.id)}
+						<tr class="border-t border-gray-100 align-top">
+							<td class="py-2 pr-3">{formatDate(event.createdAt)}</td>
+							<td class="py-2 pr-3">{event.trialIndex === null ? '-' : event.trialIndex + 1}</td>
+							<td class="py-2 pr-3 font-mono">{event.eventType}</td>
+							<td class="py-2 pr-3">
+								<pre
+									class="max-w-lg overflow-auto font-mono text-xs whitespace-pre-wrap">{formatJson(
+										event.payload
+									)}</pre>
+							</td>
+						</tr>
+					{:else}
+						<tr>
+							<td class="py-4 text-gray-500" colspan="4">No events recorded.</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
+	</div>
+
+	<div>
+		<h2 class="font-serif text-xl">Configuration</h2>
+		<pre class="mt-2 overflow-auto border-t border-gray-200 pt-3 font-mono text-xs">{formatJson(
+				data.run.config
+			)}</pre>
+	</div>
+</section>

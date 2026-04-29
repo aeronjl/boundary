@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import {
 	boundaryStudyProtocol,
 	boundaryStudyProtocolId,
@@ -272,37 +272,4 @@ export async function parseOptionalStudySessionId(request: Request): Promise<str
 	const studySessionId = payload?.studySessionId;
 
 	return typeof studySessionId === 'string' && studySessionId.length > 0 ? studySessionId : null;
-}
-
-export type AdminStudySessionSummary = StudySessionProgress & {
-	participantShortId: string;
-};
-
-export async function listAdminStudySessions(): Promise<AdminStudySessionSummary[]> {
-	const sessions = await db.select().from(studySessions).orderBy(desc(studySessions.startedAt));
-
-	if (sessions.length === 0) return [];
-
-	const tasks = await db
-		.select()
-		.from(studyTasks)
-		.where(
-			inArray(
-				studyTasks.studySessionId,
-				sessions.map((session) => session.id)
-			)
-		)
-		.orderBy(asc(studyTasks.position));
-	const tasksBySessionId = new Map<string, (typeof studyTasks.$inferSelect)[]>();
-
-	for (const task of tasks) {
-		const current = tasksBySessionId.get(task.studySessionId) ?? [];
-		current.push(task);
-		tasksBySessionId.set(task.studySessionId, current);
-	}
-
-	return sessions.map((session) => ({
-		...toProgress(session, tasksBySessionId.get(session.id) ?? []),
-		participantShortId: session.participantSessionId.slice(0, 8)
-	}));
 }

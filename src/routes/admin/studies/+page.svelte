@@ -7,6 +7,8 @@
 		value
 			? new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(value)
 			: '-';
+	const flagLabel = (flags: { label: string }[]) =>
+		flags.length > 0 ? flags.map((flag) => flag.label).join(', ') : '-';
 </script>
 
 <svelte:head>
@@ -18,6 +20,18 @@
 		<a href={resolve('/admin')} class="font-mono text-xs underline">Admin</a>
 		<h1 class="mt-2 font-serif text-3xl">Study sessions</h1>
 		<p class="mt-1 text-gray-500">Protocol-level progress across participant study sessions.</p>
+	</div>
+
+	<div class="flex flex-wrap gap-2">
+		<a
+			class="rounded-sm bg-gray-100 px-3 py-2 text-xs"
+			href={resolve('/admin/studies/export.json')}
+		>
+			Export JSON
+		</a>
+		<a class="rounded-sm bg-gray-100 px-3 py-2 text-xs" href={resolve('/admin/studies/export.csv')}>
+			Export CSV
+		</a>
 	</div>
 
 	<div class="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -46,7 +60,7 @@
 	</div>
 
 	<div class="overflow-x-auto border-t border-gray-200">
-		<table class="w-full min-w-[980px] text-left text-xs">
+		<table class="w-full min-w-[1120px] text-left text-xs">
 			<thead class="text-gray-500">
 				<tr>
 					<th class="py-2 pr-3 font-medium">Study</th>
@@ -54,6 +68,7 @@
 					<th class="py-2 pr-3 font-medium">Status</th>
 					<th class="py-2 pr-3 font-medium">Progress</th>
 					<th class="py-2 pr-3 font-medium">Current task</th>
+					<th class="py-2 pr-3 font-medium">Integrity</th>
 					<th class="py-2 pr-3 font-medium">Started</th>
 					<th class="py-2 pr-3 font-medium">Completed</th>
 					<th class="py-2 pr-3 font-medium">Task states</th>
@@ -62,7 +77,11 @@
 			<tbody>
 				{#each data.studies as study (study.id)}
 					<tr class="border-t border-gray-100 align-top">
-						<td class="py-2 pr-3 font-mono">{study.id.slice(0, 8)}</td>
+						<td class="py-2 pr-3 font-mono">
+							<a class="underline" href={resolve(`/admin/studies/${study.id}`)}>
+								View study {study.id.slice(0, 8)}
+							</a>
+						</td>
 						<td class="py-2 pr-3 font-mono">
 							<a
 								class="underline"
@@ -74,6 +93,7 @@
 						<td class="py-2 pr-3">{study.status}</td>
 						<td class="py-2 pr-3">{study.completedTasks} of {study.totalTasks}</td>
 						<td class="py-2 pr-3">{study.currentTask?.name ?? '-'}</td>
+						<td class="py-2 pr-3">{flagLabel(study.integrityFlags)}</td>
 						<td class="py-2 pr-3">{formatDate(study.startedAt)}</td>
 						<td class="py-2 pr-3">{formatDate(study.completedAt)}</td>
 						<td class="py-2 pr-3">
@@ -86,7 +106,7 @@
 					</tr>
 				{:else}
 					<tr>
-						<td class="py-4 text-gray-500" colspan="8">No study sessions recorded yet.</td>
+						<td class="py-4 text-gray-500" colspan="9">No study sessions recorded yet.</td>
 					</tr>
 				{/each}
 			</tbody>

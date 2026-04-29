@@ -20,6 +20,21 @@ type GenericExportRun = {
 	nBackSummary?: { totalTrials: number; correctCount: number } | null;
 };
 
+type StudyExportTask = {
+	slug: string;
+	status: string;
+	runId: string | null;
+	metrics: string[];
+};
+
+type StudyExportStudy = {
+	id: string;
+	completedTasks: number;
+	totalTasks: number;
+	integrityFlags: { code: string; label: string }[];
+	tasks: StudyExportTask[];
+};
+
 const testAdminCookie = `boundary_admin=${createHash('sha256').update('test-admin-token').digest('hex')}`;
 
 async function acceptConsentAndStart(page: Page) {
@@ -335,6 +350,50 @@ test('study runner tracks task progress across experiments', async ({ page }) =>
 	await expect(page.getByRole('heading', { name: 'Study sessions' })).toBeVisible();
 	await expect(page.getByText('1 of 5').first()).toBeVisible();
 	await expect(page.getByText('Intertemporal choice').first()).toBeVisible();
+
+	const studiesJsonResponse = await page.request.get('/admin/studies/export.json');
+	expect(studiesJsonResponse.status()).toBe(200);
+	const studiesJson = await studiesJsonResponse.json();
+	const studyExport = studiesJson.studies.find(
+		(study: StudyExportStudy) =>
+			study.completedTasks === 1 &&
+			study.totalTasks === 5 &&
+			study.tasks.some(
+				(task) =>
+					task.slug === 'orientation-discrimination' &&
+					task.status === 'completed' &&
+					task.runId !== null
+			)
+	);
+	expect(studyExport).toBeTruthy();
+	expect(studyExport.integrityFlags.map((flag: { code: string }) => flag.code)).toContain(
+		'partial_session'
+	);
+
+	const studiesCsvResponse = await page.request.get('/admin/studies/export.csv');
+	expect(studiesCsvResponse.status()).toBe(200);
+	expect(await studiesCsvResponse.text()).toContain('"study_session_id","participant_session_id"');
+
+	const studyLink = page.getByRole('link', { name: /View study/ }).first();
+	const studyHref = await studyLink.getAttribute('href');
+	expect(studyHref).toBeTruthy();
+	await studyLink.click();
+	await expect(page.getByRole('heading', { name: 'Study detail' })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Integrity checks' })).toBeVisible();
+	await expect(page.getByText('Partial session')).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Task timeline' })).toBeVisible();
+	await expect(page.getByRole('link', { name: /View run/ }).first()).toBeVisible();
+	await expect(page.getByText(/accuracy [0-9]+%/).first()).toBeVisible();
+
+	const detailJsonResponse = await page.request.get(`${studyHref}/export.json`);
+	expect(detailJsonResponse.status()).toBe(200);
+	const detailJson = await detailJsonResponse.json();
+	expect(detailJson.studies).toHaveLength(1);
+	expect(detailJson.studies[0].id).toBe(studyHref?.split('/').at(-1));
+
+	const detailCsvResponse = await page.request.get(`${studyHref}/export.csv`);
+	expect(detailCsvResponse.status()).toBe(200);
+	expect(await detailCsvResponse.text()).toContain('"result_summary_json"');
 });
 
 test('n-armed bandit records generic trial data', async ({ page }) => {

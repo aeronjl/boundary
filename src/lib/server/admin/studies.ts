@@ -8,12 +8,50 @@ import {
 	experimentVersions,
 	experiments,
 	participantSessions,
+	studySessionReviews,
 	studySessions,
 	studyTasks
 } from '$lib/server/db/schema';
 import { getAdminExperimentRun, type AdminExperimentRun } from './experiments';
 
 export type AdminStudyTaskStatus = 'pending' | 'started' | 'completed';
+
+export const adminStudyReviewStatuses = ['included', 'review', 'excluded'] as const;
+export const adminStudyReviewReasons = [
+	'test_data',
+	'technical_issue',
+	'duplicate',
+	'incomplete',
+	'other'
+] as const;
+
+export type AdminStudyReviewStatus = (typeof adminStudyReviewStatuses)[number];
+export type AdminStudyReviewReason = (typeof adminStudyReviewReasons)[number];
+
+export type AdminStudyReview = {
+	status: AdminStudyReviewStatus;
+	reason: AdminStudyReviewReason | null;
+	note: string;
+	createdAt: number | null;
+	updatedAt: number | null;
+	isDefault: boolean;
+};
+
+export type AdminSetStudyReviewInput = {
+	status: string;
+	reason: string | null;
+	note: string | null;
+};
+
+export type AdminStudySessionFilters = {
+	status: '' | AdminStudyTaskStatus;
+	reviewStatus: '' | 'all' | AdminStudyReviewStatus;
+	reason: '' | AdminStudyReviewReason;
+};
+
+export type AdminStudyAnalysisFilters = {
+	reviewStatus: 'all' | AdminStudyReviewStatus;
+};
 
 export type AdminStudyIntegrityFlag = {
 	code: string;
@@ -67,6 +105,7 @@ export type AdminStudySessionSummary = {
 	currentTask: AdminStudyTaskSummary | null;
 	tasks: AdminStudyTaskSummary[];
 	integrityFlags: AdminStudyIntegrityFlag[];
+	review: AdminStudyReview;
 };
 
 export type AdminStudySessionDetail = AdminStudySessionSummary & {
@@ -116,6 +155,7 @@ export type AdminStudyParticipantSummaryRow = {
 	participantSessionId: string;
 	protocolId: string;
 	status: AdminStudyTaskStatus;
+	review: AdminStudyReview;
 	startedAt: number;
 	completedAt: number | null;
 	updatedAt: number;
@@ -133,6 +173,8 @@ export type AdminStudyParticipantSummaryRow = {
 
 export type AdminStudyAnalysis = {
 	generatedAt: string;
+	filters: AdminStudyAnalysisFilters;
+	reviewStatuses: typeof adminStudyReviewStatuses;
 	overview: AdminStudyAnalysisOverview;
 	dropOffTask: AdminStudyDropOffTask | null;
 	dropOffTasks: AdminStudyDropOffTask[];
@@ -154,6 +196,9 @@ const studyCsvHeaders = [
 	'participant_session_id',
 	'protocol_id',
 	'study_status',
+	'review_status',
+	'review_reason',
+	'review_note',
 	'study_started_at',
 	'study_completed_at',
 	'study_updated_at',
@@ -182,6 +227,9 @@ const studyAnalysisBaseCsvHeaders = [
 	'participant_session_id',
 	'protocol_id',
 	'study_status',
+	'review_status',
+	'review_reason',
+	'review_note',
 	'study_started_at',
 	'study_completed_at',
 	'study_updated_at',
@@ -197,6 +245,63 @@ const studyAnalysisBaseCsvHeaders = [
 
 function toStudyTaskStatus(value: string): AdminStudyTaskStatus {
 	return value === 'completed' || value === 'started' ? value : 'pending';
+}
+
+function parseAdminStudyTaskStatusFilter(value: unknown): '' | AdminStudyTaskStatus {
+	return value === 'pending' || value === 'started' || value === 'completed' ? value : '';
+}
+
+export function parseAdminStudyReviewStatus(value: unknown): AdminStudyReviewStatus {
+	return adminStudyReviewStatuses.includes(value as AdminStudyReviewStatus)
+		? (value as AdminStudyReviewStatus)
+		: 'included';
+}
+
+export function parseAdminStudyReviewReason(value: unknown): AdminStudyReviewReason | null {
+	return adminStudyReviewReasons.includes(value as AdminStudyReviewReason)
+		? (value as AdminStudyReviewReason)
+		: null;
+}
+
+function parseAdminStudyReviewStatusFilter(
+	value: unknown,
+	defaultValue: '' | AdminStudyReviewStatus = ''
+): '' | 'all' | AdminStudyReviewStatus {
+	if (value === 'all') return 'all';
+	if (adminStudyReviewStatuses.includes(value as AdminStudyReviewStatus)) {
+		return value as AdminStudyReviewStatus;
+	}
+	return defaultValue;
+}
+
+function parseAdminStudyReviewReasonFilter(value: unknown): '' | AdminStudyReviewReason {
+	return value === '' || value === null ? '' : (parseAdminStudyReviewReason(value) ?? '');
+}
+
+export function defaultAdminStudyReview(): AdminStudyReview {
+	return {
+		status: 'included',
+		reason: null,
+		note: '',
+		createdAt: null,
+		updatedAt: null,
+		isDefault: true
+	};
+}
+
+export function toAdminStudyReview(
+	review: typeof studySessionReviews.$inferSelect | null | undefined
+): AdminStudyReview {
+	if (!review) return defaultAdminStudyReview();
+
+	return {
+		status: parseAdminStudyReviewStatus(review.status),
+		reason: parseAdminStudyReviewReason(review.reason),
+		note: review.note,
+		createdAt: review.createdAt,
+		updatedAt: review.updatedAt,
+		isDefault: false
+	};
 }
 
 function fallbackTaskDefinition(task: StudyTaskRow): StudyProtocolTask {
@@ -347,6 +452,22 @@ function studyDurationMs(
 
 function taskCsvPrefix(task: StudyProtocolTask): string {
 	return task.slug.replaceAll('-', '_');
+}
+
+function matchesStudySessionFilters(
+	study: AdminStudySessionSummary,
+	filters: AdminStudySessionFilters
+): boolean {
+	if (filters.status && study.status !== filters.status) return false;
+	if (
+		filters.reviewStatus &&
+		filters.reviewStatus !== 'all' &&
+		study.review.status !== filters.reviewStatus
+	) {
+		return false;
+	}
+	if (filters.reason && study.review.reason !== filters.reason) return false;
+	return true;
 }
 
 function createRunLink(
@@ -538,6 +659,7 @@ function buildTimeline(
 function toAdminStudySession(
 	session: StudySessionRow,
 	userAgent: string | null,
+	review: AdminStudyReview,
 	taskRows: StudyTaskRow[],
 	runLinksById: Map<string, AdminStudyRunLink>,
 	runDetailsById: Map<string, AdminExperimentRun> = new Map()
@@ -578,7 +700,8 @@ function toAdminStudySession(
 		currentTask: tasks.find((task) => task.status !== 'completed') ?? null,
 		tasks,
 		integrityFlags: [] as AdminStudyIntegrityFlag[],
-		timeline: [] as AdminStudyTimelineEntry[]
+		timeline: [] as AdminStudyTimelineEntry[],
+		review
 	};
 
 	summary.integrityFlags = createSessionFlags(session, tasks);
@@ -631,6 +754,7 @@ async function getStudySessions(): Promise<{
 	sessions: StudySessionRow[];
 	tasksBySessionId: Map<string, StudyTaskRow[]>;
 	userAgentsBySessionId: Map<string, string | null>;
+	reviewsBySessionId: Map<string, AdminStudyReview>;
 	runLinksById: Map<string, AdminStudyRunLink>;
 }> {
 	const sessions = await db.select().from(studySessions).orderBy(desc(studySessions.startedAt));
@@ -640,11 +764,12 @@ async function getStudySessions(): Promise<{
 			sessions,
 			tasksBySessionId: new Map(),
 			userAgentsBySessionId: new Map(),
+			reviewsBySessionId: new Map(),
 			runLinksById: new Map()
 		};
 	}
 
-	const [taskRows, participantRows] = await Promise.all([
+	const [taskRows, participantRows, reviewRows] = await Promise.all([
 		db
 			.select()
 			.from(studyTasks)
@@ -663,11 +788,23 @@ async function getStudySessions(): Promise<{
 					participantSessions.id,
 					sessions.map((session) => session.participantSessionId)
 				)
+			),
+		db
+			.select()
+			.from(studySessionReviews)
+			.where(
+				inArray(
+					studySessionReviews.studySessionId,
+					sessions.map((session) => session.id)
+				)
 			)
 	]);
 	const tasksBySessionId = new Map<string, StudyTaskRow[]>();
 	const userAgentsBySessionId = new Map(
 		participantRows.map((participant) => [participant.id, participant.userAgent])
+	);
+	const reviewsBySessionId = new Map(
+		reviewRows.map((review) => [review.studySessionId, toAdminStudyReview(review)])
 	);
 	const runIds = taskRows.flatMap((task) => (task.runId ? [task.runId] : []));
 
@@ -679,22 +816,47 @@ async function getStudySessions(): Promise<{
 		sessions,
 		tasksBySessionId,
 		userAgentsBySessionId,
+		reviewsBySessionId,
 		runLinksById: await getRunLinksById(runIds)
 	};
 }
 
-export async function listAdminStudySessions(): Promise<AdminStudySessionSummary[]> {
-	const { sessions, tasksBySessionId, userAgentsBySessionId, runLinksById } =
+export function parseAdminStudySessionFilters(
+	searchParams: URLSearchParams
+): AdminStudySessionFilters {
+	return {
+		status: parseAdminStudyTaskStatusFilter(searchParams.get('status')),
+		reviewStatus: parseAdminStudyReviewStatusFilter(searchParams.get('review')),
+		reason: parseAdminStudyReviewReasonFilter(searchParams.get('reason'))
+	};
+}
+
+export function parseAdminStudyAnalysisFilters(
+	searchParams: URLSearchParams
+): AdminStudyAnalysisFilters {
+	return {
+		reviewStatus:
+			parseAdminStudyReviewStatusFilter(searchParams.get('review'), 'included') || 'included'
+	};
+}
+
+export async function listAdminStudySessions(
+	filters: AdminStudySessionFilters = { status: '', reviewStatus: '', reason: '' }
+): Promise<AdminStudySessionSummary[]> {
+	const { sessions, tasksBySessionId, userAgentsBySessionId, reviewsBySessionId, runLinksById } =
 		await getStudySessions();
 
-	return sessions.map((session) =>
-		toAdminStudySession(
-			session,
-			userAgentsBySessionId.get(session.participantSessionId) ?? null,
-			tasksBySessionId.get(session.id) ?? [],
-			runLinksById
+	return sessions
+		.map((session) =>
+			toAdminStudySession(
+				session,
+				userAgentsBySessionId.get(session.participantSessionId) ?? null,
+				reviewsBySessionId.get(session.id) ?? toAdminStudyReview(null),
+				tasksBySessionId.get(session.id) ?? [],
+				runLinksById
+			)
 		)
-	);
+		.filter((study) => matchesStudySessionFilters(study, filters));
 }
 
 export async function getAdminStudySessionDetail(
@@ -707,7 +869,7 @@ export async function getAdminStudySessionDetail(
 
 	if (!session) return null;
 
-	const [tasks, participant] = await Promise.all([
+	const [tasks, participant, reviewRows] = await Promise.all([
 		db
 			.select()
 			.from(studyTasks)
@@ -716,7 +878,11 @@ export async function getAdminStudySessionDetail(
 		db
 			.select()
 			.from(participantSessions)
-			.where(eq(participantSessions.id, session.participantSessionId))
+			.where(eq(participantSessions.id, session.participantSessionId)),
+		db
+			.select()
+			.from(studySessionReviews)
+			.where(eq(studySessionReviews.studySessionId, studySessionId))
 	]);
 	const runIds = tasks.flatMap((task) => (task.runId ? [task.runId] : []));
 	const [runLinksById, runDetailsById] = await Promise.all([
@@ -727,6 +893,7 @@ export async function getAdminStudySessionDetail(
 	return toAdminStudySession(
 		session,
 		participant[0]?.userAgent ?? null,
+		toAdminStudyReview(reviewRows[0]),
 		tasks,
 		runLinksById,
 		runDetailsById
@@ -743,7 +910,7 @@ export async function getAdminStudyExport(studySessionId?: string): Promise<Admi
 		};
 	}
 
-	const { sessions, tasksBySessionId, userAgentsBySessionId, runLinksById } =
+	const { sessions, tasksBySessionId, userAgentsBySessionId, reviewsBySessionId, runLinksById } =
 		await getStudySessions();
 	const runIds = [
 		...new Set(
@@ -760,6 +927,7 @@ export async function getAdminStudyExport(studySessionId?: string): Promise<Admi
 			toAdminStudySession(
 				session,
 				userAgentsBySessionId.get(session.participantSessionId) ?? null,
+				reviewsBySessionId.get(session.id) ?? toAdminStudyReview(null),
 				tasksBySessionId.get(session.id) ?? [],
 				runLinksById,
 				runDetailsById
@@ -793,6 +961,7 @@ function toParticipantSummaryRow(study: AdminStudySessionSummary): AdminStudyPar
 		participantSessionId: study.participantSessionId,
 		protocolId: study.protocolId,
 		status: study.status,
+		review: study.review,
 		startedAt: study.startedAt,
 		completedAt: study.completedAt,
 		updatedAt: study.updatedAt,
@@ -866,8 +1035,14 @@ function createTaskAnalysis(studies: AdminStudySessionSummary[]): AdminStudyTask
 	});
 }
 
-export async function getAdminStudyAnalysis(): Promise<AdminStudyAnalysis> {
-	const studies = await listAdminStudySessions();
+export async function getAdminStudyAnalysis(
+	filters: AdminStudyAnalysisFilters = { reviewStatus: 'included' }
+): Promise<AdminStudyAnalysis> {
+	const studies = await listAdminStudySessions({
+		status: '',
+		reviewStatus: filters.reviewStatus,
+		reason: ''
+	});
 	const completedSessions = studies.filter((study) => study.status === 'completed').length;
 	const integrityFlags = studies.flatMap((study) => study.integrityFlags);
 	const studyDurations = studies.flatMap((study) => {
@@ -884,6 +1059,8 @@ export async function getAdminStudyAnalysis(): Promise<AdminStudyAnalysis> {
 
 	return {
 		generatedAt: new Date().toISOString(),
+		filters,
+		reviewStatuses: adminStudyReviewStatuses,
 		overview: {
 			totalSessions: studies.length,
 			completedSessions,
@@ -903,8 +1080,10 @@ export async function getAdminStudyAnalysis(): Promise<AdminStudyAnalysis> {
 	};
 }
 
-export async function getAdminStudyParticipantSummaryCsv(): Promise<string> {
-	const { participants } = await getAdminStudyAnalysis();
+export async function getAdminStudyParticipantSummaryCsv(
+	filters: AdminStudyAnalysisFilters = { reviewStatus: 'included' }
+): Promise<string> {
+	const { participants } = await getAdminStudyAnalysis(filters);
 	const dynamicHeaders = boundaryStudyProtocol.tasks.flatMap((task) => {
 		const prefix = taskCsvPrefix(task);
 		return [`${prefix}_status`, `${prefix}_run_id`, `${prefix}_duration_ms`];
@@ -918,6 +1097,9 @@ export async function getAdminStudyParticipantSummaryCsv(): Promise<string> {
 				participant.participantSessionId,
 				participant.protocolId,
 				participant.status,
+				participant.review.status,
+				participant.review.reason,
+				participant.review.note,
 				isoCell(participant.startedAt),
 				isoCell(participant.completedAt),
 				isoCell(participant.updatedAt),
@@ -943,6 +1125,50 @@ export async function getAdminStudyParticipantSummaryCsv(): Promise<string> {
 	return `${rows.join('\n')}\n`;
 }
 
+export async function setAdminStudyReview(
+	studySessionId: string,
+	input: AdminSetStudyReviewInput
+): Promise<AdminStudyReview | null> {
+	const [session] = await db
+		.select({ id: studySessions.id })
+		.from(studySessions)
+		.where(eq(studySessions.id, studySessionId));
+
+	if (!session) return null;
+
+	const now = Date.now();
+	const status = parseAdminStudyReviewStatus(input.status);
+	const reason = status === 'included' ? null : parseAdminStudyReviewReason(input.reason);
+	const note = input.note?.trim() ?? '';
+
+	await db
+		.insert(studySessionReviews)
+		.values({
+			studySessionId,
+			status,
+			reason,
+			note,
+			createdAt: now,
+			updatedAt: now
+		})
+		.onConflictDoUpdate({
+			target: studySessionReviews.studySessionId,
+			set: {
+				status,
+				reason,
+				note,
+				updatedAt: now
+			}
+		});
+
+	const [review] = await db
+		.select()
+		.from(studySessionReviews)
+		.where(eq(studySessionReviews.studySessionId, studySessionId));
+
+	return toAdminStudyReview(review);
+}
+
 export async function getAdminStudyCsv(studySessionId?: string): Promise<string> {
 	const { studies } = await getAdminStudyExport(studySessionId);
 	const rows = [studyCsvHeaders.map(csvCell).join(',')];
@@ -955,6 +1181,9 @@ export async function getAdminStudyCsv(studySessionId?: string): Promise<string>
 					study.participantSessionId,
 					study.protocolId,
 					study.status,
+					study.review.status,
+					study.review.reason,
+					study.review.note,
 					isoCell(study.startedAt),
 					isoCell(study.completedAt),
 					isoCell(study.updatedAt),

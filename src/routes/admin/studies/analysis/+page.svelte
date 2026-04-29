@@ -14,6 +14,7 @@
 
 		return minutes > 0 ? `${minutes}m ${remainder}s` : `${seconds}s`;
 	};
+	const formatReason = (value: string | null) => value?.replaceAll('_', ' ') ?? '-';
 </script>
 
 <svelte:head>
@@ -30,7 +31,7 @@
 	<div class="flex flex-wrap gap-2">
 		<a
 			class="rounded-sm bg-gray-100 px-3 py-2 text-xs"
-			href={resolve('/admin/studies/analysis/export.csv')}
+			href={resolve(`/admin/studies/analysis/export.csv${data.exportQuery}`)}
 		>
 			Participant summary CSV
 		</a>
@@ -38,6 +39,24 @@
 			Task-level CSV
 		</a>
 	</div>
+
+	<form method="GET" class="flex flex-wrap items-end gap-3 border-t border-gray-200 pt-4">
+		<label class="flex min-w-48 flex-col gap-1">
+			<span class="text-xs text-gray-500">Review status</span>
+			<select name="review" class="border border-gray-300 bg-white px-2 py-2">
+				<option value="all" selected={data.filters.reviewStatus === 'all'}>
+					All review states
+				</option>
+				{#each data.reviewStatuses as status (status)}
+					<option value={status} selected={data.filters.reviewStatus === status}>{status}</option>
+				{/each}
+			</select>
+		</label>
+		<button class="rounded-sm bg-black px-3 py-2 text-xs text-white" type="submit">Filter</button>
+		<a class="rounded-sm bg-gray-100 px-3 py-2 text-xs" href={resolve('/admin/studies/analysis')}>
+			Reset
+		</a>
+	</form>
 
 	<div class="grid grid-cols-2 gap-3 md:grid-cols-4">
 		<div class="border-t border-gray-200 py-3">
@@ -142,12 +161,13 @@
 	<div>
 		<h2 class="font-serif text-xl">Participant summaries</h2>
 		<div class="mt-2 overflow-x-auto border-t border-gray-200">
-			<table class="w-full min-w-[1080px] text-left text-xs">
+			<table class="w-full min-w-[1180px] text-left text-xs">
 				<thead class="text-gray-500">
 					<tr>
 						<th class="py-2 pr-3 font-medium">Study</th>
 						<th class="py-2 pr-3 font-medium">Participant</th>
 						<th class="py-2 pr-3 font-medium">Status</th>
+						<th class="py-2 pr-3 font-medium">Review</th>
 						<th class="py-2 pr-3 font-medium">Progress</th>
 						<th class="py-2 pr-3 font-medium">Duration</th>
 						<th class="py-2 pr-3 font-medium">Current task</th>
@@ -172,6 +192,15 @@
 							</td>
 							<td class="py-2 pr-3">{participant.status}</td>
 							<td class="py-2 pr-3">
+								<span>{participant.review.status}</span>
+								{#if participant.review.reason}
+									<span class="text-gray-500">({formatReason(participant.review.reason)})</span>
+								{/if}
+								{#if participant.review.note}
+									<div class="mt-1 max-w-48 text-gray-600">{participant.review.note}</div>
+								{/if}
+							</td>
+							<td class="py-2 pr-3">
 								{participant.completedTasks} of {participant.totalTasks}
 							</td>
 							<td class="py-2 pr-3">{formatDuration(participant.studyDurationMs)}</td>
@@ -184,7 +213,7 @@
 						</tr>
 					{:else}
 						<tr>
-							<td class="py-4 text-gray-500" colspan="7">No study sessions recorded yet.</td>
+							<td class="py-4 text-gray-500" colspan="8">No study sessions match this filter.</td>
 						</tr>
 					{/each}
 				</tbody>

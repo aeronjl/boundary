@@ -8,6 +8,7 @@
 			? new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(value)
 			: '-';
 	const formatJson = (value: unknown) => JSON.stringify(value, null, 2) ?? 'undefined';
+	const formatReason = (value: string | null) => value?.replaceAll('_', ' ') ?? '-';
 	const flagLabel = (flags: { label: string }[]) =>
 		flags.length > 0 ? flags.map((flag) => flag.label).join(', ') : '-';
 
@@ -77,6 +78,66 @@
 		<div class="border-t border-gray-200 py-3">
 			<p class="text-xs text-gray-500">Current task</p>
 			<p>{study.currentTask?.name ?? '-'}</p>
+		</div>
+	</div>
+
+	<div>
+		<h2 class="font-serif text-xl">Review</h2>
+		<div class="mt-2 grid gap-4 border-t border-gray-200 pt-3 md:grid-cols-[1fr_2fr]">
+			<div class="text-xs">
+				<p>
+					<span class="text-gray-500">Status</span>
+					<span class="ml-2">{study.review.status}</span>
+					{#if study.review.reason}
+						<span class="text-gray-500">({formatReason(study.review.reason)})</span>
+					{/if}
+				</p>
+				<p class="mt-2 text-gray-600">{study.review.note || 'No review note.'}</p>
+				<p class="mt-2 text-gray-500">Updated {formatDate(study.review.updatedAt)}</p>
+			</div>
+			<form method="POST" action="?/review" class="grid gap-3 md:grid-cols-3">
+				<label class="flex flex-col gap-1">
+					<span class="text-xs text-gray-500">Review status</span>
+					<select
+						id="study-review-status"
+						name="status"
+						class="border border-gray-300 bg-white px-2 py-2"
+					>
+						{#each data.reviewStatuses as status (status)}
+							<option value={status} selected={study.review.status === status}>{status}</option>
+						{/each}
+					</select>
+				</label>
+				<label class="flex flex-col gap-1">
+					<span class="text-xs text-gray-500">Review reason</span>
+					<select
+						id="study-review-reason"
+						name="reason"
+						class="border border-gray-300 bg-white px-2 py-2"
+					>
+						<option value="">No reason</option>
+						{#each data.reviewReasons as reason (reason)}
+							<option value={reason} selected={study.review.reason === reason}>
+								{formatReason(reason)}
+							</option>
+						{/each}
+					</select>
+				</label>
+				<label class="flex flex-col gap-1">
+					<span class="text-xs text-gray-500">Review note</span>
+					<input
+						id="study-review-note"
+						name="note"
+						class="border border-gray-300 px-2 py-2"
+						value={study.review.note}
+					/>
+				</label>
+				<div class="md:col-span-3">
+					<button class="rounded-sm bg-black px-3 py-2 text-xs text-white" type="submit">
+						Save review
+					</button>
+				</div>
+			</form>
 		</div>
 	</div>
 

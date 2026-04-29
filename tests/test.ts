@@ -32,6 +32,7 @@ type StudyExportStudy = {
 	completedTasks: number;
 	totalTasks: number;
 	integrityFlags: { code: string; label: string }[];
+	review: { status: string; reason: string | null; note: string };
 	tasks: (StudyExportTask & { resultSummary: unknown })[];
 };
 
@@ -488,6 +489,37 @@ test('study runner completes the full protocol and exposes analysis', async ({ p
 	expect(participantCsv).toContain('"study_session_id","participant_session_id"');
 	expect(participantCsv).toContain('"ten_item_personality_inventory_status"');
 	expect(participantCsv).toContain('"completed"');
+
+	const completedStudyId = completedStudy.id as string;
+	const completedStudyLinkName = `View study ${completedStudyId.slice(0, 8)}`;
+
+	await page.goto(`/admin/studies/${completedStudyId}`);
+	await page.getByLabel('Review status').selectOption('excluded');
+	await page.getByLabel('Review reason').selectOption('test_data');
+	await page.getByLabel('Review note').fill('Pilot exclusion check');
+	await page.getByRole('button', { name: 'Save review' }).click();
+	await expect(page.getByText(/excluded\s*\(test data\)/).first()).toBeVisible();
+
+	await page.goto('/admin/studies?review=excluded');
+	await expect(page.getByRole('link', { name: completedStudyLinkName })).toBeVisible();
+
+	await page.goto('/admin/studies/analysis');
+	await expect(page.getByRole('link', { name: completedStudyLinkName })).toHaveCount(0);
+
+	await page.goto('/admin/studies/analysis?review=excluded');
+	await expect(page.getByRole('link', { name: completedStudyLinkName })).toBeVisible();
+
+	const excludedCsvResponse = await page.request.get(
+		'/admin/studies/analysis/export.csv?review=excluded'
+	);
+	expect(excludedCsvResponse.status()).toBe(200);
+	const excludedCsv = await excludedCsvResponse.text();
+	expect(excludedCsv).toContain(completedStudyId);
+	expect(excludedCsv).toContain('"excluded","test_data","Pilot exclusion check"');
+
+	const includedCsvResponse = await page.request.get('/admin/studies/analysis/export.csv');
+	expect(includedCsvResponse.status()).toBe(200);
+	expect(await includedCsvResponse.text()).not.toContain(completedStudyId);
 });
 
 test('n-armed bandit records generic trial data', async ({ page }) => {

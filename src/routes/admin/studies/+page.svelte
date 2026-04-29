@@ -7,6 +7,7 @@
 		value
 			? new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(value)
 			: '-';
+	const formatReason = (value: string | null) => value?.replaceAll('_', ' ') ?? '-';
 	const flagLabel = (flags: { label: string }[]) =>
 		flags.length > 0 ? flags.map((flag) => flag.label).join(', ') : '-';
 </script>
@@ -40,9 +41,47 @@
 		</a>
 	</div>
 
+	<form method="GET" class="grid gap-3 border-t border-gray-200 pt-4 md:grid-cols-4">
+		<label class="flex flex-col gap-1">
+			<span class="text-xs text-gray-500">Study status</span>
+			<select name="status" class="border border-gray-300 bg-white px-2 py-2">
+				<option value="">All statuses</option>
+				{#each data.statuses as status (status)}
+					<option value={status} selected={data.filters.status === status}>{status}</option>
+				{/each}
+			</select>
+		</label>
+		<label class="flex flex-col gap-1">
+			<span class="text-xs text-gray-500">Review status</span>
+			<select name="review" class="border border-gray-300 bg-white px-2 py-2">
+				<option value="">All review states</option>
+				{#each data.reviewStatuses as status (status)}
+					<option value={status} selected={data.filters.reviewStatus === status}>{status}</option>
+				{/each}
+			</select>
+		</label>
+		<label class="flex flex-col gap-1">
+			<span class="text-xs text-gray-500">Review reason</span>
+			<select name="reason" class="border border-gray-300 bg-white px-2 py-2">
+				<option value="">All reasons</option>
+				{#each data.reviewReasons as reason (reason)}
+					<option value={reason} selected={data.filters.reason === reason}>
+						{formatReason(reason)}
+					</option>
+				{/each}
+			</select>
+		</label>
+		<div class="flex items-end gap-2">
+			<button class="rounded-sm bg-black px-3 py-2 text-xs text-white" type="submit">Filter</button>
+			<a class="rounded-sm bg-gray-100 px-3 py-2 text-xs" href={resolve('/admin/studies')}>
+				Reset
+			</a>
+		</div>
+	</form>
+
 	<div class="grid grid-cols-2 gap-3 md:grid-cols-4">
 		<div class="border-t border-gray-200 py-3">
-			<p class="text-xs text-gray-500">Sessions</p>
+			<p class="text-xs text-gray-500">Visible sessions</p>
 			<p class="font-serif text-2xl">{data.studies.length}</p>
 		</div>
 		<div class="border-t border-gray-200 py-3">
@@ -66,12 +105,13 @@
 	</div>
 
 	<div class="overflow-x-auto border-t border-gray-200">
-		<table class="w-full min-w-[1120px] text-left text-xs">
+		<table class="w-full min-w-[1280px] text-left text-xs">
 			<thead class="text-gray-500">
 				<tr>
 					<th class="py-2 pr-3 font-medium">Study</th>
 					<th class="py-2 pr-3 font-medium">Participant</th>
 					<th class="py-2 pr-3 font-medium">Status</th>
+					<th class="py-2 pr-3 font-medium">Review</th>
 					<th class="py-2 pr-3 font-medium">Progress</th>
 					<th class="py-2 pr-3 font-medium">Current task</th>
 					<th class="py-2 pr-3 font-medium">Integrity</th>
@@ -97,6 +137,15 @@
 							</a>
 						</td>
 						<td class="py-2 pr-3">{study.status}</td>
+						<td class="py-2 pr-3">
+							<span>{study.review.status}</span>
+							{#if study.review.reason}
+								<span class="text-gray-500">({formatReason(study.review.reason)})</span>
+							{/if}
+							{#if study.review.note}
+								<div class="mt-1 max-w-52 text-gray-600">{study.review.note}</div>
+							{/if}
+						</td>
 						<td class="py-2 pr-3">{study.completedTasks} of {study.totalTasks}</td>
 						<td class="py-2 pr-3">{study.currentTask?.name ?? '-'}</td>
 						<td class="py-2 pr-3">{flagLabel(study.integrityFlags)}</td>
@@ -112,7 +161,7 @@
 					</tr>
 				{:else}
 					<tr>
-						<td class="py-4 text-gray-500" colspan="9">No study sessions recorded yet.</td>
+						<td class="py-4 text-gray-500" colspan="10">No study sessions match these filters.</td>
 					</tr>
 				{/each}
 			</tbody>

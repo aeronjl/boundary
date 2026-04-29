@@ -127,6 +127,24 @@ export const studyTasks = sqliteTable(
 	]
 );
 
+export const studySessionReviews = sqliteTable(
+	'study_session_reviews',
+	{
+		studySessionId: text('study_session_id')
+			.primaryKey()
+			.references(() => studySessions.id, { onDelete: 'cascade' }),
+		status: text('status').notNull().default('included'),
+		reason: text('reason'),
+		note: text('note').notNull().default(''),
+		createdAt: integer('created_at').notNull(),
+		updatedAt: integer('updated_at').notNull()
+	},
+	(table) => [
+		index('study_session_reviews_status_idx').on(table.status),
+		index('study_session_reviews_reason_idx').on(table.reason)
+	]
+);
+
 export const experimentRunReviews = sqliteTable(
 	'experiment_run_reviews',
 	{

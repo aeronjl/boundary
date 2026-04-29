@@ -1,5 +1,6 @@
 import type { ExperimentRoutePath } from '../experiments/interpretation';
 import type { ReferenceMetricUnit } from './catalog';
+import { crossTaskRelationshipsForMetric, type CrossTaskRelationshipKind } from './relationships';
 import { formatReferenceValue, type ReferenceMetricValue } from './summary';
 
 export type ReferenceComparisonState =
@@ -52,12 +53,17 @@ export type ReferenceInterpretationPrompt = {
 
 export type ReferenceTaskRecommendation = {
 	metricKey: string;
+	relationshipId: string;
+	relationshipKind: CrossTaskRelationshipKind;
 	title: string;
 	body: string;
 	href: ExperimentRoutePath;
 	caveat: string;
 	sourceCitation: string | null;
 	sourceUrl: string | null;
+	relationshipCitation: string | null;
+	relationshipUrl: string | null;
+	evidenceIds: string[];
 };
 
 export type ReferenceComparisonResponse = {
@@ -81,35 +87,6 @@ type ComparisonSummaryInput = {
 	referenceMean: number | null;
 	zScore: number | null;
 	percentile: number | null;
-};
-
-type ReferenceTaskRecommendationTemplate = {
-	href: ExperimentRoutePath;
-	title: string;
-	body: string;
-};
-
-const referenceTaskRecommendationTemplates: Record<string, ReferenceTaskRecommendationTemplate> = {
-	'orientation-discrimination': {
-		href: '/n-back',
-		title: 'Try n-back next',
-		body: 'Run n-back next to compare this visual baseline with a working-memory updating task.'
-	},
-	'n-back': {
-		href: '/orientation-discrimination',
-		title: 'Try orientation next',
-		body: 'Run orientation discrimination next to separate working-memory updating from the visual/perceptual baseline.'
-	},
-	'n-armed-bandit': {
-		href: '/intertemporal-choice',
-		title: 'Try intertemporal choice next',
-		body: 'Run intertemporal choice next to compare reward learning under uncertainty with value-over-time decisions.'
-	},
-	'intertemporal-choice': {
-		href: '/n-armed-bandit',
-		title: 'Try the bandit task next',
-		body: 'Run the bandit task next to compare value-over-time choices with reward learning under uncertainty.'
-	}
 };
 
 function normalCdf(value: number): number {
@@ -250,9 +227,9 @@ export function createReferenceTaskRecommendation(
 	experimentSlug: string,
 	comparison: ReferenceComparison
 ): ReferenceTaskRecommendation | null {
-	const template = referenceTaskRecommendationTemplates[experimentSlug];
+	const relationship = crossTaskRelationshipsForMetric(experimentSlug, comparison.metricKey)[0];
 	if (
-		!template ||
+		!relationship ||
 		comparison.state !== 'comparable' ||
 		comparison.zScore === null ||
 		comparison.percentile === null ||
@@ -264,12 +241,16 @@ export function createReferenceTaskRecommendation(
 
 	return {
 		metricKey: comparison.metricKey,
-		title: template.title,
-		body: `This run's ${comparison.label.toLowerCase()} is anchored to ${referenceAnchor(comparison)}, around the ${formatPercentile(comparison.percentile)} for that validated reference metric. ${template.body}`,
-		href: template.href,
-		caveat:
-			'This is a follow-up suggestion for building a richer task profile, not a diagnosis or claim about a fixed trait.',
+		relationshipId: relationship.id,
+		relationshipKind: relationship.kind,
+		title: relationship.title,
+		body: `This run's ${comparison.label.toLowerCase()} is anchored to ${referenceAnchor(comparison)}, around the ${formatPercentile(comparison.percentile)} for that validated reference metric. ${relationship.rationale}`,
+		href: relationship.targetHref,
+		caveat: relationship.caveat,
 		sourceCitation: comparison.referenceSourceCitation,
-		sourceUrl: comparison.referenceSourceUrl
+		sourceUrl: comparison.referenceSourceUrl,
+		relationshipCitation: relationship.sources[0]?.shortCitation ?? null,
+		relationshipUrl: relationship.sources[0]?.url ?? null,
+		evidenceIds: relationship.sources.map((source) => source.evidenceId)
 	};
 }

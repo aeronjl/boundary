@@ -20,6 +20,7 @@ import {
 	type ReferenceComparison
 } from '$lib/reference-data/comparison';
 import { parseReferenceImportSummary } from '$lib/reference-data/import-summary';
+import { crossTaskRelationshipsForMetric } from '$lib/reference-data/relationships';
 import { createReferenceContext } from '$lib/reference-data/summary';
 import { calculateNBackSignalDetectionMetrics, type NBackResult } from '$lib/experiments/n-back';
 import { createNBackInterpretation } from '$lib/experiments/n-back-interpretation';
@@ -237,10 +238,16 @@ describe('reference data contracts', () => {
 		};
 		const prompt = createReferenceInterpretationPrompt(comparison);
 		const recommendation = createReferenceTaskRecommendation('n-back', comparison);
+		const relationships = crossTaskRelationshipsForMetric('n-back', 'accuracy');
 
 		expect(prompt?.body).toContain('around the 84th percentile');
 		expect(prompt?.caveat).toContain('not a diagnosis');
+		expect(relationships[0]?.id).toBe('n-back-to-orientation-perceptual-control');
+		expect(relationships[0]?.sources.map((source) => source.evidenceId)).toContain('meule-2017');
 		expect(recommendation?.href).toBe('/orientation-discrimination');
+		expect(recommendation?.relationshipId).toBe('n-back-to-orientation-perceptual-control');
+		expect(recommendation?.relationshipCitation).toBe('Meule, 2017');
+		expect(recommendation?.evidenceIds).toContain('meule-2017');
 		expect(recommendation?.body).toContain('Boundary pilot cohort in Boundary Pilot, 2026');
 		expect(recommendation?.caveat).toContain('not a diagnosis');
 	});

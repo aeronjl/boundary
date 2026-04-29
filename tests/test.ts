@@ -921,9 +921,11 @@ test('admin can inspect and export ten item personality inventory data', async (
 		expect.arrayContaining([
 			expect.objectContaining({
 				metricKey: 'accuracy',
+				relationshipId: 'n-back-to-orientation-perceptual-control',
 				href: '/orientation-discrimination',
 				sourceCitation,
-				sourceUrl: 'https://example.com/boundary-pilot'
+				sourceUrl: 'https://example.com/boundary-pilot',
+				relationshipCitation: 'Meule, 2017'
 			})
 		])
 	);
@@ -931,6 +933,7 @@ test('admin can inspect and export ten item personality inventory data', async (
 		(recommendation: { metricKey: string }) => recommendation.metricKey === 'accuracy'
 	);
 	expect(accuracyRecommendation.body).toContain(cohortLabel);
+	expect(accuracyRecommendation.evidenceIds).toContain('meule-2017');
 	expect(accuracyRecommendation.caveat).toContain('not a diagnosis');
 
 	const metricForm = page.locator('form[aria-label^="Edit reference metric Accuracy"]').first();

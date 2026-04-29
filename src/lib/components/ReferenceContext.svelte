@@ -215,7 +215,7 @@
 
 	{#if taskRecommendations.length > 0}
 		<div class="mt-4 border-t border-gray-200 pt-3">
-			<h4 class="font-medium">Suggested next task</h4>
+			<h4 class="font-medium">Evidence-linked next task</h4>
 			<ul class="mt-2 space-y-2">
 				{#each taskRecommendations as recommendation (`${recommendation.metricKey}:${recommendation.href}`)}
 					<li class="border-l-2 border-gray-200 py-1 pl-3">
@@ -233,6 +233,19 @@
 								target="_blank"
 							>
 								{recommendation.sourceCitation}
+							</a>
+							<!-- eslint-enable svelte/no-navigation-without-resolve -->
+						{/if}
+						{#if recommendation.relationshipCitation && recommendation.relationshipUrl}
+							<span class="mx-1 text-xs text-gray-400">|</span>
+							<!-- eslint-disable svelte/no-navigation-without-resolve -->
+							<a
+								class="mt-1 inline-block text-xs underline"
+								href={recommendation.relationshipUrl}
+								rel="noreferrer"
+								target="_blank"
+							>
+								{recommendation.relationshipCitation}
 							</a>
 							<!-- eslint-enable svelte/no-navigation-without-resolve -->
 						{/if}

@@ -903,6 +903,20 @@ test('admin can inspect and export ten item personality inventory data', async (
 		referenceStandardDeviation: 0.1884581684338786
 	});
 	expect(importedAccuracyComparison.zScore).toBeCloseTo(-0.11, 2);
+	expect(importedReferenceContext.prompts).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				metricKey: 'accuracy',
+				sourceCitation,
+				sourceUrl: 'https://example.com/boundary-pilot'
+			})
+		])
+	);
+	const accuracyPrompt = importedReferenceContext.prompts.find(
+		(prompt: { metricKey: string }) => prompt.metricKey === 'accuracy'
+	);
+	expect(accuracyPrompt.body).toContain(cohortLabel);
+	expect(accuracyPrompt.caveat).toContain('not a diagnosis');
 
 	const metricForm = page.locator('form[aria-label^="Edit reference metric Accuracy"]').first();
 	await metricForm.getByLabel('Mean').fill('0.72');

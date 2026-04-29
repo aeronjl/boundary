@@ -13,6 +13,7 @@ import { referenceMetricContracts } from '$lib/reference-data/catalog';
 import {
 	calculateReferenceZScore,
 	createComparisonSummary,
+	createReferenceInterpretationPrompt,
 	formatPercentile,
 	percentileFromZScore
 } from '$lib/reference-data/comparison';
@@ -209,6 +210,32 @@ describe('reference data contracts', () => {
 				percentile
 			})
 		).toContain('above the reference mean');
+
+		const prompt = createReferenceInterpretationPrompt({
+			metricKey: 'accuracy',
+			label: 'Accuracy',
+			unit: 'proportion',
+			currentValue: 0.83,
+			state: 'comparable',
+			datasetName: 'OpenfMRI smoke test',
+			datasetStatus: 'validated',
+			datasetCompatibility: 'compatible',
+			referenceSourceCitation: 'Boundary Pilot, 2026',
+			referenceSourceUrl: 'https://example.com',
+			referenceCohortLabel: 'Boundary pilot cohort',
+			referenceCohortSampleSize: 12,
+			mappingSourceMetric: 'pilot_accuracy',
+			mappingSourceColumns: ['pilot_nont', 'pilot_targ'],
+			mappingExtractionStatus: 'reviewed',
+			referenceMean: 0.72,
+			referenceStandardDeviation: 0.11,
+			zScore,
+			percentile,
+			summary: ''
+		});
+
+		expect(prompt?.body).toContain('around the 84th percentile');
+		expect(prompt?.caveat).toContain('not a diagnosis');
 	});
 
 	it('validates the OpenfMRI n-back reference import summary', () => {

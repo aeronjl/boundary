@@ -34,6 +34,7 @@
 	$: candidateDatasetCount = serverContext?.candidateDatasetCount ?? context.candidateDatasetCount;
 	$: validatedDatasetCount = serverContext?.validatedDatasetCount ?? context.validatedDatasetCount;
 	$: displayDatasets = serverContext?.datasets ?? context.datasets;
+	$: interpretationPrompts = serverContext?.prompts ?? [];
 	$: if (mounted) {
 		void loadComparison(metricsRequestKey);
 	}
@@ -181,6 +182,33 @@
 					{/each}
 				</tbody>
 			</table>
+		</div>
+	{/if}
+
+	{#if interpretationPrompts.length > 0}
+		<div class="mt-4 border-t border-gray-200 pt-3">
+			<h4 class="font-medium">Source-backed prompts</h4>
+			<ul class="mt-2 space-y-2">
+				{#each interpretationPrompts as prompt (prompt.metricKey)}
+					<li class="border-l-2 border-gray-200 py-1 pl-3">
+						<p class="font-medium">{prompt.title}</p>
+						<p class="mt-1 text-gray-600">{prompt.body}</p>
+						<p class="mt-1 text-xs text-gray-500">{prompt.caveat}</p>
+						{#if prompt.sourceCitation && prompt.sourceUrl}
+							<!-- eslint-disable svelte/no-navigation-without-resolve -->
+							<a
+								class="mt-1 inline-block text-xs underline"
+								href={prompt.sourceUrl}
+								rel="noreferrer"
+								target="_blank"
+							>
+								{prompt.sourceCitation}
+							</a>
+							<!-- eslint-enable svelte/no-navigation-without-resolve -->
+						{/if}
+					</li>
+				{/each}
+			</ul>
 		</div>
 	{/if}
 

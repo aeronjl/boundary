@@ -40,9 +40,19 @@ export type ReferenceComparisonDataset = {
 	notes: string;
 };
 
+export type ReferenceInterpretationPrompt = {
+	metricKey: string;
+	title: string;
+	body: string;
+	caveat: string;
+	sourceCitation: string | null;
+	sourceUrl: string | null;
+};
+
 export type ReferenceComparisonResponse = {
 	experimentSlug: string;
 	comparisons: ReferenceComparison[];
+	prompts: ReferenceInterpretationPrompt[];
 	datasets: ReferenceComparisonDataset[];
 	candidateDatasetCount: number;
 	validatedDatasetCount: number;
@@ -153,4 +163,35 @@ export function createComparisonSummary(input: ComparisonSummaryInput): string {
 
 	const direction = input.zScore > 0 ? 'above' : 'below';
 	return `This run's ${input.label} is ${absoluteZ.toFixed(1)} SD ${direction} the reference mean${datasetText} (${referenceValue}), about the ${formatPercentile(input.percentile)}.`;
+}
+
+export function createReferenceInterpretationPrompt(
+	comparison: ReferenceComparison
+): ReferenceInterpretationPrompt | null {
+	if (
+		comparison.state !== 'comparable' ||
+		comparison.zScore === null ||
+		comparison.percentile === null ||
+		comparison.referenceMean === null
+	) {
+		return null;
+	}
+
+	const cohort =
+		comparison.referenceCohortLabel ?? comparison.datasetName ?? 'the validated reference sample';
+	const sourceText = comparison.referenceSourceCitation
+		? ` in ${comparison.referenceSourceCitation}`
+		: '';
+	const absoluteZ = Math.abs(comparison.zScore);
+	const position = absoluteZ < 0.25 ? 'close to' : comparison.zScore > 0 ? 'above' : 'below';
+
+	return {
+		metricKey: comparison.metricKey,
+		title: `${comparison.label} reference position`,
+		body: `This run's ${comparison.label.toLowerCase()} is ${position} ${cohort}${sourceText}, around the ${formatPercentile(comparison.percentile)} for that validated reference metric.`,
+		caveat:
+			'Treat this as task-specific reference context only; it is not a diagnosis, trait label, or clinical classification.',
+		sourceCitation: comparison.referenceSourceCitation,
+		sourceUrl: comparison.referenceSourceUrl
+	};
 }

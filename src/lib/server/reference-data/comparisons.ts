@@ -6,6 +6,7 @@ import {
 import {
 	calculateReferenceZScore,
 	createComparisonSummary,
+	createReferenceInterpretationPrompt,
 	percentileFromZScore,
 	type ReferenceComparison,
 	type ReferenceComparisonDataset,
@@ -319,10 +320,15 @@ export async function getReferenceComparisonContext(
 			mappingsByMetricId
 		)
 	);
+	const prompts = comparisons.flatMap((comparison) => {
+		const prompt = createReferenceInterpretationPrompt(comparison);
+		return prompt ? [prompt] : [];
+	});
 
 	return {
 		experimentSlug,
 		comparisons,
+		prompts,
 		datasets: datasets.map(datasetSummary),
 		candidateDatasetCount: datasets.filter((dataset) => dataset.status === 'candidate').length,
 		validatedDatasetCount: datasets.filter((dataset) => dataset.status === 'validated').length,

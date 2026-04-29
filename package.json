@@ -18,10 +18,11 @@
 		"db:generate": "drizzle-kit generate",
 		"db:migrate": "bun run scripts/db-migrate.ts",
 		"db:seed": "bun run scripts/db-seed.ts",
-		"db:setup": "bun run db:migrate && bun run db:seed",
-		"db:deploy": "bun run db:migrate && bun run db:seed && bun run reference:import static/reference-data/n-back/openfmri-ds000115-summary.json",
+		"db:setup": "bun run db:migrate && bun run db:seed && bun run reference:import:nback",
+		"db:deploy": "bun run db:migrate && bun run db:seed && bun run reference:import:nback",
 		"db:studio": "drizzle-kit studio",
-		"reference:import": "bun run scripts/reference-import.ts"
+		"reference:import": "bun run scripts/reference-import.ts",
+		"reference:import:nback": "bun run reference:import static/reference-data/n-back/openfmri-ds000115-summary.json"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",

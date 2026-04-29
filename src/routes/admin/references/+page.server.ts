@@ -3,13 +3,16 @@ import { isAdminAuthenticated } from '$lib/server/admin/auth';
 import {
 	listAdminReferenceRegistry,
 	setAdminReferenceDataset,
-	setAdminReferenceMetric
+	setAdminReferenceMetric,
+	setAdminReferenceReviewStatus
 } from '$lib/server/admin/references';
 import type { Actions, PageServerLoad } from './$types';
 
 function updateMessage(value: string | null): string {
 	if (value === 'dataset') return 'Reference dataset updated.';
 	if (value === 'metric') return 'Reference metric updated.';
+	if (value === 'validated') return 'Reference dataset validated.';
+	if (value === 'candidate') return 'Reference dataset reverted to candidate.';
 	return '';
 }
 
@@ -56,6 +59,33 @@ export const actions: Actions = {
 		}
 
 		throw redirect(303, '/admin/references?updated=dataset');
+	},
+	review: async ({ cookies, request }) => {
+		if (!isAdminAuthenticated(cookies)) {
+			throw redirect(303, '/admin');
+		}
+
+		const form = await request.formData();
+		const id = form.get('datasetId');
+
+		if (typeof id !== 'string' || id.length === 0) {
+			return fail(400, { message: 'Reference dataset id is required.' });
+		}
+
+		const nextStatus = String(form.get('status') ?? '');
+		const result = await setAdminReferenceReviewStatus({
+			id,
+			status: nextStatus,
+			compatibility: String(form.get('compatibility') ?? ''),
+			notes: typeof form.get('notes') === 'string' ? String(form.get('notes')) : null
+		});
+
+		if (!result.ok) {
+			return fail(result.status, { message: result.message });
+		}
+
+		const updated = nextStatus === 'validated' ? 'validated' : 'candidate';
+		throw redirect(303, `/admin/references?updated=${updated}`);
 	},
 	metric: async ({ cookies, request }) => {
 		if (!isAdminAuthenticated(cookies)) {

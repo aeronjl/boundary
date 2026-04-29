@@ -150,6 +150,59 @@
 								{/if}
 							</div>
 						{/if}
+						{#if dataset.status === 'validated'}
+							<form
+								method="POST"
+								action="?/review"
+								aria-label={`Revert reference dataset ${dataset.name} to candidate`}
+								class="mt-3"
+							>
+								<input type="hidden" name="datasetId" value={dataset.id} />
+								<input type="hidden" name="status" value="candidate" />
+								<input type="hidden" name="compatibility" value={dataset.compatibility} />
+								<input type="hidden" name="notes" value={dataset.notes} />
+								<button class="rounded-sm border border-gray-300 px-3 py-2 text-xs">
+									Revert to candidate
+								</button>
+							</form>
+						{:else}
+							<form
+								method="POST"
+								action="?/review"
+								aria-label={`Validate reference dataset ${dataset.name}`}
+								class="mt-3 grid max-w-3xl gap-3 border-t border-gray-100 pt-3 md:grid-cols-[180px_1fr]"
+							>
+								<input type="hidden" name="datasetId" value={dataset.id} />
+								<input type="hidden" name="status" value="validated" />
+								<label class="flex flex-col gap-1">
+									<span class="text-xs font-medium text-gray-500">Review compatibility</span>
+									<select name="compatibility" class="rounded-sm border border-gray-300 px-3 py-2">
+										{#each data.compatibilities as compatibility (compatibility)}
+											<option
+												value={compatibility}
+												selected={dataset.compatibility === compatibility}
+											>
+												{compatibility}
+											</option>
+										{/each}
+									</select>
+								</label>
+								<label class="flex flex-col gap-1">
+									<span class="text-xs font-medium text-gray-500">Validation notes</span>
+									<textarea
+										name="notes"
+										rows="2"
+										required
+										class="rounded-sm border border-gray-300 px-3 py-2">{dataset.notes}</textarea
+									>
+								</label>
+								<div class="md:col-span-2">
+									<button class="rounded-sm bg-black px-3 py-2 text-xs text-white">
+										Mark validated
+									</button>
+								</div>
+							</form>
+						{/if}
 					</div>
 
 					<form

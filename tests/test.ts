@@ -758,16 +758,59 @@ test('admin can inspect and export ten item personality inventory data', async (
 	await expect(page.getByRole('heading', { name: 'Reference registry' })).toBeVisible();
 	await expect(page.getByText('OpenfMRI ds000115').first()).toBeVisible();
 	await expect(page.getByText('Metric contracts', { exact: true })).toBeVisible();
+	await expect(page.getByText('Imported reference summary')).toBeVisible();
+	await expect(page.getByText('Imported n=98 from nback2_nont, nback2_targ')).toBeVisible();
+
+	const initialRevertButton = page.getByRole('button', { name: 'Revert to candidate' });
+	if (await initialRevertButton.isVisible()) {
+		await initialRevertButton.click();
+		await expect(page.getByText('Reference dataset reverted to candidate.')).toBeVisible();
+	}
 
 	const datasetForm = page.locator('form[aria-label^="Edit reference dataset"]').first();
-	await datasetForm.getByLabel('Dataset status').selectOption('validated');
-	await datasetForm.locator('select[name="compatibility"]').selectOption('compatible');
+	await datasetForm.getByLabel('Dataset status').selectOption('candidate');
+	await datasetForm.locator('select[name="compatibility"]').selectOption('partial');
 	await datasetForm.getByLabel('Sample size').fill('42');
-	await datasetForm.getByLabel('Compatibility notes').fill('Validated for smoke-test review flow.');
+	await datasetForm
+		.getByLabel('Compatibility notes')
+		.fill('Candidate details updated before review.');
 	await datasetForm.getByRole('button', { name: 'Save dataset' }).click();
 	await expect(page.getByText('Reference dataset updated.')).toBeVisible();
-	await expect(datasetForm.getByLabel('Dataset status')).toHaveValue('validated');
+	await expect(datasetForm.getByLabel('Dataset status')).toHaveValue('candidate');
 	await expect(datasetForm.getByLabel('Sample size')).toHaveValue('42');
+
+	const validateForm = page.locator('form[aria-label^="Validate reference dataset"]').first();
+	await validateForm.getByLabel('Review compatibility').selectOption('compatible');
+	await validateForm
+		.getByLabel('Validation notes')
+		.fill('Validated imported participants.tsv summary for smoke-test review flow.');
+	await validateForm.getByRole('button', { name: 'Mark validated' }).click();
+	await expect(page.getByText('Reference dataset validated.')).toBeVisible();
+	await expect(datasetForm.getByLabel('Dataset status')).toHaveValue('validated');
+
+	const importedReferenceContextResponse = await page.request.post(
+		'/api/reference-context/n-back',
+		{
+			data: {
+				metrics: {
+					accuracy: 0.83,
+					sensitivityIndex: 1.2,
+					falseAlarmRate: 0.1
+				}
+			}
+		}
+	);
+	expect(importedReferenceContextResponse.status()).toBe(200);
+	const importedReferenceContext = await importedReferenceContextResponse.json();
+	const importedAccuracyComparison = importedReferenceContext.comparisons.find(
+		(comparison: { metricKey: string }) => comparison.metricKey === 'accuracy'
+	);
+	expect(importedAccuracyComparison).toMatchObject({
+		state: 'comparable',
+		referenceMean: 0.8508194948622451,
+		referenceStandardDeviation: 0.1884581684338786
+	});
+	expect(importedAccuracyComparison.zScore).toBeCloseTo(-0.11, 2);
 
 	const metricForm = page.locator('form[aria-label^="Edit reference metric Accuracy"]').first();
 	await metricForm.getByLabel('Mean').fill('0.72');
@@ -801,6 +844,30 @@ test('admin can inspect and export ten item personality inventory data', async (
 	});
 	expect(accuracyComparison.zScore).toBeCloseTo(1);
 	expect(accuracyComparison.summary).toContain('above the reference mean');
+
+	await page.getByRole('button', { name: 'Revert to candidate' }).click();
+	await expect(page.getByText('Reference dataset reverted to candidate.')).toBeVisible();
+	const revertedReferenceContextResponse = await page.request.post(
+		'/api/reference-context/n-back',
+		{
+			data: {
+				metrics: {
+					accuracy: 0.83,
+					sensitivityIndex: 1.2,
+					falseAlarmRate: 0.1
+				}
+			}
+		}
+	);
+	expect(revertedReferenceContextResponse.status()).toBe(200);
+	const revertedReferenceContext = await revertedReferenceContextResponse.json();
+	const revertedAccuracyComparison = revertedReferenceContext.comparisons.find(
+		(comparison: { metricKey: string }) => comparison.metricKey === 'accuracy'
+	);
+	expect(revertedAccuracyComparison).toMatchObject({
+		state: 'candidate_only',
+		zScore: null
+	});
 	await page.goto('/admin');
 
 	const csvResponse = await page.request.get('/admin/tipi/export.csv');

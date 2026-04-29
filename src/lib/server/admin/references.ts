@@ -68,6 +68,13 @@ export type AdminSetReferenceMetricInput = {
 	notes: string | null;
 };
 
+export type AdminSetReferenceReviewInput = {
+	id: string;
+	status: string;
+	compatibility: string;
+	notes: string | null;
+};
+
 export type AdminReferenceUpdateResult =
 	| {
 			ok: true;
@@ -195,6 +202,47 @@ function metricImportMetadata(metricJson: string): AdminReferenceMetricImport | 
 	};
 }
 
+function hasUsableReferenceStats(metric: typeof referenceMetrics.$inferSelect): boolean {
+	return (
+		metric.mean !== null &&
+		Number.isFinite(metric.mean) &&
+		metric.standardDeviation !== null &&
+		Number.isFinite(metric.standardDeviation) &&
+		metric.standardDeviation > 0
+	);
+}
+
+async function validateReferenceReview(
+	datasetId: string,
+	status: ReferenceDatasetStatus,
+	notes: string
+): Promise<AdminReferenceUpdateResult> {
+	if (status !== 'validated') return { ok: true };
+
+	if (notes.length === 0) {
+		return {
+			ok: false,
+			status: 400,
+			message: 'Compatibility notes are required before validating a reference dataset.'
+		};
+	}
+
+	const metrics = await db
+		.select()
+		.from(referenceMetrics)
+		.where(eq(referenceMetrics.referenceDatasetId, datasetId));
+
+	if (!metrics.some(hasUsableReferenceStats)) {
+		return {
+			ok: false,
+			status: 400,
+			message: 'At least one reference metric needs a mean and positive SD before validation.'
+		};
+	}
+
+	return { ok: true };
+}
+
 export async function listAdminReferenceRegistry(): Promise<{
 	studies: AdminReferenceStudy[];
 	datasets: AdminReferenceDataset[];
@@ -250,16 +298,51 @@ export async function setAdminReferenceDataset(
 		return { ok: false, status: 400, message: 'Sample size must be a whole number.' };
 	}
 
+	const status = parseReferenceDatasetStatus(input.status);
+	const compatibility = parseReferenceCompatibility(input.compatibility);
+	const notes = trimmed(input.notes);
+	const validation = await validateReferenceReview(input.id, status, notes);
+	if (!validation.ok) return validation;
+
 	await db
 		.update(referenceDatasets)
 		.set({
-			status: parseReferenceDatasetStatus(input.status),
-			compatibility: parseReferenceCompatibility(input.compatibility),
+			status,
+			compatibility,
 			sampleSize,
 			license: trimmed(input.license),
 			population: trimmed(input.population),
 			taskVariant: trimmed(input.taskVariant),
-			notes: trimmed(input.notes),
+			notes,
+			updatedAt: Date.now()
+		})
+		.where(eq(referenceDatasets.id, input.id));
+
+	return { ok: true };
+}
+
+export async function setAdminReferenceReviewStatus(
+	input: AdminSetReferenceReviewInput
+): Promise<AdminReferenceUpdateResult> {
+	const [dataset] = await db
+		.select({ id: referenceDatasets.id })
+		.from(referenceDatasets)
+		.where(eq(referenceDatasets.id, input.id));
+
+	if (!dataset) return { ok: false, status: 404, message: 'Reference dataset not found.' };
+
+	const status = parseReferenceDatasetStatus(input.status);
+	const compatibility = parseReferenceCompatibility(input.compatibility);
+	const notes = trimmed(input.notes);
+	const validation = await validateReferenceReview(input.id, status, notes);
+	if (!validation.ok) return validation;
+
+	await db
+		.update(referenceDatasets)
+		.set({
+			status,
+			compatibility,
+			notes,
 			updatedAt: Date.now()
 		})
 		.where(eq(referenceDatasets.id, input.id));

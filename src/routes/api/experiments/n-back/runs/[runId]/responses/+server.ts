@@ -1,7 +1,14 @@
 import { json } from '@sveltejs/kit';
 import { isNBackResponseChoice } from '$lib/experiments/n-back';
+import {
+	isConsentRequiredError,
+	requireCookieParticipantConsent
+} from '$lib/server/experiments/consent';
 import { submitNBackResponse } from '$lib/server/experiments/n-back';
-import { experimentSubmissionErrorMessage } from '$lib/server/experiments/records';
+import {
+	experimentSubmissionErrorMessage,
+	experimentSubmissionErrorStatus
+} from '$lib/server/experiments/records';
 import type { RequestHandler } from './$types';
 
 type Payload = {
@@ -16,7 +23,7 @@ function optionalNumber(value: unknown): number | null {
 	return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
-export const POST: RequestHandler = async ({ params, request }) => {
+export const POST: RequestHandler = async ({ cookies, params, request }) => {
 	const payload = (await request.json()) as Payload;
 
 	if (typeof payload.trialId !== 'string') {
@@ -28,17 +35,27 @@ export const POST: RequestHandler = async ({ params, request }) => {
 	}
 
 	try {
-		const result = await submitNBackResponse(params.runId, payload.trialId, payload.response, {
-			trialIndex: optionalNumber(payload.trialIndex),
-			clientTrialStartedAt: optionalNumber(payload.trialStartedAt),
-			clientSubmittedAt: optionalNumber(payload.submittedAt)
-		});
+		const participantSessionId = await requireCookieParticipantConsent(cookies);
+		const result = await submitNBackResponse(
+			params.runId,
+			payload.trialId,
+			payload.response,
+			{
+				trialIndex: optionalNumber(payload.trialIndex),
+				clientTrialStartedAt: optionalNumber(payload.trialStartedAt),
+				clientSubmittedAt: optionalNumber(payload.submittedAt)
+			},
+			participantSessionId
+		);
 		return json(result);
 	} catch (error) {
-		console.error(error);
+		if (isConsentRequiredError(error)) {
+			return json({ message: error.message }, { status: 403 });
+		}
+
 		return json(
 			{ message: experimentSubmissionErrorMessage(error, 'Could not record n-back response.') },
-			{ status: 400 }
+			{ status: experimentSubmissionErrorStatus(error) }
 		);
 	}
 };

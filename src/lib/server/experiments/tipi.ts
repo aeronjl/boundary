@@ -23,6 +23,8 @@ import {
 import {
 	assertSubmittedTrialIndex,
 	createTimingMetadata,
+	duplicateSubmissionError,
+	getSubmittedTrialIndex,
 	getTrialStartedAt,
 	recordExperimentEvent,
 	recordExperimentResponse,
@@ -124,13 +126,14 @@ export async function submitTipiResponse(
 	runId: string,
 	questionId: string,
 	response: string,
-	timing: TrialSubmissionTiming = {}
+	timing: TrialSubmissionTiming = {},
+	participantSessionId?: string
 ): Promise<TipiSubmitResult> {
 	if (!isTipiLikertResponse(response)) {
 		throw new Error('Invalid TIPI response.');
 	}
 
-	const run = await getExperimentRun(runId, tipiVersionId);
+	const run = await getExperimentRun(runId, tipiVersionId, participantSessionId);
 
 	if (!run) {
 		throw new Error('Experiment run not found.');
@@ -154,7 +157,25 @@ export async function submitTipiResponse(
 		.orderBy(asc(tipiResponses.trialIndex));
 	const trialIndex = existingResponses.length;
 	const expectedQuestionId = questionOrder[trialIndex];
-	assertSubmittedTrialIndex(timing.trialIndex, trialIndex);
+	const submittedTrialIndex = getSubmittedTrialIndex(timing);
+
+	if (submittedTrialIndex !== null && submittedTrialIndex < trialIndex) {
+		const existingResponse = existingResponses.find(
+			(candidate) => candidate.trialIndex === submittedTrialIndex
+		);
+
+		if (
+			!existingResponse ||
+			existingResponse.questionId !== questionId ||
+			existingResponse.response !== response
+		) {
+			duplicateSubmissionError();
+		}
+
+		return getTipiCurrentStateOrResult(runId, questionOrder, trialIndex);
+	}
+
+	assertSubmittedTrialIndex(submittedTrialIndex, trialIndex);
 
 	if (!expectedQuestionId || expectedQuestionId !== questionId) {
 		throw new Error('Response does not match the next expected question.');
@@ -244,6 +265,35 @@ export async function submitTipiResponse(
 		completed: true,
 		runId,
 		result
+	};
+}
+
+async function getTipiCurrentStateOrResult(
+	runId: string,
+	questionOrder: string[],
+	responseCount: number
+): Promise<TipiSubmitResult> {
+	const nextQuestionId = questionOrder[responseCount];
+
+	if (!nextQuestionId) {
+		const existingResult = await getTipiResult(runId);
+		const result = existingResult ?? (await completeTipiRun(runId));
+		return { completed: true, runId, result };
+	}
+
+	const [nextQuestionRow] = await db
+		.select()
+		.from(tipiQuestions)
+		.where(eq(tipiQuestions.id, nextQuestionId));
+	const trialStartedAt = await getTrialStartedAt(runId, responseCount);
+
+	return {
+		completed: false,
+		runId,
+		trialNumber: responseCount + 1,
+		totalTrials: questionOrder.length,
+		question: nextQuestionRow ? toTipiQuestion(nextQuestionRow) : null,
+		trialStartedAt
 	};
 }
 

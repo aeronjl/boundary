@@ -108,3 +108,14 @@ export async function requireParticipantConsent(participantSessionId: string): P
 		throw new ConsentRequiredError();
 	}
 }
+
+export async function requireCookieParticipantConsent(cookies: Cookies): Promise<string> {
+	const participantSessionId = cookies.get(participantCookieName);
+
+	if (!participantSessionId) {
+		throw new ConsentRequiredError();
+	}
+
+	await requireParticipantConsent(participantSessionId);
+	return participantSessionId;
+}

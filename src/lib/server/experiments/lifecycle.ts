@@ -102,12 +102,14 @@ export async function createExperimentRun({
 
 export async function getExperimentRun(
 	runId: string,
-	experimentVersionId?: string
+	experimentVersionId?: string,
+	participantSessionId?: string
 ): Promise<ExperimentRun | null> {
 	const [run] = await db.select().from(experimentRuns).where(eq(experimentRuns.id, runId));
 
 	if (!run) return null;
 	if (experimentVersionId && run.experimentVersionId !== experimentVersionId) return null;
+	if (participantSessionId && run.participantSessionId !== participantSessionId) return null;
 
 	return run;
 }

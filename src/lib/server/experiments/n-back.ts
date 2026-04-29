@@ -22,6 +22,8 @@ import {
 import {
 	assertSubmittedTrialIndex,
 	createTimingMetadata,
+	duplicateSubmissionError,
+	getSubmittedTrialIndex,
 	getTrialStartedAt,
 	recordExperimentEvent,
 	recordExperimentResponse,
@@ -300,9 +302,10 @@ export async function submitNBackResponse(
 	runId: string,
 	trialId: string,
 	response: NBackResponseChoice,
-	timing: TrialSubmissionTiming = {}
+	timing: TrialSubmissionTiming = {},
+	participantSessionId?: string
 ): Promise<NBackSubmitResult> {
-	const run = await getExperimentRun(runId, nBackVersionId);
+	const run = await getExperimentRun(runId, nBackVersionId, participantSessionId);
 
 	if (!run) {
 		throw new Error('Experiment run not found.');
@@ -325,7 +328,24 @@ export async function submitNBackResponse(
 
 	const trialIndex = responses.length;
 	const expectedTrialId = context.trialOrder[trialIndex];
-	assertSubmittedTrialIndex(timing.trialIndex, trialIndex);
+	const submittedTrialIndex = getSubmittedTrialIndex(timing);
+
+	if (submittedTrialIndex !== null && submittedTrialIndex < trialIndex) {
+		const existingResponse = responses.find(
+			(candidate) => candidate.trialIndex === submittedTrialIndex
+		);
+		const existingPayload = existingResponse
+			? parseJson<NBackResponse>(existingResponse.responseJson)
+			: null;
+
+		if (existingPayload?.trialId !== trialId || existingPayload?.response !== response) {
+			duplicateSubmissionError();
+		}
+
+		return getNBackCurrentStateOrResult(runId, context, responses);
+	}
+
+	assertSubmittedTrialIndex(submittedTrialIndex, trialIndex);
 
 	if (!expectedTrialId || expectedTrialId !== trialId) {
 		throw new Error('Response does not match the next expected trial.');
@@ -405,6 +425,31 @@ export async function submitNBackResponse(
 	return {
 		completed: false,
 		...createState(runId, context, updatedResponses, outcome, nextTrialStarted.createdAt)
+	};
+}
+
+async function getNBackCurrentStateOrResult(
+	runId: string,
+	context: NBackStartedPayload,
+	responses: ResponseRow[]
+): Promise<NBackSubmitResult> {
+	const lastOutcome = createLastOutcome(responses);
+
+	if (responses.length >= context.totalTrials) {
+		const result = await completeNBackRun(runId, context, responses);
+
+		if (!lastOutcome) {
+			throw new Error('n-back run has no response outcome.');
+		}
+
+		return { completed: true, runId, result, lastOutcome };
+	}
+
+	const trialStartedAt = await getTrialStartedAt(runId, responses.length);
+
+	return {
+		completed: false,
+		...createState(runId, context, responses, lastOutcome, trialStartedAt)
 	};
 }
 

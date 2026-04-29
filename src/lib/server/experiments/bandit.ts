@@ -21,6 +21,8 @@ import {
 import {
 	assertSubmittedTrialIndex,
 	createTimingMetadata,
+	duplicateSubmissionError,
+	getSubmittedTrialIndex,
 	getTrialStartedAt,
 	recordExperimentEvent,
 	recordExperimentResponse,
@@ -204,9 +206,10 @@ export async function startBanditRun(
 export async function submitBanditPull(
 	runId: string,
 	armId: string,
-	timing: TrialSubmissionTiming = {}
+	timing: TrialSubmissionTiming = {},
+	participantSessionId?: string
 ): Promise<BanditPullResult> {
-	const run = await getExperimentRun(runId, banditVersionId);
+	const run = await getExperimentRun(runId, banditVersionId, participantSessionId);
 
 	if (!run) {
 		throw new Error('Experiment run not found.');
@@ -229,7 +232,24 @@ export async function submitBanditPull(
 	}
 
 	const trialIndex = responses.length;
-	assertSubmittedTrialIndex(timing.trialIndex, trialIndex);
+	const submittedTrialIndex = getSubmittedTrialIndex(timing);
+
+	if (submittedTrialIndex !== null && submittedTrialIndex < trialIndex) {
+		const existingResponse = responses.find(
+			(candidate) => candidate.trialIndex === submittedTrialIndex
+		);
+		const existingPayload = existingResponse
+			? parseJson<BanditPullResponse>(existingResponse.responseJson)
+			: null;
+
+		if (existingPayload?.armId !== armId) {
+			duplicateSubmissionError();
+		}
+
+		return getBanditCurrentStateOrResult(runId, context, responses);
+	}
+
+	assertSubmittedTrialIndex(submittedTrialIndex, trialIndex);
 
 	if (trialIndex >= context.totalTrials) {
 		const result = await completeBanditRun(runId, context, responses);
@@ -305,6 +325,31 @@ export async function submitBanditPull(
 	return {
 		completed: false,
 		...createState(runId, context, updatedResponses, outcome, nextTrialStarted.createdAt)
+	};
+}
+
+async function getBanditCurrentStateOrResult(
+	runId: string,
+	context: BanditStartedPayload,
+	responses: ResponseRow[]
+): Promise<BanditPullResult> {
+	const lastOutcome = createLastOutcome(responses);
+
+	if (responses.length >= context.totalTrials) {
+		const result = await completeBanditRun(runId, context, responses);
+
+		if (!lastOutcome) {
+			throw new Error('Bandit run has no pull outcome.');
+		}
+
+		return { completed: true, runId, result, lastOutcome };
+	}
+
+	const trialStartedAt = await getTrialStartedAt(runId, responses.length);
+
+	return {
+		completed: false,
+		...createState(runId, context, responses, lastOutcome, trialStartedAt)
 	};
 }
 

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
@@ -10,6 +11,7 @@ type GenericExportResponse = {
 };
 
 type GenericExportRun = {
+	id: string;
 	experimentVersionId: string;
 	responses: GenericExportResponse[];
 	events: { eventType: string }[];
@@ -17,6 +19,8 @@ type GenericExportRun = {
 	orientationSummary?: { totalTrials: number; correctCount: number } | null;
 	nBackSummary?: { totalTrials: number; correctCount: number } | null;
 };
+
+const testAdminCookie = `boundary_admin=${createHash('sha256').update('test-admin-token').digest('hex')}`;
 
 async function acceptConsentAndStart(page: Page) {
 	await expect(page.getByRole('heading', { name: 'Before you start' })).toBeVisible();
@@ -126,6 +130,124 @@ test('experiment starts require participant consent', async ({ page, request }) 
 	await page.getByLabel(/I consent to take part/).check();
 	await page.getByRole('button', { name: 'Accept and start' }).click();
 	await expect(page.getByText('1 of 16')).toBeVisible();
+});
+
+test('experiment submissions enforce run integrity', async ({ request }) => {
+	const blockedSubmission = await request.post('/api/experiments/tipi/runs/not-a-run/responses', {
+		data: {
+			questionId: 'tipi-v1-1',
+			response: 'Agree a little',
+			trialIndex: 0
+		}
+	});
+	expect(blockedSubmission.status()).toBe(403);
+
+	await request.post('/api/consent');
+	const startResponse = await request.post('/api/experiments/tipi/runs');
+	expect(startResponse.status()).toBe(200);
+	const start = await startResponse.json();
+	const runId = start.runId as string;
+	const firstQuestionId = start.question.id as string;
+
+	const invalidRunResponse = await request.post('/api/experiments/tipi/runs/not-a-run/responses', {
+		data: {
+			questionId: firstQuestionId,
+			response: 'Agree a little',
+			trialIndex: 0
+		}
+	});
+	expect(invalidRunResponse.status()).toBe(404);
+
+	const wrongTrialResponse = await request.post(`/api/experiments/tipi/runs/${runId}/responses`, {
+		data: {
+			questionId: firstQuestionId,
+			response: 'Agree a little',
+			trialIndex: 1
+		}
+	});
+	expect(wrongTrialResponse.status()).toBe(400);
+	expect(await wrongTrialResponse.json()).toMatchObject({
+		message: expect.stringContaining('next expected trial')
+	});
+
+	const firstSubmitResponse = await request.post(`/api/experiments/tipi/runs/${runId}/responses`, {
+		data: {
+			questionId: firstQuestionId,
+			response: 'Agree a little',
+			trialIndex: 0,
+			trialStartedAt: start.trialStartedAt,
+			submittedAt: Date.now()
+		}
+	});
+	expect(firstSubmitResponse.status()).toBe(200);
+	const firstSubmit = await firstSubmitResponse.json();
+	expect(firstSubmit).toMatchObject({ completed: false, trialNumber: 2 });
+
+	const retryResponse = await request.post(`/api/experiments/tipi/runs/${runId}/responses`, {
+		data: {
+			questionId: firstQuestionId,
+			response: 'Agree a little',
+			trialIndex: 0
+		}
+	});
+	expect(retryResponse.status()).toBe(200);
+	expect(await retryResponse.json()).toMatchObject({ completed: false, trialNumber: 2 });
+
+	const conflictingRetryResponse = await request.post(
+		`/api/experiments/tipi/runs/${runId}/responses`,
+		{
+			data: {
+				questionId: firstQuestionId,
+				response: 'Disagree a little',
+				trialIndex: 0
+			}
+		}
+	);
+	expect(conflictingRetryResponse.status()).toBe(409);
+	expect(await conflictingRetryResponse.json()).toMatchObject({
+		message: expect.stringContaining('already submitted with different data')
+	});
+
+	let state = firstSubmit;
+
+	while (!state.completed) {
+		const trialIndex = state.trialNumber - 1;
+		const response = await request.post(`/api/experiments/tipi/runs/${runId}/responses`, {
+			data: {
+				questionId: state.question.id,
+				response: 'Agree a little',
+				trialIndex,
+				trialStartedAt: state.trialStartedAt,
+				submittedAt: Date.now()
+			}
+		});
+
+		expect(response.status()).toBe(200);
+		state = await response.json();
+	}
+
+	expect(state).toMatchObject({ completed: true, runId });
+
+	const completedRetryResponse = await request.post(
+		`/api/experiments/tipi/runs/${runId}/responses`,
+		{
+			data: {
+				questionId: firstQuestionId,
+				response: 'Agree a little',
+				trialIndex: 0
+			}
+		}
+	);
+	expect(completedRetryResponse.status()).toBe(200);
+	expect(await completedRetryResponse.json()).toMatchObject({ completed: true, runId });
+
+	const exportResponse = await request.get('/admin/experiments/export.json', {
+		headers: { cookie: testAdminCookie }
+	});
+	expect(exportResponse.status()).toBe(200);
+	const exportBody = await exportResponse.json();
+	const run = exportBody.runs.find((candidate: GenericExportRun) => candidate.id === runId);
+	expect(run?.responses).toHaveLength(10);
 });
 
 test('ten item personality inventory records and displays results', async ({ page }) => {

@@ -37,6 +37,16 @@ export type TrialSubmissionTiming = {
 	clientSubmittedAt?: number | null;
 };
 
+export class ExperimentSubmissionError extends Error {
+	status: number;
+
+	constructor(message: string, status = 400) {
+		super(message);
+		this.name = 'ExperimentSubmissionError';
+		this.status = status;
+	}
+}
+
 function assertValidTrialIndex(trialIndex: number | null | undefined): void {
 	if (trialIndex == null) return;
 	if (!Number.isInteger(trialIndex) || trialIndex < 0) {
@@ -65,8 +75,37 @@ export function assertSubmittedTrialIndex(
 	if (submittedTrialIndex == null) return;
 
 	if (submittedTrialIndex !== expectedTrialIndex) {
-		throw new Error('Submission does not match the next expected trial.');
+		throw new ExperimentSubmissionError('Submission does not match the next expected trial.');
 	}
+}
+
+export function getSubmittedTrialIndex(timing: TrialSubmissionTiming | undefined): number | null {
+	assertValidTrialIndex(timing?.trialIndex);
+	return timing?.trialIndex ?? null;
+}
+
+export function duplicateSubmissionError(): never {
+	throw new ExperimentSubmissionError(
+		'This trial was already submitted with different data. Refresh the run before continuing.',
+		409
+	);
+}
+
+export function experimentSubmissionErrorStatus(error: unknown): number {
+	if (error instanceof ExperimentSubmissionError) return error.status;
+
+	if (!(error instanceof Error)) return 400;
+
+	if (
+		error.message.includes('UNIQUE constraint failed') ||
+		error.message.includes('SQLITE_CONSTRAINT')
+	) {
+		return 409;
+	}
+
+	if (error.message === 'Experiment run not found.') return 404;
+
+	return 400;
 }
 
 export function experimentSubmissionErrorMessage(error: unknown, fallback: string): string {

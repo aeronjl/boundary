@@ -22,6 +22,8 @@ import {
 import {
 	assertSubmittedTrialIndex,
 	createTimingMetadata,
+	duplicateSubmissionError,
+	getSubmittedTrialIndex,
 	getTrialStartedAt,
 	recordExperimentEvent,
 	recordExperimentResponse,
@@ -258,9 +260,10 @@ export async function submitOrientationResponse(
 	runId: string,
 	trialId: string,
 	response: OrientationDirection,
-	timing: TrialSubmissionTiming = {}
+	timing: TrialSubmissionTiming = {},
+	participantSessionId?: string
 ): Promise<OrientationSubmitResult> {
-	const run = await getExperimentRun(runId, orientationVersionId);
+	const run = await getExperimentRun(runId, orientationVersionId, participantSessionId);
 
 	if (!run) {
 		throw new Error('Experiment run not found.');
@@ -283,7 +286,24 @@ export async function submitOrientationResponse(
 
 	const trialIndex = responses.length;
 	const expectedTrialId = context.trialOrder[trialIndex];
-	assertSubmittedTrialIndex(timing.trialIndex, trialIndex);
+	const submittedTrialIndex = getSubmittedTrialIndex(timing);
+
+	if (submittedTrialIndex !== null && submittedTrialIndex < trialIndex) {
+		const existingResponse = responses.find(
+			(candidate) => candidate.trialIndex === submittedTrialIndex
+		);
+		const existingPayload = existingResponse
+			? parseJson<OrientationResponse>(existingResponse.responseJson)
+			: null;
+
+		if (existingPayload?.trialId !== trialId || existingPayload?.response !== response) {
+			duplicateSubmissionError();
+		}
+
+		return getOrientationCurrentStateOrResult(runId, context, responses);
+	}
+
+	assertSubmittedTrialIndex(submittedTrialIndex, trialIndex);
 
 	if (!expectedTrialId || expectedTrialId !== trialId) {
 		throw new Error('Response does not match the next expected trial.');
@@ -363,6 +383,31 @@ export async function submitOrientationResponse(
 	return {
 		completed: false,
 		...createState(runId, context, updatedResponses, outcome, nextTrialStarted.createdAt)
+	};
+}
+
+async function getOrientationCurrentStateOrResult(
+	runId: string,
+	context: OrientationStartedPayload,
+	responses: ResponseRow[]
+): Promise<OrientationSubmitResult> {
+	const lastOutcome = createLastOutcome(responses);
+
+	if (responses.length >= context.totalTrials) {
+		const result = await completeOrientationRun(runId, context, responses);
+
+		if (!lastOutcome) {
+			throw new Error('Orientation discrimination run has no response outcome.');
+		}
+
+		return { completed: true, runId, result, lastOutcome };
+	}
+
+	const trialStartedAt = await getTrialStartedAt(runId, responses.length);
+
+	return {
+		completed: false,
+		...createState(runId, context, responses, lastOutcome, trialStartedAt)
 	};
 }
 

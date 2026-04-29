@@ -15,6 +15,22 @@
 		return minutes > 0 ? `${minutes}m ${remainder}s` : `${seconds}s`;
 	};
 	const formatReason = (value: string | null) => value?.replaceAll('_', ' ') ?? '-';
+	const formatNumber = (value: number, fractionDigits = 1) => value.toFixed(fractionDigits);
+	const formatMetricValue = (metric: {
+		value: number | string | null;
+		format: 'number' | 'percent' | 'duration-ms' | 'text';
+	}) => {
+		if (metric.value === null) return '-';
+		if (typeof metric.value === 'string') return metric.value;
+		if (metric.format === 'percent') return formatPercent(metric.value);
+		if (metric.format === 'duration-ms') return formatDuration(metric.value);
+		return formatNumber(metric.value, Number.isInteger(metric.value) ? 0 : 1);
+	};
+	const barWidth = (value: number | null) => `${Math.max(0, Math.min(1, value ?? 0)) * 100}%`;
+	const countBarWidth = (count: number, max: number) =>
+		`${max > 0 ? Math.max(0, Math.min(1, count / max)) * 100 : 0}%`;
+
+	$: maxDropOffCount = Math.max(0, ...data.dropOffTasks.map((task) => task.count));
 </script>
 
 <svelte:head>
@@ -100,7 +116,7 @@
 	<div>
 		<h2 class="font-serif text-xl">Task completion</h2>
 		<div class="mt-2 overflow-x-auto border-t border-gray-200">
-			<table class="w-full min-w-[860px] text-left text-xs">
+			<table class="w-full min-w-[1080px] text-left text-xs">
 				<thead class="text-gray-500">
 					<tr>
 						<th class="py-2 pr-3 font-medium">Task</th>
@@ -110,6 +126,7 @@
 						<th class="py-2 pr-3 font-medium">Drop-offs</th>
 						<th class="py-2 pr-3 font-medium">Median duration</th>
 						<th class="py-2 pr-3 font-medium">Integrity flags</th>
+						<th class="py-2 pr-3 font-medium">Primary metrics</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -121,10 +138,32 @@
 							</td>
 							<td class="py-2 pr-3">{task.startedSessions} of {task.totalSessions}</td>
 							<td class="py-2 pr-3">{task.completedSessions} of {task.totalSessions}</td>
-							<td class="py-2 pr-3">{formatPercent(task.completionRate)}</td>
+							<td class="py-2 pr-3">
+								<div class="flex min-w-36 items-center gap-2">
+									<div class="h-1.5 w-20 bg-gray-100">
+										<div
+											class="h-full bg-black"
+											style={`width: ${barWidth(task.completionRate)}`}
+										></div>
+									</div>
+									<span>{formatPercent(task.completionRate)}</span>
+								</div>
+							</td>
 							<td class="py-2 pr-3">{task.dropOffCount}</td>
 							<td class="py-2 pr-3">{formatDuration(task.medianDurationMs)}</td>
 							<td class="py-2 pr-3">{task.integrityFlagCount}</td>
+							<td class="py-2 pr-3">
+								<div class="flex flex-wrap gap-x-3 gap-y-1">
+									{#each task.metricSummaries as metric (metric.key)}
+										<span>
+											<span class="text-gray-500">{metric.label}:</span>
+											{formatMetricValue(metric)}
+										</span>
+									{:else}
+										<span class="text-gray-500">-</span>
+									{/each}
+								</div>
+							</td>
 						</tr>
 					{/each}
 				</tbody>
@@ -146,7 +185,17 @@
 					{#each data.dropOffTasks as task (task.slug)}
 						<tr class="border-t border-gray-100">
 							<td class="py-2 pr-3">{task.position}. {task.name}</td>
-							<td class="py-2 pr-3">{task.count}</td>
+							<td class="py-2 pr-3">
+								<div class="flex min-w-40 items-center gap-2">
+									<div class="h-1.5 w-28 bg-gray-100">
+										<div
+											class="h-full bg-black"
+											style={`width: ${countBarWidth(task.count, maxDropOffCount)}`}
+										></div>
+									</div>
+									<span>{task.count}</span>
+								</div>
+							</td>
 						</tr>
 					{:else}
 						<tr>

@@ -469,7 +469,7 @@ function createIntertemporalSummary(
 	);
 	const completedResult = isRecord(completedPayload?.result) ? completedPayload.result : null;
 
-	if (choiceResponses.length === 0 && !completedResult) return null;
+	if (choiceResponses.length === 0) return null;
 
 	const config = isRecord(startedPayload?.config) ? startedPayload.config : null;
 	const initialWealth = numberValue(config?.initialWealth) ?? 0;
@@ -536,7 +536,7 @@ function createOrientationSummary(
 	);
 	const completedResult = isRecord(completedPayload?.result) ? completedPayload.result : null;
 
-	if (orientationResponses.length === 0 && !completedResult) return null;
+	if (orientationResponses.length === 0) return null;
 
 	const correctCount =
 		numberValue(completedResult?.correctCount) ??
@@ -586,7 +586,7 @@ function createNBackSummary(
 	);
 	const completedResult = isRecord(completedPayload?.result) ? completedPayload.result : null;
 
-	if (nBackResponses.length === 0 && !completedResult) return null;
+	if (nBackResponses.length === 0) return null;
 
 	let computedCorrectCount = 0;
 	let hits = 0;

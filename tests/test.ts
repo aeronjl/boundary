@@ -25,6 +25,7 @@ type StudyExportTask = {
 	status: string;
 	runId: string | null;
 	metrics: string[];
+	metricValues: { key: string; value: number | string | null }[];
 };
 
 type StudyExportStudy = {
@@ -370,6 +371,11 @@ test('study runner tracks task progress across experiments', async ({ page }) =>
 	expect(studyExport.integrityFlags.map((flag: { code: string }) => flag.code)).toContain(
 		'partial_session'
 	);
+	expect(
+		studyExport.tasks.find(
+			(task: StudyExportStudy['tasks'][number]) => task.slug === 'orientation-discrimination'
+		)?.metricValues
+	).toEqual(expect.arrayContaining([expect.objectContaining({ key: 'accuracy' })]));
 
 	const studiesCsvResponse = await page.request.get('/admin/studies/export.csv');
 	expect(studiesCsvResponse.status()).toBe(200);
@@ -482,12 +488,18 @@ test('study runner completes the full protocol and exposes analysis', async ({ p
 	await expect(page.getByRole('heading', { name: 'Task completion' })).toBeVisible();
 	await expect(page.getByRole('heading', { name: 'Participant summaries' })).toBeVisible();
 	await expect(page.getByText('5 of 5').first()).toBeVisible();
+	await expect(page.getByText(/Accuracy:/).first()).toBeVisible();
+	await expect(page.getByText(/Final wealth:/).first()).toBeVisible();
+	await expect(page.getByText(/Extroversion:/).first()).toBeVisible();
 
 	const participantCsvResponse = await page.request.get('/admin/studies/analysis/export.csv');
 	expect(participantCsvResponse.status()).toBe(200);
 	const participantCsv = await participantCsvResponse.text();
 	expect(participantCsv).toContain('"study_session_id","participant_session_id"');
 	expect(participantCsv).toContain('"ten_item_personality_inventory_status"');
+	expect(participantCsv).toContain('"orientation_discrimination_accuracy"');
+	expect(participantCsv).toContain('"intertemporal_choice_final_wealth"');
+	expect(participantCsv).toContain('"ten_item_personality_inventory_extroversion"');
 	expect(participantCsv).toContain('"completed"');
 
 	const completedStudyId = completedStudy.id as string;

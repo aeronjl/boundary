@@ -1,4 +1,5 @@
 import { asc, desc, eq, inArray } from 'drizzle-orm';
+import { tipiScales } from '$lib/experiments/tipi';
 import { boundaryStudyProtocol, type StudyProtocolTask } from '$lib/studies/protocol';
 import { db } from '$lib/server/db';
 import {
@@ -15,6 +16,7 @@ import {
 import { getAdminExperimentRun, type AdminExperimentRun } from './experiments';
 
 export type AdminStudyTaskStatus = 'pending' | 'started' | 'completed';
+export type AdminStudyMetricFormat = 'number' | 'percent' | 'duration-ms' | 'text';
 
 export const adminStudyReviewStatuses = ['included', 'review', 'excluded'] as const;
 export const adminStudyReviewReasons = [
@@ -72,6 +74,17 @@ export type AdminStudyRunLink = {
 	eventCount: number;
 };
 
+export type AdminStudyMetricValue = {
+	key: string;
+	label: string;
+	value: number | string | null;
+	format: AdminStudyMetricFormat;
+};
+
+export type AdminStudyTaskAnalysisMetric = AdminStudyMetricValue & {
+	sampleSize: number;
+};
+
 export type AdminStudyTaskSummary = StudyProtocolTask & {
 	id: string;
 	status: AdminStudyTaskStatus;
@@ -80,6 +93,7 @@ export type AdminStudyTaskSummary = StudyProtocolTask & {
 	completedAt: number | null;
 	run: AdminStudyRunLink | null;
 	metrics: string[];
+	metricValues: AdminStudyMetricValue[];
 	resultSummary: unknown;
 	integrityFlags: AdminStudyIntegrityFlag[];
 };
@@ -148,6 +162,7 @@ export type AdminStudyTaskAnalysis = {
 	dropOffCount: number;
 	medianDurationMs: number | null;
 	integrityFlagCount: number;
+	metricSummaries: AdminStudyTaskAnalysisMetric[];
 };
 
 export type AdminStudyParticipantSummaryRow = {
@@ -169,6 +184,7 @@ export type AdminStudyParticipantSummaryRow = {
 	taskStatuses: Record<string, AdminStudyTaskStatus | 'missing'>;
 	taskRunIds: Record<string, string | null>;
 	taskDurationsMs: Record<string, number | null>;
+	taskMetricValues: Record<string, Record<string, number | string | null>>;
 };
 
 export type AdminStudyAnalysis = {
@@ -359,6 +375,11 @@ function ratio(numerator: number, denominator: number): number | null {
 	return denominator > 0 ? numerator / denominator : null;
 }
 
+function mean(values: number[]): number | null {
+	if (values.length === 0) return null;
+	return values.reduce((total, value) => total + value, 0) / values.length;
+}
+
 function median(values: number[]): number | null {
 	if (values.length === 0) return null;
 	const sorted = [...values].sort((left, right) => left - right);
@@ -375,6 +396,285 @@ function numberValue(value: unknown): number | null {
 	return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
+function stringValue(value: unknown): string | null {
+	return typeof value === 'string' ? value : null;
+}
+
+type StudyMetricAggregate = 'mean' | 'median' | 'mode';
+
+type StudyMetricDefinition = {
+	taskSlug: string;
+	key: string;
+	label: string;
+	format: AdminStudyMetricFormat;
+	aggregate: StudyMetricAggregate;
+	showInSummary: boolean;
+	extract: (result: Record<string, unknown>) => number | string | null;
+};
+
+function nestedNumber(value: unknown, path: readonly string[]): number | null {
+	let current = value;
+
+	for (const key of path) {
+		const record = isRecord(current) ? current : null;
+		current = record?.[key];
+	}
+
+	return numberValue(current);
+}
+
+function resultRatio(
+	result: Record<string, unknown>,
+	numeratorKey: string,
+	denominatorKey: string
+): number | null {
+	const numerator = numberValue(result[numeratorKey]);
+	const denominator = numberValue(result[denominatorKey]);
+	return numerator === null || denominator === null ? null : ratio(numerator, denominator);
+}
+
+function banditBestArmSelectionRate(result: Record<string, unknown>): number | null {
+	const bestArmId = stringValue(result.bestArmId);
+	const arms = Array.isArray(result.arms)
+		? result.arms.flatMap((arm) => (isRecord(arm) ? [arm] : []))
+		: [];
+
+	if (!bestArmId || arms.length === 0) return null;
+
+	const totalPulls = arms.reduce((total, arm) => total + (numberValue(arm.pulls) ?? 0), 0);
+	const bestArmPulls = numberValue(arms.find((arm) => arm.id === bestArmId)?.pulls) ?? 0;
+
+	return ratio(bestArmPulls, totalPulls);
+}
+
+function capitalizedLabel(value: string): string {
+	return value.charAt(0).toUpperCase() + value.slice(1).replaceAll('-', ' ');
+}
+
+const studyMetricDefinitions = [
+	{
+		taskSlug: 'orientation-discrimination',
+		key: 'accuracy',
+		label: 'Accuracy',
+		format: 'percent',
+		aggregate: 'mean',
+		showInSummary: true,
+		extract: (result) => numberValue(result.accuracy)
+	},
+	{
+		taskSlug: 'orientation-discrimination',
+		key: 'correct_count',
+		label: 'Correct',
+		format: 'number',
+		aggregate: 'mean',
+		showInSummary: false,
+		extract: (result) => numberValue(result.correctCount)
+	},
+	{
+		taskSlug: 'orientation-discrimination',
+		key: 'mean_response_time_ms',
+		label: 'Mean RT',
+		format: 'duration-ms',
+		aggregate: 'median',
+		showInSummary: true,
+		extract: (result) => numberValue(result.meanResponseTimeMs)
+	},
+	{
+		taskSlug: 'intertemporal-choice',
+		key: 'delayed_choice_rate',
+		label: 'Delayed choices',
+		format: 'percent',
+		aggregate: 'mean',
+		showInSummary: true,
+		extract: (result) => resultRatio(result, 'delayedChoiceCount', 'totalTrials')
+	},
+	{
+		taskSlug: 'intertemporal-choice',
+		key: 'final_wealth',
+		label: 'Final wealth',
+		format: 'number',
+		aggregate: 'mean',
+		showInSummary: true,
+		extract: (result) => numberValue(result.finalWealth)
+	},
+	{
+		taskSlug: 'intertemporal-choice',
+		key: 'net_gain',
+		label: 'Net gain',
+		format: 'number',
+		aggregate: 'mean',
+		showInSummary: false,
+		extract: (result) => numberValue(result.netGain)
+	},
+	{
+		taskSlug: 'intertemporal-choice',
+		key: 'average_delay_seconds',
+		label: 'Average delay',
+		format: 'number',
+		aggregate: 'mean',
+		showInSummary: false,
+		extract: (result) => numberValue(result.averageDelaySeconds)
+	},
+	{
+		taskSlug: 'n-back',
+		key: 'accuracy',
+		label: 'Accuracy',
+		format: 'percent',
+		aggregate: 'mean',
+		showInSummary: true,
+		extract: (result) => numberValue(result.accuracy)
+	},
+	{
+		taskSlug: 'n-back',
+		key: 'hits',
+		label: 'Hits',
+		format: 'number',
+		aggregate: 'mean',
+		showInSummary: false,
+		extract: (result) => numberValue(result.hits)
+	},
+	{
+		taskSlug: 'n-back',
+		key: 'misses',
+		label: 'Misses',
+		format: 'number',
+		aggregate: 'mean',
+		showInSummary: false,
+		extract: (result) => numberValue(result.misses)
+	},
+	{
+		taskSlug: 'n-back',
+		key: 'false_alarms',
+		label: 'False alarms',
+		format: 'number',
+		aggregate: 'mean',
+		showInSummary: true,
+		extract: (result) => numberValue(result.falseAlarms)
+	},
+	{
+		taskSlug: 'n-back',
+		key: 'mean_response_time_ms',
+		label: 'Mean RT',
+		format: 'duration-ms',
+		aggregate: 'median',
+		showInSummary: true,
+		extract: (result) => numberValue(result.meanResponseTimeMs)
+	},
+	{
+		taskSlug: 'n-armed-bandit',
+		key: 'total_reward',
+		label: 'Total reward',
+		format: 'number',
+		aggregate: 'mean',
+		showInSummary: true,
+		extract: (result) => numberValue(result.totalReward)
+	},
+	{
+		taskSlug: 'n-armed-bandit',
+		key: 'best_arm_selection_rate',
+		label: 'Best arm rate',
+		format: 'percent',
+		aggregate: 'mean',
+		showInSummary: true,
+		extract: banditBestArmSelectionRate
+	},
+	{
+		taskSlug: 'n-armed-bandit',
+		key: 'best_arm_id',
+		label: 'Best arm',
+		format: 'text',
+		aggregate: 'mode',
+		showInSummary: false,
+		extract: (result) => stringValue(result.bestArmId)
+	},
+	...tipiScales.map((scale) => ({
+		taskSlug: 'ten-item-personality-inventory',
+		key: scale,
+		label: capitalizedLabel(scale),
+		format: 'number' as const,
+		aggregate: 'mean' as const,
+		showInSummary: true,
+		extract: (result: Record<string, unknown>) => nestedNumber(result.scores, [scale, 'average'])
+	}))
+] satisfies StudyMetricDefinition[];
+
+function studyMetricDefinitionsFor(taskSlug: string): StudyMetricDefinition[] {
+	return studyMetricDefinitions.filter((definition) => definition.taskSlug === taskSlug);
+}
+
+function createTaskMetricValues(taskSlug: string, resultSummary: unknown): AdminStudyMetricValue[] {
+	const result = isRecord(resultSummary) ? resultSummary : null;
+
+	if (!result) return [];
+
+	return studyMetricDefinitionsFor(taskSlug).flatMap((definition) => {
+		const value = definition.extract(result);
+
+		return value === null
+			? []
+			: [
+					{
+						key: definition.key,
+						label: definition.label,
+						value,
+						format: definition.format
+					}
+				];
+	});
+}
+
+function mode(values: string[]): string | null {
+	if (values.length === 0) return null;
+
+	const counts = new Map<string, number>();
+
+	for (const value of values) {
+		counts.set(value, (counts.get(value) ?? 0) + 1);
+	}
+
+	return [...counts.entries()].sort(
+		(left, right) => right[1] - left[1] || left[0].localeCompare(right[0])
+	)[0][0];
+}
+
+function summarizeMetricValues(
+	values: (number | string)[],
+	aggregate: StudyMetricAggregate
+): number | string | null {
+	if (aggregate === 'mode')
+		return mode(values.flatMap((value) => (typeof value === 'string' ? [value] : [])));
+
+	const numbers = values.flatMap((value) => (typeof value === 'number' ? [value] : []));
+	return aggregate === 'median' ? median(numbers) : mean(numbers);
+}
+
+function createTaskMetricSummaries(
+	taskSlug: string,
+	tasks: AdminStudyTaskSummary[]
+): AdminStudyTaskAnalysisMetric[] {
+	return studyMetricDefinitionsFor(taskSlug)
+		.filter((definition) => definition.showInSummary)
+		.flatMap((definition) => {
+			const values = tasks.flatMap((task) => {
+				const value = task.metricValues.find((metric) => metric.key === definition.key)?.value;
+				return value === undefined || value === null ? [] : [value];
+			});
+			const value = summarizeMetricValues(values, definition.aggregate);
+
+			return value === null
+				? []
+				: [
+						{
+							key: definition.key,
+							label: definition.label,
+							format: definition.format,
+							value,
+							sampleSize: values.length
+						}
+					];
+		});
+}
+
 function completedResult(run: AdminExperimentRun): Record<string, unknown> | null {
 	const completedEvent = run.events.find((event) => event.eventType === 'run_completed');
 	const payload = isRecord(completedEvent?.payload) ? completedEvent.payload : null;
@@ -385,21 +685,21 @@ function completedResult(run: AdminExperimentRun): Record<string, unknown> | nul
 function createRunMetrics(run: AdminExperimentRun | null): string[] {
 	if (!run) return [];
 
-	if (run.orientationSummary) {
+	if (run.experimentSlug === 'orientation-discrimination' && run.orientationSummary) {
 		return [
 			`accuracy ${(run.orientationSummary.accuracy * 100).toFixed(0)}%`,
 			`correct ${run.orientationSummary.correctCount}/${run.orientationSummary.totalTrials}`
 		];
 	}
 
-	if (run.intertemporalSummary) {
+	if (run.experimentSlug === 'intertemporal-choice' && run.intertemporalSummary) {
 		return [
 			`delayed ${run.intertemporalSummary.delayedChoiceCount}/${run.intertemporalSummary.totalTrials}`,
 			`wealth ${run.intertemporalSummary.finalWealth.toFixed(0)}`
 		];
 	}
 
-	if (run.nBackSummary) {
+	if (run.experimentSlug === 'n-back' && run.nBackSummary) {
 		return [
 			`accuracy ${(run.nBackSummary.accuracy * 100).toFixed(0)}%`,
 			`hits ${run.nBackSummary.hits}`,
@@ -407,7 +707,7 @@ function createRunMetrics(run: AdminExperimentRun | null): string[] {
 		];
 	}
 
-	if (run.banditSummary) {
+	if (run.experimentSlug === 'n-armed-bandit' && run.banditSummary) {
 		return [
 			`reward ${run.banditSummary.totalReward}`,
 			`best arm ${run.banditSummary.bestArmId ?? '-'}`
@@ -429,10 +729,12 @@ function createRunMetrics(run: AdminExperimentRun | null): string[] {
 
 function createResultSummary(run: AdminExperimentRun | null): unknown {
 	if (!run) return null;
-	if (run.orientationSummary) return run.orientationSummary;
-	if (run.intertemporalSummary) return run.intertemporalSummary;
-	if (run.nBackSummary) return run.nBackSummary;
-	if (run.banditSummary) return run.banditSummary;
+
+	if (run.experimentSlug === 'orientation-discrimination') return run.orientationSummary;
+	if (run.experimentSlug === 'intertemporal-choice') return run.intertemporalSummary;
+	if (run.experimentSlug === 'n-back') return run.nBackSummary;
+	if (run.experimentSlug === 'n-armed-bandit') return run.banditSummary;
+
 	return completedResult(run);
 }
 
@@ -669,6 +971,7 @@ function toAdminStudySession(
 		.map((task) => {
 			const run = task.runId ? (runLinksById.get(task.runId) ?? null) : null;
 			const detail = task.runId ? (runDetailsById.get(task.runId) ?? null) : null;
+			const resultSummary = createResultSummary(detail);
 
 			return {
 				...taskDefinitionBySlug(task),
@@ -680,7 +983,8 @@ function toAdminStudySession(
 				completedAt: task.completedAt,
 				run,
 				metrics: createRunMetrics(detail),
-				resultSummary: createResultSummary(detail),
+				metricValues: createTaskMetricValues(task.experimentSlug, resultSummary),
+				resultSummary,
 				integrityFlags: createTaskFlags(session, task, run)
 			};
 		});
@@ -955,6 +1259,17 @@ function toParticipantSummaryRow(study: AdminStudySessionSummary): AdminStudyPar
 			return [task.slug, studyTask ? taskDurationMs(studyTask) : null];
 		})
 	) as Record<string, number | null>;
+	const taskMetricValues = Object.fromEntries(
+		boundaryStudyProtocol.tasks.map((task) => {
+			const studyTask = study.tasks.find((candidate) => candidate.slug === task.slug);
+			return [
+				task.slug,
+				Object.fromEntries(
+					(studyTask?.metricValues ?? []).map((metric) => [metric.key, metric.value])
+				)
+			];
+		})
+	) as Record<string, Record<string, number | string | null>>;
 
 	return {
 		studySessionId: study.id,
@@ -974,7 +1289,8 @@ function toParticipantSummaryRow(study: AdminStudySessionSummary): AdminStudyPar
 		integrityFlags: study.integrityFlags.map((flag) => flag.code),
 		taskStatuses,
 		taskRunIds,
-		taskDurationsMs
+		taskDurationsMs,
+		taskMetricValues
 	};
 }
 
@@ -1030,7 +1346,8 @@ function createTaskAnalysis(studies: AdminStudySessionSummary[]): AdminStudyTask
 			integrityFlagCount: matchingTasks.reduce(
 				(total, candidate) => total + candidate.integrityFlags.length,
 				0
-			)
+			),
+			metricSummaries: createTaskMetricSummaries(task.slug, matchingTasks)
 		};
 	});
 }
@@ -1038,11 +1355,14 @@ function createTaskAnalysis(studies: AdminStudySessionSummary[]): AdminStudyTask
 export async function getAdminStudyAnalysis(
 	filters: AdminStudyAnalysisFilters = { reviewStatus: 'included' }
 ): Promise<AdminStudyAnalysis> {
-	const studies = await listAdminStudySessions({
-		status: '',
-		reviewStatus: filters.reviewStatus,
-		reason: ''
-	});
+	const { studies: allStudies } = await getAdminStudyExport();
+	const studies = allStudies.filter((study) =>
+		matchesStudySessionFilters(study, {
+			status: '',
+			reviewStatus: filters.reviewStatus,
+			reason: ''
+		})
+	);
 	const completedSessions = studies.filter((study) => study.status === 'completed').length;
 	const integrityFlags = studies.flatMap((study) => study.integrityFlags);
 	const studyDurations = studies.flatMap((study) => {
@@ -1086,7 +1406,12 @@ export async function getAdminStudyParticipantSummaryCsv(
 	const { participants } = await getAdminStudyAnalysis(filters);
 	const dynamicHeaders = boundaryStudyProtocol.tasks.flatMap((task) => {
 		const prefix = taskCsvPrefix(task);
-		return [`${prefix}_status`, `${prefix}_run_id`, `${prefix}_duration_ms`];
+		return [
+			`${prefix}_status`,
+			`${prefix}_run_id`,
+			`${prefix}_duration_ms`,
+			...studyMetricDefinitionsFor(task.slug).map((definition) => `${prefix}_${definition.key}`)
+		];
 	});
 	const rows = [[...studyAnalysisBaseCsvHeaders, ...dynamicHeaders].map(csvCell).join(',')];
 
@@ -1111,11 +1436,18 @@ export async function getAdminStudyParticipantSummaryCsv(
 				participant.currentTaskName,
 				participant.integrityFlags.length,
 				participant.integrityFlags.join('|'),
-				...boundaryStudyProtocol.tasks.flatMap((task) => [
-					participant.taskStatuses[task.slug],
-					participant.taskRunIds[task.slug],
-					participant.taskDurationsMs[task.slug]
-				])
+				...boundaryStudyProtocol.tasks.flatMap((task) => {
+					const metricValues = participant.taskMetricValues[task.slug] ?? {};
+
+					return [
+						participant.taskStatuses[task.slug],
+						participant.taskRunIds[task.slug],
+						participant.taskDurationsMs[task.slug],
+						...studyMetricDefinitionsFor(task.slug).map(
+							(definition) => metricValues[definition.key] ?? null
+						)
+					];
+				})
 			]
 				.map(csvCell)
 				.join(',')

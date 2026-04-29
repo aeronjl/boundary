@@ -33,6 +33,8 @@ type StudyExportStudy = {
 	completedTasks: number;
 	totalTasks: number;
 	integrityFlags: { code: string; label: string }[];
+	qualityFlags: { code: string; label: string }[];
+	needsReview: boolean;
 	review: { status: string; reason: string | null; note: string };
 	tasks: (StudyExportTask & { resultSummary: unknown })[];
 };
@@ -371,6 +373,10 @@ test('study runner tracks task progress across experiments', async ({ page }) =>
 	expect(studyExport.integrityFlags.map((flag: { code: string }) => flag.code)).toContain(
 		'partial_session'
 	);
+	expect(studyExport.needsReview).toBe(true);
+	expect(studyExport.qualityFlags.map((flag: { code: string }) => flag.code)).toContain(
+		'incomplete_study_session'
+	);
 	expect(
 		studyExport.tasks.find(
 			(task: StudyExportStudy['tasks'][number]) => task.slug === 'orientation-discrimination'
@@ -381,11 +387,18 @@ test('study runner tracks task progress across experiments', async ({ page }) =>
 	expect(studiesCsvResponse.status()).toBe(200);
 	expect(await studiesCsvResponse.text()).toContain('"study_session_id","participant_session_id"');
 
-	const studyLink = page.getByRole('link', { name: /View study/ }).first();
+	await page.goto('/admin/studies?quality=needs_review');
+	await expect(page.getByText('1 of 5').first()).toBeVisible();
+	const partialStudyRow = page.getByRole('row').filter({ hasText: '1 of 5' }).first();
+	await expect(partialStudyRow).toContainText('needs review');
+
+	const studyLink = partialStudyRow.getByRole('link', { name: /View study/ });
 	const studyHref = await studyLink.getAttribute('href');
 	expect(studyHref).toBeTruthy();
 	await studyLink.click();
 	await expect(page.getByRole('heading', { name: 'Study detail' })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Quality review' })).toBeVisible();
+	await expect(page.getByText('Study session is incomplete')).toBeVisible();
 	await expect(page.getByRole('heading', { name: 'Integrity checks' })).toBeVisible();
 	await expect(page.getByText('Partial session')).toBeVisible();
 	await expect(page.getByRole('heading', { name: 'Task timeline' })).toBeVisible();
@@ -485,6 +498,7 @@ test('study runner completes the full protocol and exposes analysis', async ({ p
 	await expect(page.locator('p', { hasText: 'Study sessions' }).first()).toBeVisible();
 	await expect(page.getByText('Completion rate')).toBeVisible();
 	await expect(page.getByText('Median study duration')).toBeVisible();
+	await expect(page.getByText('Quality flags')).toBeVisible();
 	await expect(page.getByRole('heading', { name: 'Task completion' })).toBeVisible();
 	await expect(page.getByRole('heading', { name: 'Participant summaries' })).toBeVisible();
 	await expect(page.getByText('5 of 5').first()).toBeVisible();
@@ -496,6 +510,7 @@ test('study runner completes the full protocol and exposes analysis', async ({ p
 	expect(participantCsvResponse.status()).toBe(200);
 	const participantCsv = await participantCsvResponse.text();
 	expect(participantCsv).toContain('"study_session_id","participant_session_id"');
+	expect(participantCsv).toContain('"needs_review","quality_flag_count","quality_flags"');
 	expect(participantCsv).toContain('"ten_item_personality_inventory_status"');
 	expect(participantCsv).toContain('"orientation_discrimination_accuracy"');
 	expect(participantCsv).toContain('"intertemporal_choice_final_wealth"');

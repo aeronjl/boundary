@@ -74,7 +74,7 @@
 		</a>
 	</form>
 
-	<div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+	<div class="grid grid-cols-2 gap-3 md:grid-cols-5">
 		<div class="border-t border-gray-200 py-3">
 			<p class="text-xs text-gray-500">Study sessions</p>
 			<p class="font-serif text-2xl">{data.overview.totalSessions}</p>
@@ -102,6 +102,14 @@
 		<div class="border-t border-gray-200 py-3">
 			<p class="text-xs text-gray-500">Top drop-off task</p>
 			<p>{data.dropOffTask ? `${data.dropOffTask.name} (${data.dropOffTask.count})` : '-'}</p>
+		</div>
+		<div class="border-t border-gray-200 py-3">
+			<p class="text-xs text-gray-500">Needs review</p>
+			<p class="font-serif text-2xl">{data.overview.needsReviewSessions}</p>
+		</div>
+		<div class="border-t border-gray-200 py-3">
+			<p class="text-xs text-gray-500">Quality flags</p>
+			<p class="font-serif text-2xl">{data.overview.qualityFlagCount}</p>
 		</div>
 		<div class="border-t border-gray-200 py-3">
 			<p class="text-xs text-gray-500">Integrity flags</p>
@@ -210,7 +218,7 @@
 	<div>
 		<h2 class="font-serif text-xl">Participant summaries</h2>
 		<div class="mt-2 overflow-x-auto border-t border-gray-200">
-			<table class="w-full min-w-[1180px] text-left text-xs">
+			<table class="w-full min-w-[1280px] text-left text-xs">
 				<thead class="text-gray-500">
 					<tr>
 						<th class="py-2 pr-3 font-medium">Study</th>
@@ -220,6 +228,7 @@
 						<th class="py-2 pr-3 font-medium">Progress</th>
 						<th class="py-2 pr-3 font-medium">Duration</th>
 						<th class="py-2 pr-3 font-medium">Current task</th>
+						<th class="py-2 pr-3 font-medium">Quality</th>
 						<th class="py-2 pr-3 font-medium">Integrity flags</th>
 					</tr>
 				</thead>
@@ -255,6 +264,14 @@
 							<td class="py-2 pr-3">{formatDuration(participant.studyDurationMs)}</td>
 							<td class="py-2 pr-3">{participant.currentTaskName ?? '-'}</td>
 							<td class="py-2 pr-3">
+								<span>{participant.needsReview ? 'needs review' : 'clear'}</span>
+								{#if participant.qualityFlags.length > 0}
+									<div class="mt-1 max-w-56 text-gray-600">
+										{participant.qualityFlags.join(', ')}
+									</div>
+								{/if}
+							</td>
+							<td class="py-2 pr-3">
 								{participant.integrityFlags.length > 0
 									? participant.integrityFlags.join(', ')
 									: '-'}
@@ -262,7 +279,7 @@
 						</tr>
 					{:else}
 						<tr>
-							<td class="py-4 text-gray-500" colspan="8">No study sessions match this filter.</td>
+							<td class="py-4 text-gray-500" colspan="9">No study sessions match this filter.</td>
 						</tr>
 					{/each}
 				</tbody>

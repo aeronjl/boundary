@@ -19,6 +19,7 @@ export const load: PageServerLoad = async ({ cookies, url }) => {
 		filters,
 		reviewStatuses: adminStudyReviewStatuses,
 		reviewReasons: adminStudyReviewReasons,
+		qualityFilters: ['needs_review'],
 		statuses: ['pending', 'started', 'completed'],
 		studies: await listAdminStudySessions(filters)
 	};

@@ -60,6 +60,10 @@
 			<p>{study.status}</p>
 		</div>
 		<div class="border-t border-gray-200 py-3">
+			<p class="text-xs text-gray-500">Quality</p>
+			<p>{study.needsReview ? 'needs review' : 'clear'}</p>
+		</div>
+		<div class="border-t border-gray-200 py-3">
 			<p class="text-xs text-gray-500">Progress</p>
 			<p class="font-serif text-2xl">{study.completedTasks} of {study.totalTasks}</p>
 		</div>
@@ -78,6 +82,24 @@
 		<div class="border-t border-gray-200 py-3">
 			<p class="text-xs text-gray-500">Current task</p>
 			<p>{study.currentTask?.name ?? '-'}</p>
+		</div>
+	</div>
+
+	<div>
+		<h2 class="font-serif text-xl">Quality review</h2>
+		<div class="mt-2 border-t border-gray-200 pt-3">
+			{#if study.qualityFlags.length > 0}
+				<ul class="flex flex-col gap-1">
+					{#each study.qualityFlags as flag, index (`${flag.code}-${index}`)}
+						<li>
+							<span class="font-medium">{flag.label}</span>
+							<span class="font-mono text-xs text-gray-500">({flag.severity}, {flag.code})</span>
+						</li>
+					{/each}
+				</ul>
+			{:else}
+				<p class="text-gray-500">No quality flags.</p>
+			{/if}
 		</div>
 	</div>
 

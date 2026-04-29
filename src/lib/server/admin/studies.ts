@@ -8,6 +8,7 @@ import {
 	experimentRuns,
 	experimentVersions,
 	experiments,
+	participantConsents,
 	participantSessions,
 	studySessionReviews,
 	studySessions,
@@ -49,6 +50,7 @@ export type AdminStudySessionFilters = {
 	status: '' | AdminStudyTaskStatus;
 	reviewStatus: '' | 'all' | AdminStudyReviewStatus;
 	reason: '' | AdminStudyReviewReason;
+	quality: '' | 'needs_review';
 };
 
 export type AdminStudyAnalysisFilters = {
@@ -119,6 +121,8 @@ export type AdminStudySessionSummary = {
 	currentTask: AdminStudyTaskSummary | null;
 	tasks: AdminStudyTaskSummary[];
 	integrityFlags: AdminStudyIntegrityFlag[];
+	qualityFlags: AdminStudyIntegrityFlag[];
+	needsReview: boolean;
 	review: AdminStudyReview;
 };
 
@@ -146,6 +150,8 @@ export type AdminStudyAnalysisOverview = {
 	medianStudyDurationMs: number | null;
 	medianTaskDurationMs: number | null;
 	integrityFlagCount: number;
+	qualityFlagCount: number;
+	needsReviewSessions: number;
 	errorFlagCount: number;
 	warningFlagCount: number;
 	infoFlagCount: number;
@@ -181,6 +187,8 @@ export type AdminStudyParticipantSummaryRow = {
 	currentTaskSlug: string | null;
 	currentTaskName: string | null;
 	integrityFlags: string[];
+	qualityFlags: string[];
+	needsReview: boolean;
 	taskStatuses: Record<string, AdminStudyTaskStatus | 'missing'>;
 	taskRunIds: Record<string, string | null>;
 	taskDurationsMs: Record<string, number | null>;
@@ -220,6 +228,8 @@ const studyCsvHeaders = [
 	'study_updated_at',
 	'completed_tasks',
 	'total_tasks',
+	'needs_review',
+	'quality_flags',
 	'session_integrity_flags',
 	'task_position',
 	'task_slug',
@@ -253,6 +263,9 @@ const studyAnalysisBaseCsvHeaders = [
 	'completed_tasks',
 	'total_tasks',
 	'completion_rate',
+	'needs_review',
+	'quality_flag_count',
+	'quality_flags',
 	'current_task_slug',
 	'current_task_name',
 	'integrity_flag_count',
@@ -292,6 +305,10 @@ function parseAdminStudyReviewStatusFilter(
 
 function parseAdminStudyReviewReasonFilter(value: unknown): '' | AdminStudyReviewReason {
 	return value === '' || value === null ? '' : (parseAdminStudyReviewReason(value) ?? '');
+}
+
+function parseAdminStudyQualityFilter(value: unknown): '' | 'needs_review' {
+	return value === 'needs_review' ? 'needs_review' : '';
 }
 
 export function defaultAdminStudyReview(): AdminStudyReview {
@@ -353,6 +370,18 @@ function countByRunId(rows: { runId: string }[]): Map<string, number> {
 
 	for (const row of rows) {
 		counts.set(row.runId, (counts.get(row.runId) ?? 0) + 1);
+	}
+
+	return counts;
+}
+
+function countByParticipantSessionId(
+	rows: { participantSessionId: string }[]
+): Map<string, number> {
+	const counts = new Map<string, number>();
+
+	for (const row of rows) {
+		counts.set(row.participantSessionId, (counts.get(row.participantSessionId) ?? 0) + 1);
 	}
 
 	return counts;
@@ -769,6 +798,7 @@ function matchesStudySessionFilters(
 		return false;
 	}
 	if (filters.reason && study.review.reason !== filters.reason) return false;
+	if (filters.quality === 'needs_review' && !study.needsReview) return false;
 	return true;
 }
 
@@ -917,6 +947,125 @@ function createSessionFlags(
 	return [...flags, ...taskFlags];
 }
 
+const fastStudyDurationMs = 60_000;
+const fastTaskDurationMs = 1_500;
+const fastMeanResponseTimeMs = 150;
+
+function createSessionQualityFlags(
+	study: Pick<
+		AdminStudySessionSummary,
+		'status' | 'startedAt' | 'completedAt' | 'tasks' | 'completedTasks' | 'totalTasks'
+	>,
+	consentCount: number,
+	participantStudyCount: number
+): AdminStudyIntegrityFlag[] {
+	const flags: AdminStudyIntegrityFlag[] = [];
+
+	if (consentCount === 0) {
+		flags.push({
+			code: 'missing_study_consent',
+			label: 'No consent record for participant session',
+			severity: 'warning'
+		});
+	}
+
+	if (participantStudyCount > 1) {
+		flags.push({
+			code: 'duplicate_participant_study',
+			label: 'Participant has multiple study sessions',
+			severity: 'warning'
+		});
+	}
+
+	if (study.status !== 'completed' && study.completedTasks < study.totalTasks) {
+		flags.push({
+			code: 'incomplete_study_session',
+			label: 'Study session is incomplete',
+			severity: 'warning'
+		});
+	}
+
+	const studyDuration = studyDurationMs(study);
+
+	if (
+		study.status === 'completed' &&
+		studyDuration !== null &&
+		studyDuration < fastStudyDurationMs
+	) {
+		flags.push({
+			code: 'fast_study_completion',
+			label: 'Study completed very quickly',
+			severity: 'warning'
+		});
+	}
+
+	for (const task of study.tasks) {
+		if (task.status !== 'completed') continue;
+
+		const duration = taskDurationMs(task);
+
+		if (duration !== null && duration < fastTaskDurationMs) {
+			flags.push({
+				code: `fast_task_completion:${task.slug}`,
+				label: `${task.name} completed very quickly`,
+				severity: 'warning'
+			});
+		}
+
+		if (task.resultSummary === null) {
+			flags.push({
+				code: `empty_task_result:${task.slug}`,
+				label: `${task.name} completed without a result summary`,
+				severity: 'warning'
+			});
+		}
+
+		if (task.metricValues.length === 0) {
+			flags.push({
+				code: `empty_task_metrics:${task.slug}`,
+				label: `${task.name} completed without structured metrics`,
+				severity: 'warning'
+			});
+		}
+
+		const meanResponseTimeMs = task.metricValues.find(
+			(metric) => metric.key === 'mean_response_time_ms'
+		)?.value;
+
+		if (
+			typeof meanResponseTimeMs === 'number' &&
+			Number.isFinite(meanResponseTimeMs) &&
+			meanResponseTimeMs < fastMeanResponseTimeMs
+		) {
+			flags.push({
+				code: `fast_response_time:${task.slug}`,
+				label: `${task.name} mean response time is very low`,
+				severity: 'warning'
+			});
+		}
+
+		if (task.run && task.run.responseCount === 0) {
+			flags.push({
+				code: `completed_task_no_responses:${task.slug}`,
+				label: `${task.name} completed with no response rows`,
+				severity: 'warning'
+			});
+		}
+	}
+
+	return flags;
+}
+
+function studyNeedsReview(
+	study: Pick<AdminStudySessionSummary, 'review' | 'integrityFlags' | 'qualityFlags'>
+): boolean {
+	return (
+		study.review.status === 'review' ||
+		study.qualityFlags.length > 0 ||
+		study.integrityFlags.some((flag) => flag.severity === 'warning' || flag.severity === 'error')
+	);
+}
+
 function buildTimeline(
 	session: StudySessionRow,
 	tasks: AdminStudyTaskSummary[]
@@ -962,6 +1111,8 @@ function toAdminStudySession(
 	session: StudySessionRow,
 	userAgent: string | null,
 	review: AdminStudyReview,
+	consentCount: number,
+	participantStudyCount: number,
 	taskRows: StudyTaskRow[],
 	runLinksById: Map<string, AdminStudyRunLink>,
 	runDetailsById: Map<string, AdminExperimentRun> = new Map()
@@ -989,7 +1140,7 @@ function toAdminStudySession(
 			};
 		});
 	const completedTasks = tasks.filter((task) => task.status === 'completed').length;
-	const summary = {
+	const summary: AdminStudySessionDetail = {
 		id: session.id,
 		participantSessionId: session.participantSessionId,
 		participantShortId: session.participantSessionId.slice(0, 8),
@@ -1004,11 +1155,15 @@ function toAdminStudySession(
 		currentTask: tasks.find((task) => task.status !== 'completed') ?? null,
 		tasks,
 		integrityFlags: [] as AdminStudyIntegrityFlag[],
+		qualityFlags: [] as AdminStudyIntegrityFlag[],
+		needsReview: false,
 		timeline: [] as AdminStudyTimelineEntry[],
 		review
 	};
 
 	summary.integrityFlags = createSessionFlags(session, tasks);
+	summary.qualityFlags = createSessionQualityFlags(summary, consentCount, participantStudyCount);
+	summary.needsReview = studyNeedsReview(summary);
 	summary.timeline = buildTimeline(session, tasks);
 
 	return summary;
@@ -1059,6 +1214,8 @@ async function getStudySessions(): Promise<{
 	tasksBySessionId: Map<string, StudyTaskRow[]>;
 	userAgentsBySessionId: Map<string, string | null>;
 	reviewsBySessionId: Map<string, AdminStudyReview>;
+	consentCountsByParticipantSessionId: Map<string, number>;
+	studyCountsByParticipantSessionId: Map<string, number>;
 	runLinksById: Map<string, AdminStudyRunLink>;
 }> {
 	const sessions = await db.select().from(studySessions).orderBy(desc(studySessions.startedAt));
@@ -1069,11 +1226,14 @@ async function getStudySessions(): Promise<{
 			tasksBySessionId: new Map(),
 			userAgentsBySessionId: new Map(),
 			reviewsBySessionId: new Map(),
+			consentCountsByParticipantSessionId: new Map(),
+			studyCountsByParticipantSessionId: new Map(),
 			runLinksById: new Map()
 		};
 	}
 
-	const [taskRows, participantRows, reviewRows] = await Promise.all([
+	const participantSessionIds = sessions.map((session) => session.participantSessionId);
+	const [taskRows, participantRows, reviewRows, consentRows] = await Promise.all([
 		db
 			.select()
 			.from(studyTasks)
@@ -1087,12 +1247,7 @@ async function getStudySessions(): Promise<{
 		db
 			.select()
 			.from(participantSessions)
-			.where(
-				inArray(
-					participantSessions.id,
-					sessions.map((session) => session.participantSessionId)
-				)
-			),
+			.where(inArray(participantSessions.id, participantSessionIds)),
 		db
 			.select()
 			.from(studySessionReviews)
@@ -1101,7 +1256,11 @@ async function getStudySessions(): Promise<{
 					studySessionReviews.studySessionId,
 					sessions.map((session) => session.id)
 				)
-			)
+			),
+		db
+			.select({ participantSessionId: participantConsents.participantSessionId })
+			.from(participantConsents)
+			.where(inArray(participantConsents.participantSessionId, participantSessionIds))
 	]);
 	const tasksBySessionId = new Map<string, StudyTaskRow[]>();
 	const userAgentsBySessionId = new Map(
@@ -1110,6 +1269,8 @@ async function getStudySessions(): Promise<{
 	const reviewsBySessionId = new Map(
 		reviewRows.map((review) => [review.studySessionId, toAdminStudyReview(review)])
 	);
+	const consentCountsByParticipantSessionId = countByParticipantSessionId(consentRows);
+	const studyCountsByParticipantSessionId = countByParticipantSessionId(sessions);
 	const runIds = taskRows.flatMap((task) => (task.runId ? [task.runId] : []));
 
 	for (const task of taskRows) {
@@ -1121,6 +1282,8 @@ async function getStudySessions(): Promise<{
 		tasksBySessionId,
 		userAgentsBySessionId,
 		reviewsBySessionId,
+		consentCountsByParticipantSessionId,
+		studyCountsByParticipantSessionId,
 		runLinksById: await getRunLinksById(runIds)
 	};
 }
@@ -1131,7 +1294,8 @@ export function parseAdminStudySessionFilters(
 	return {
 		status: parseAdminStudyTaskStatusFilter(searchParams.get('status')),
 		reviewStatus: parseAdminStudyReviewStatusFilter(searchParams.get('review')),
-		reason: parseAdminStudyReviewReasonFilter(searchParams.get('reason'))
+		reason: parseAdminStudyReviewReasonFilter(searchParams.get('reason')),
+		quality: parseAdminStudyQualityFilter(searchParams.get('quality'))
 	};
 }
 
@@ -1145,10 +1309,25 @@ export function parseAdminStudyAnalysisFilters(
 }
 
 export async function listAdminStudySessions(
-	filters: AdminStudySessionFilters = { status: '', reviewStatus: '', reason: '' }
+	filters: AdminStudySessionFilters = { status: '', reviewStatus: '', reason: '', quality: '' }
 ): Promise<AdminStudySessionSummary[]> {
-	const { sessions, tasksBySessionId, userAgentsBySessionId, reviewsBySessionId, runLinksById } =
-		await getStudySessions();
+	const {
+		sessions,
+		tasksBySessionId,
+		userAgentsBySessionId,
+		reviewsBySessionId,
+		consentCountsByParticipantSessionId,
+		studyCountsByParticipantSessionId,
+		runLinksById
+	} = await getStudySessions();
+	const runIds = [
+		...new Set(
+			[...tasksBySessionId.values()].flatMap((tasks) =>
+				tasks.flatMap((task) => (task.runId ? [task.runId] : []))
+			)
+		)
+	];
+	const runDetailsById = await getRunDetailsById(runIds);
 
 	return sessions
 		.map((session) =>
@@ -1156,8 +1335,11 @@ export async function listAdminStudySessions(
 				session,
 				userAgentsBySessionId.get(session.participantSessionId) ?? null,
 				reviewsBySessionId.get(session.id) ?? toAdminStudyReview(null),
+				consentCountsByParticipantSessionId.get(session.participantSessionId) ?? 0,
+				studyCountsByParticipantSessionId.get(session.participantSessionId) ?? 1,
 				tasksBySessionId.get(session.id) ?? [],
-				runLinksById
+				runLinksById,
+				runDetailsById
 			)
 		)
 		.filter((study) => matchesStudySessionFilters(study, filters));
@@ -1173,7 +1355,7 @@ export async function getAdminStudySessionDetail(
 
 	if (!session) return null;
 
-	const [tasks, participant, reviewRows] = await Promise.all([
+	const [tasks, participant, reviewRows, consentRows, participantStudyRows] = await Promise.all([
 		db
 			.select()
 			.from(studyTasks)
@@ -1186,7 +1368,15 @@ export async function getAdminStudySessionDetail(
 		db
 			.select()
 			.from(studySessionReviews)
-			.where(eq(studySessionReviews.studySessionId, studySessionId))
+			.where(eq(studySessionReviews.studySessionId, studySessionId)),
+		db
+			.select({ participantSessionId: participantConsents.participantSessionId })
+			.from(participantConsents)
+			.where(eq(participantConsents.participantSessionId, session.participantSessionId)),
+		db
+			.select({ participantSessionId: studySessions.participantSessionId })
+			.from(studySessions)
+			.where(eq(studySessions.participantSessionId, session.participantSessionId))
 	]);
 	const runIds = tasks.flatMap((task) => (task.runId ? [task.runId] : []));
 	const [runLinksById, runDetailsById] = await Promise.all([
@@ -1198,6 +1388,8 @@ export async function getAdminStudySessionDetail(
 		session,
 		participant[0]?.userAgent ?? null,
 		toAdminStudyReview(reviewRows[0]),
+		consentRows.length,
+		participantStudyRows.length,
 		tasks,
 		runLinksById,
 		runDetailsById
@@ -1214,8 +1406,15 @@ export async function getAdminStudyExport(studySessionId?: string): Promise<Admi
 		};
 	}
 
-	const { sessions, tasksBySessionId, userAgentsBySessionId, reviewsBySessionId, runLinksById } =
-		await getStudySessions();
+	const {
+		sessions,
+		tasksBySessionId,
+		userAgentsBySessionId,
+		reviewsBySessionId,
+		consentCountsByParticipantSessionId,
+		studyCountsByParticipantSessionId,
+		runLinksById
+	} = await getStudySessions();
 	const runIds = [
 		...new Set(
 			[...tasksBySessionId.values()].flatMap((tasks) =>
@@ -1232,6 +1431,8 @@ export async function getAdminStudyExport(studySessionId?: string): Promise<Admi
 				session,
 				userAgentsBySessionId.get(session.participantSessionId) ?? null,
 				reviewsBySessionId.get(session.id) ?? toAdminStudyReview(null),
+				consentCountsByParticipantSessionId.get(session.participantSessionId) ?? 0,
+				studyCountsByParticipantSessionId.get(session.participantSessionId) ?? 1,
 				tasksBySessionId.get(session.id) ?? [],
 				runLinksById,
 				runDetailsById
@@ -1287,6 +1488,8 @@ function toParticipantSummaryRow(study: AdminStudySessionSummary): AdminStudyPar
 		currentTaskSlug: study.currentTask?.slug ?? null,
 		currentTaskName: study.currentTask?.name ?? null,
 		integrityFlags: study.integrityFlags.map((flag) => flag.code),
+		qualityFlags: study.qualityFlags.map((flag) => flag.code),
+		needsReview: study.needsReview,
 		taskStatuses,
 		taskRunIds,
 		taskDurationsMs,
@@ -1360,11 +1563,13 @@ export async function getAdminStudyAnalysis(
 		matchesStudySessionFilters(study, {
 			status: '',
 			reviewStatus: filters.reviewStatus,
-			reason: ''
+			reason: '',
+			quality: ''
 		})
 	);
 	const completedSessions = studies.filter((study) => study.status === 'completed').length;
 	const integrityFlags = studies.flatMap((study) => study.integrityFlags);
+	const qualityFlags = studies.flatMap((study) => study.qualityFlags);
 	const studyDurations = studies.flatMap((study) => {
 		const durationMs = studyDurationMs(study);
 		return durationMs === null ? [] : [durationMs];
@@ -1389,6 +1594,8 @@ export async function getAdminStudyAnalysis(
 			medianStudyDurationMs: median(studyDurations),
 			medianTaskDurationMs: median(taskDurations),
 			integrityFlagCount: integrityFlags.length,
+			qualityFlagCount: qualityFlags.length,
+			needsReviewSessions: studies.filter((study) => study.needsReview).length,
 			errorFlagCount: integrityFlags.filter((flag) => flag.severity === 'error').length,
 			warningFlagCount: integrityFlags.filter((flag) => flag.severity === 'warning').length,
 			infoFlagCount: integrityFlags.filter((flag) => flag.severity === 'info').length
@@ -1432,6 +1639,9 @@ export async function getAdminStudyParticipantSummaryCsv(
 				participant.completedTasks,
 				participant.totalTasks,
 				participant.completionRate,
+				participant.needsReview,
+				participant.qualityFlags.length,
+				participant.qualityFlags.join('|'),
 				participant.currentTaskSlug,
 				participant.currentTaskName,
 				participant.integrityFlags.length,
@@ -1521,6 +1731,8 @@ export async function getAdminStudyCsv(studySessionId?: string): Promise<string>
 					isoCell(study.updatedAt),
 					study.completedTasks,
 					study.totalTasks,
+					study.needsReview,
+					study.qualityFlags.map((flag) => flag.code).join('|'),
 					study.integrityFlags.map((flag) => flag.code).join('|'),
 					task.position,
 					task.slug,

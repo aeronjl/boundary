@@ -439,6 +439,81 @@ export async function listAdminReferenceRegistry(): Promise<{
 	};
 }
 
+function csvCell(value: unknown): string {
+	if (value === null || value === undefined) return '';
+	const text = String(value).replaceAll('"', '""');
+	return `"${text}"`;
+}
+
+export async function getAdminReferenceRegistryExport() {
+	return listAdminReferenceRegistry();
+}
+
+export async function getAdminReferenceRegistryCsv(): Promise<string> {
+	const registry = await listAdminReferenceRegistry();
+	const headers = [
+		'source_id',
+		'source_citation',
+		'dataset_id',
+		'dataset_name',
+		'experiment_slug',
+		'dataset_status',
+		'dataset_compatibility',
+		'cohort_id',
+		'cohort_label',
+		'cohort_group',
+		'cohort_sample_size',
+		'metric_id',
+		'metric_key',
+		'metric_label',
+		'metric_mean',
+		'metric_standard_deviation',
+		'mapping_source_metric',
+		'mapping_source_columns',
+		'mapping_direction',
+		'mapping_extraction_status'
+	];
+	const rows = [headers.map(csvCell).join(',')];
+
+	for (const dataset of registry.datasets) {
+		for (const metric of dataset.metrics) {
+			const cohort =
+				dataset.cohorts.find((candidate) => candidate.id === metric.mapping?.referenceCohortId) ??
+				dataset.cohorts[0] ??
+				null;
+
+			rows.push(
+				[
+					dataset.study?.id ?? dataset.referenceStudyId,
+					dataset.study?.shortCitation,
+					dataset.id,
+					dataset.name,
+					dataset.experimentSlug,
+					dataset.status,
+					dataset.compatibility,
+					cohort?.id,
+					cohort?.label,
+					cohort?.groupLabel,
+					cohort?.sampleSize,
+					metric.id,
+					metric.metricKey,
+					metric.label,
+					metric.mean,
+					metric.standardDeviation,
+					metric.mapping?.sourceMetric,
+					metric.mapping?.sourceColumns.join('|'),
+					metric.mapping?.direction,
+					metric.mapping?.extractionStatus
+				]
+					.map(csvCell)
+					.join(',')
+			);
+		}
+	}
+
+	return `${rows.join('\n')}\n`;
+}
+
 function parsedReferenceStudyFields(input: AdminCreateReferenceStudyInput) {
 	const shortCitation = trimmed(input.shortCitation);
 	const title = trimmed(input.title);

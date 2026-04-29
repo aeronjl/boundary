@@ -839,6 +839,32 @@ test('admin can inspect and export ten item personality inventory data', async (
 	await expect(page.getByText('Reference metric mapping updated.')).toBeVisible();
 	await expect(mappingForm.getByLabel('Source metric')).toHaveValue('pilot_accuracy');
 	await expect(mappingForm.getByLabel('Source columns')).toHaveValue('pilot_nont, pilot_targ');
+	await expect(page.getByRole('link', { name: 'Export JSON' })).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Export CSV' })).toBeVisible();
+
+	const referenceJsonResponse = await page.request.get('/admin/references/export.json');
+	expect(referenceJsonResponse.status()).toBe(200);
+	const referenceJson = await referenceJsonResponse.json();
+	const exportedDataset = referenceJson.datasets.find(
+		(dataset: { id: string }) => dataset.id === 'openfmri-ds000115-nback'
+	);
+	expect(exportedDataset.cohorts.map((cohort: { label: string }) => cohort.label)).toContain(
+		cohortLabel
+	);
+	const exportedAccuracy = exportedDataset.metrics.find(
+		(metric: { metricKey: string }) => metric.metricKey === 'accuracy'
+	);
+	expect(exportedAccuracy.mapping).toMatchObject({
+		sourceMetric: 'pilot_accuracy',
+		sourceColumns: ['pilot_nont', 'pilot_targ'],
+		extractionStatus: 'reviewed'
+	});
+
+	const referenceCsvResponse = await page.request.get('/admin/references/export.csv');
+	expect(referenceCsvResponse.status()).toBe(200);
+	const referenceCsv = await referenceCsvResponse.text();
+	expect(referenceCsv).toContain('"mapping_source_metric"');
+	expect(referenceCsv).toContain('"pilot_accuracy"');
 
 	const validateForm = page.locator('form[aria-label^="Validate reference dataset"]').first();
 	await validateForm.getByLabel('Review compatibility').selectOption('compatible');

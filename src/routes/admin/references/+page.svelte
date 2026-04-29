@@ -61,6 +61,21 @@
 		</div>
 	</div>
 
+	<div class="flex flex-wrap gap-2">
+		<a
+			class="rounded-sm bg-gray-100 px-3 py-2 text-xs"
+			href={resolve('/admin/references/export.json')}
+		>
+			Export JSON
+		</a>
+		<a
+			class="rounded-sm bg-gray-100 px-3 py-2 text-xs"
+			href={resolve('/admin/references/export.csv')}
+		>
+			Export CSV
+		</a>
+	</div>
+
 	<div>
 		<h2 class="font-serif text-2xl">Registered datasets</h2>
 		<div class="mt-3 overflow-x-auto border-t border-gray-200">

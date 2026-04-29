@@ -91,6 +91,9 @@
 			>
 				Experiment runs
 			</a>
+			<a class="rounded-sm bg-gray-100 px-3 py-2 text-xs" href={resolve('/admin/review')}>
+				Review queue
+			</a>
 			<a class="rounded-sm bg-gray-100 px-3 py-2 text-xs" href={resolve('/admin/analysis')}>
 				Analysis
 			</a>

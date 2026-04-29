@@ -78,6 +78,68 @@ export type AdminStudyExport = {
 	studies: AdminStudySessionDetail[];
 };
 
+export type AdminStudyDropOffTask = {
+	position: number;
+	slug: string;
+	name: string;
+	count: number;
+};
+
+export type AdminStudyAnalysisOverview = {
+	totalSessions: number;
+	completedSessions: number;
+	inProgressSessions: number;
+	completionRate: number | null;
+	medianStudyDurationMs: number | null;
+	medianTaskDurationMs: number | null;
+	integrityFlagCount: number;
+	errorFlagCount: number;
+	warningFlagCount: number;
+	infoFlagCount: number;
+};
+
+export type AdminStudyTaskAnalysis = {
+	position: number;
+	slug: string;
+	name: string;
+	totalSessions: number;
+	startedSessions: number;
+	completedSessions: number;
+	completionRate: number | null;
+	dropOffCount: number;
+	medianDurationMs: number | null;
+	integrityFlagCount: number;
+};
+
+export type AdminStudyParticipantSummaryRow = {
+	studySessionId: string;
+	participantSessionId: string;
+	protocolId: string;
+	status: AdminStudyTaskStatus;
+	startedAt: number;
+	completedAt: number | null;
+	updatedAt: number;
+	studyDurationMs: number | null;
+	completedTasks: number;
+	totalTasks: number;
+	completionRate: number | null;
+	currentTaskSlug: string | null;
+	currentTaskName: string | null;
+	integrityFlags: string[];
+	taskStatuses: Record<string, AdminStudyTaskStatus | 'missing'>;
+	taskRunIds: Record<string, string | null>;
+	taskDurationsMs: Record<string, number | null>;
+};
+
+export type AdminStudyAnalysis = {
+	generatedAt: string;
+	overview: AdminStudyAnalysisOverview;
+	dropOffTask: AdminStudyDropOffTask | null;
+	dropOffTasks: AdminStudyDropOffTask[];
+	taskSummaries: AdminStudyTaskAnalysis[];
+	participants: AdminStudyParticipantSummaryRow[];
+};
+
 type StudySessionRow = typeof studySessions.$inferSelect;
 type StudyTaskRow = typeof studyTasks.$inferSelect;
 
@@ -113,6 +175,24 @@ const studyCsvHeaders = [
 	'task_integrity_flags',
 	'metrics',
 	'result_summary_json'
+] as const;
+
+const studyAnalysisBaseCsvHeaders = [
+	'study_session_id',
+	'participant_session_id',
+	'protocol_id',
+	'study_status',
+	'study_started_at',
+	'study_completed_at',
+	'study_updated_at',
+	'study_duration_ms',
+	'completed_tasks',
+	'total_tasks',
+	'completion_rate',
+	'current_task_slug',
+	'current_task_name',
+	'integrity_flag_count',
+	'integrity_flags'
 ] as const;
 
 function toStudyTaskStatus(value: string): AdminStudyTaskStatus {
@@ -168,6 +248,18 @@ function jsonCell(value: unknown): string {
 
 function isoCell(value: number | null): string {
 	return value == null ? '' : new Date(value).toISOString();
+}
+
+function ratio(numerator: number, denominator: number): number | null {
+	return denominator > 0 ? numerator / denominator : null;
+}
+
+function median(values: number[]): number | null {
+	if (values.length === 0) return null;
+	const sorted = [...values].sort((left, right) => left - right);
+	const midpoint = Math.floor(sorted.length / 2);
+
+	return sorted.length % 2 === 0 ? (sorted[midpoint - 1] + sorted[midpoint]) / 2 : sorted[midpoint];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -237,6 +329,24 @@ function createResultSummary(run: AdminExperimentRun | null): unknown {
 	if (run.nBackSummary) return run.nBackSummary;
 	if (run.banditSummary) return run.banditSummary;
 	return completedResult(run);
+}
+
+function taskDurationMs(
+	task: Pick<AdminStudyTaskSummary, 'startedAt' | 'completedAt'>
+): number | null {
+	return task.startedAt !== null && task.completedAt !== null
+		? task.completedAt - task.startedAt
+		: null;
+}
+
+function studyDurationMs(
+	study: Pick<AdminStudySessionSummary, 'startedAt' | 'completedAt'>
+): number | null {
+	return study.completedAt === null ? null : study.completedAt - study.startedAt;
+}
+
+function taskCsvPrefix(task: StudyProtocolTask): string {
+	return task.slug.replaceAll('-', '_');
 }
 
 function createRunLink(
@@ -656,6 +766,181 @@ export async function getAdminStudyExport(studySessionId?: string): Promise<Admi
 			)
 		)
 	};
+}
+
+function toParticipantSummaryRow(study: AdminStudySessionSummary): AdminStudyParticipantSummaryRow {
+	const taskStatuses = Object.fromEntries(
+		boundaryStudyProtocol.tasks.map((task) => [
+			task.slug,
+			study.tasks.find((candidate) => candidate.slug === task.slug)?.status ?? 'missing'
+		])
+	) as Record<string, AdminStudyTaskStatus | 'missing'>;
+	const taskRunIds = Object.fromEntries(
+		boundaryStudyProtocol.tasks.map((task) => [
+			task.slug,
+			study.tasks.find((candidate) => candidate.slug === task.slug)?.runId ?? null
+		])
+	) as Record<string, string | null>;
+	const taskDurationsMs = Object.fromEntries(
+		boundaryStudyProtocol.tasks.map((task) => {
+			const studyTask = study.tasks.find((candidate) => candidate.slug === task.slug);
+			return [task.slug, studyTask ? taskDurationMs(studyTask) : null];
+		})
+	) as Record<string, number | null>;
+
+	return {
+		studySessionId: study.id,
+		participantSessionId: study.participantSessionId,
+		protocolId: study.protocolId,
+		status: study.status,
+		startedAt: study.startedAt,
+		completedAt: study.completedAt,
+		updatedAt: study.updatedAt,
+		studyDurationMs: studyDurationMs(study),
+		completedTasks: study.completedTasks,
+		totalTasks: study.totalTasks,
+		completionRate: ratio(study.completedTasks, study.totalTasks),
+		currentTaskSlug: study.currentTask?.slug ?? null,
+		currentTaskName: study.currentTask?.name ?? null,
+		integrityFlags: study.integrityFlags.map((flag) => flag.code),
+		taskStatuses,
+		taskRunIds,
+		taskDurationsMs
+	};
+}
+
+function createDropOffTasks(studies: AdminStudySessionSummary[]): AdminStudyDropOffTask[] {
+	const counts = new Map<string, AdminStudyDropOffTask>();
+
+	for (const study of studies) {
+		if (study.status === 'completed' || !study.currentTask) continue;
+
+		const current = counts.get(study.currentTask.slug);
+		counts.set(study.currentTask.slug, {
+			position: study.currentTask.position,
+			slug: study.currentTask.slug,
+			name: study.currentTask.name,
+			count: (current?.count ?? 0) + 1
+		});
+	}
+
+	return [...counts.values()].sort(
+		(left, right) => right.count - left.count || left.position - right.position
+	);
+}
+
+function createTaskAnalysis(studies: AdminStudySessionSummary[]): AdminStudyTaskAnalysis[] {
+	const dropOffTasks = createDropOffTasks(studies);
+	const dropOffCounts = new Map(dropOffTasks.map((task) => [task.slug, task.count]));
+
+	return boundaryStudyProtocol.tasks.map((task) => {
+		const matchingTasks = studies.flatMap((study) =>
+			study.tasks.flatMap((candidate) => (candidate.slug === task.slug ? [candidate] : []))
+		);
+		const startedSessions = matchingTasks.filter(
+			(candidate) => candidate.status !== 'pending'
+		).length;
+		const completedSessions = matchingTasks.filter(
+			(candidate) => candidate.status === 'completed'
+		).length;
+		const durations = matchingTasks.flatMap((candidate) => {
+			const durationMs = taskDurationMs(candidate);
+			return durationMs === null ? [] : [durationMs];
+		});
+
+		return {
+			position: task.position,
+			slug: task.slug,
+			name: task.name,
+			totalSessions: studies.length,
+			startedSessions,
+			completedSessions,
+			completionRate: ratio(completedSessions, studies.length),
+			dropOffCount: dropOffCounts.get(task.slug) ?? 0,
+			medianDurationMs: median(durations),
+			integrityFlagCount: matchingTasks.reduce(
+				(total, candidate) => total + candidate.integrityFlags.length,
+				0
+			)
+		};
+	});
+}
+
+export async function getAdminStudyAnalysis(): Promise<AdminStudyAnalysis> {
+	const studies = await listAdminStudySessions();
+	const completedSessions = studies.filter((study) => study.status === 'completed').length;
+	const integrityFlags = studies.flatMap((study) => study.integrityFlags);
+	const studyDurations = studies.flatMap((study) => {
+		const durationMs = studyDurationMs(study);
+		return durationMs === null ? [] : [durationMs];
+	});
+	const taskDurations = studies.flatMap((study) =>
+		study.tasks.flatMap((task) => {
+			const durationMs = taskDurationMs(task);
+			return durationMs === null ? [] : [durationMs];
+		})
+	);
+	const dropOffTasks = createDropOffTasks(studies);
+
+	return {
+		generatedAt: new Date().toISOString(),
+		overview: {
+			totalSessions: studies.length,
+			completedSessions,
+			inProgressSessions: studies.length - completedSessions,
+			completionRate: ratio(completedSessions, studies.length),
+			medianStudyDurationMs: median(studyDurations),
+			medianTaskDurationMs: median(taskDurations),
+			integrityFlagCount: integrityFlags.length,
+			errorFlagCount: integrityFlags.filter((flag) => flag.severity === 'error').length,
+			warningFlagCount: integrityFlags.filter((flag) => flag.severity === 'warning').length,
+			infoFlagCount: integrityFlags.filter((flag) => flag.severity === 'info').length
+		},
+		dropOffTask: dropOffTasks[0] ?? null,
+		dropOffTasks,
+		taskSummaries: createTaskAnalysis(studies),
+		participants: studies.map(toParticipantSummaryRow)
+	};
+}
+
+export async function getAdminStudyParticipantSummaryCsv(): Promise<string> {
+	const { participants } = await getAdminStudyAnalysis();
+	const dynamicHeaders = boundaryStudyProtocol.tasks.flatMap((task) => {
+		const prefix = taskCsvPrefix(task);
+		return [`${prefix}_status`, `${prefix}_run_id`, `${prefix}_duration_ms`];
+	});
+	const rows = [[...studyAnalysisBaseCsvHeaders, ...dynamicHeaders].map(csvCell).join(',')];
+
+	for (const participant of participants) {
+		rows.push(
+			[
+				participant.studySessionId,
+				participant.participantSessionId,
+				participant.protocolId,
+				participant.status,
+				isoCell(participant.startedAt),
+				isoCell(participant.completedAt),
+				isoCell(participant.updatedAt),
+				participant.studyDurationMs,
+				participant.completedTasks,
+				participant.totalTasks,
+				participant.completionRate,
+				participant.currentTaskSlug,
+				participant.currentTaskName,
+				participant.integrityFlags.length,
+				participant.integrityFlags.join('|'),
+				...boundaryStudyProtocol.tasks.flatMap((task) => [
+					participant.taskStatuses[task.slug],
+					participant.taskRunIds[task.slug],
+					participant.taskDurationsMs[task.slug]
+				])
+			]
+				.map(csvCell)
+				.join(',')
+		);
+	}
+
+	return `${rows.join('\n')}\n`;
 }
 
 export async function getAdminStudyCsv(studySessionId?: string): Promise<string> {

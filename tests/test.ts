@@ -32,7 +32,7 @@ type StudyExportStudy = {
 	completedTasks: number;
 	totalTasks: number;
 	integrityFlags: { code: string; label: string }[];
-	tasks: StudyExportTask[];
+	tasks: (StudyExportTask & { resultSummary: unknown })[];
 };
 
 const testAdminCookie = `boundary_admin=${createHash('sha256').update('test-admin-token').digest('hex')}`;
@@ -396,6 +396,100 @@ test('study runner tracks task progress across experiments', async ({ page }) =>
 	expect(await detailCsvResponse.text()).toContain('"result_summary_json"');
 });
 
+test('study runner completes the full protocol and exposes analysis', async ({ page }) => {
+	await page.goto('/study');
+	await page.getByLabel(/I consent to take part in this study/).check();
+	await page.getByRole('button', { name: 'Accept and start study' }).click();
+	await expect(page.getByText('0 of 5')).toBeVisible();
+
+	await page.getByRole('link', { name: 'Start task' }).click();
+	await page.getByRole('button', { name: 'Start' }).click();
+	for (let trial = 1; trial <= 16; trial++) {
+		await expect(page.getByText(`${trial} of 16`)).toBeVisible();
+		await page.getByRole('button', { name: 'Choose clockwise' }).click();
+	}
+	await expect(
+		page.getByRole('heading', { name: 'Orientation discrimination complete' })
+	).toBeVisible();
+	await page.getByRole('link', { name: 'Continue study' }).click();
+	await expect(page.getByText('1 of 5')).toBeVisible();
+
+	await page.getByRole('link', { name: 'Start task' }).click();
+	await page.getByRole('button', { name: 'Start' }).click();
+	for (let trial = 1; trial <= 8; trial++) {
+		await expect(page.getByText(`${trial} of 8`)).toBeVisible();
+		await page.getByRole('button', { name: 'Choose later option' }).click();
+	}
+	await expect(page.getByRole('heading', { name: 'Intertemporal choice complete' })).toBeVisible();
+	await page.getByRole('link', { name: 'Continue study' }).click();
+	await expect(page.getByText('2 of 5')).toBeVisible();
+
+	await page.getByRole('link', { name: 'Start task' }).click();
+	await page.getByRole('button', { name: 'Start' }).click();
+	for (let trial = 1; trial <= 16; trial++) {
+		await expect(page.getByText(`${trial} of 16`)).toBeVisible();
+		await page.getByRole('button', { name: 'Choose no match' }).click();
+	}
+	await expect(page.getByRole('heading', { name: 'n-back complete' })).toBeVisible();
+	await page.getByRole('link', { name: 'Continue study' }).click();
+	await expect(page.getByText('3 of 5')).toBeVisible();
+
+	await page.getByRole('link', { name: 'Start task' }).click();
+	await page.getByRole('button', { name: 'Start' }).click();
+	for (let trial = 1; trial <= 20; trial++) {
+		await expect(page.getByText(`Trial ${trial} of 20`)).toBeVisible();
+		await page.getByRole('button', { name: 'Choose arm A' }).click();
+	}
+	await expect(page.getByRole('heading', { name: 'Bandit run complete' })).toBeVisible();
+	await page.getByRole('link', { name: 'Continue study' }).click();
+	await expect(page.getByText('4 of 5')).toBeVisible();
+
+	await page.getByRole('link', { name: 'Start task' }).click();
+	await page.getByRole('button', { name: 'Start' }).click();
+	for (let trial = 1; trial <= 10; trial++) {
+		await expect(page.getByText(`Question ${trial} of 10`)).toBeVisible();
+		await page.getByRole('radio', { name: 'Agree a little', exact: true }).check();
+		await page.getByRole('button', { name: 'Submit' }).click();
+	}
+	await expect(page.getByText('You have completed the inventory.')).toBeVisible();
+	await page.getByRole('link', { name: 'Continue study' }).click();
+
+	await expect(page).toHaveURL(/\/study$/);
+	await expect(page.getByText('5 of 5')).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Study complete' })).toBeVisible();
+
+	await page.goto('/admin');
+	await page.getByLabel('Admin token').fill('test-admin-token');
+	await page.getByRole('button', { name: 'Sign in' }).click();
+
+	const studiesJsonResponse = await page.request.get('/admin/studies/export.json');
+	expect(studiesJsonResponse.status()).toBe(200);
+	const studiesJson = await studiesJsonResponse.json();
+	const completedStudy = studiesJson.studies.find(
+		(study: StudyExportStudy) =>
+			study.completedTasks === 5 &&
+			study.totalTasks === 5 &&
+			study.tasks.every((task) => task.status === 'completed' && task.resultSummary !== null)
+	);
+	expect(completedStudy).toBeTruthy();
+
+	await page.getByRole('link', { name: 'Study analysis' }).click();
+	await expect(page.getByRole('heading', { name: 'Study analysis' })).toBeVisible();
+	await expect(page.locator('p', { hasText: 'Study sessions' }).first()).toBeVisible();
+	await expect(page.getByText('Completion rate')).toBeVisible();
+	await expect(page.getByText('Median study duration')).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Task completion' })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Participant summaries' })).toBeVisible();
+	await expect(page.getByText('5 of 5').first()).toBeVisible();
+
+	const participantCsvResponse = await page.request.get('/admin/studies/analysis/export.csv');
+	expect(participantCsvResponse.status()).toBe(200);
+	const participantCsv = await participantCsvResponse.text();
+	expect(participantCsv).toContain('"study_session_id","participant_session_id"');
+	expect(participantCsv).toContain('"ten_item_personality_inventory_status"');
+	expect(participantCsv).toContain('"completed"');
+});
+
 test('n-armed bandit records generic trial data', async ({ page }) => {
 	await completeBanditRun(page);
 
@@ -559,7 +653,8 @@ test('admin can inspect and export ten item personality inventory data', async (
 	await expect(page.getByRole('link', { name: 'All experiment CSV' })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Experiment runs' })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Review queue' })).toBeVisible();
-	await expect(page.getByRole('link', { name: 'Analysis' })).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Study analysis' })).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Analysis', exact: true })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Participants' })).toBeVisible();
 
 	const csvResponse = await page.request.get('/admin/tipi/export.csv');
@@ -579,7 +674,7 @@ test('admin can inspect and export ten item personality inventory data', async (
 	expect(genericCsvResponse.status()).toBe(200);
 	expect(await genericCsvResponse.text()).toContain('response_time_ms');
 
-	await page.getByRole('link', { name: 'Analysis' }).click();
+	await page.getByRole('link', { name: 'Analysis', exact: true }).click();
 	await expect(page.getByRole('heading', { name: 'Analysis' })).toBeVisible();
 	await expect(page.getByText('Total participants')).toBeVisible();
 	await expect(page.getByText('Completion rate')).toBeVisible();

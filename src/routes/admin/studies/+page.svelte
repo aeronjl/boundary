@@ -24,6 +24,12 @@
 
 	<div class="flex flex-wrap gap-2">
 		<a
+			class="rounded-sm bg-black px-3 py-2 text-xs text-white"
+			href={resolve('/admin/studies/analysis')}
+		>
+			Study analysis
+		</a>
+		<a
 			class="rounded-sm bg-gray-100 px-3 py-2 text-xs"
 			href={resolve('/admin/studies/export.json')}
 		>

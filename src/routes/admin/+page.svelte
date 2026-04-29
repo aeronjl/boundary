@@ -97,6 +97,9 @@
 			<a class="rounded-sm bg-gray-100 px-3 py-2 text-xs" href={resolve('/admin/studies')}>
 				Study sessions
 			</a>
+			<a class="rounded-sm bg-gray-100 px-3 py-2 text-xs" href={resolve('/admin/studies/analysis')}>
+				Study analysis
+			</a>
 			<a class="rounded-sm bg-gray-100 px-3 py-2 text-xs" href={resolve('/admin/analysis')}>
 				Analysis
 			</a>

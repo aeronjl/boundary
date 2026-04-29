@@ -26,6 +26,18 @@ async function completeBanditRun(page: Page) {
 	await expect(page.getByRole('heading', { name: 'Bandit run complete' })).toBeVisible();
 }
 
+async function completeIntertemporalRun(page: Page) {
+	await page.goto('/intertemporal-choice');
+	await page.getByRole('button', { name: 'Start' }).click();
+
+	for (let trial = 1; trial <= 8; trial++) {
+		await expect(page.getByText(`${trial} of 8`)).toBeVisible();
+		await page.getByRole('button', { name: 'Choose later option' }).click();
+	}
+
+	await expect(page.getByRole('heading', { name: 'Intertemporal choice complete' })).toBeVisible();
+}
+
 test('index page has expected h1', async ({ page }) => {
 	await page.goto('/');
 	await expect(page.getByRole('heading', { name: 'Boundary' })).toBeVisible();
@@ -85,6 +97,46 @@ test('n-armed bandit records generic trial data', async ({ page }) => {
 		.click();
 	await expect(page.getByRole('heading', { name: 'Bandit summary' })).toBeVisible();
 	await expect(page.getByText('arm_pulled').first()).toBeVisible();
+});
+
+test('intertemporal choice records generic trial data', async ({ page }) => {
+	await completeIntertemporalRun(page);
+
+	await page.goto('/admin');
+	await page.getByLabel('Admin token').fill('test-admin-token');
+	await page.getByRole('button', { name: 'Sign in' }).click();
+
+	const exportResponse = await page.request.get('/admin/experiments/export.json');
+	expect(exportResponse.status()).toBe(200);
+
+	const exportBody = await exportResponse.json();
+	const choiceRun = exportBody.runs.find(
+		(run: {
+			experimentVersionId: string;
+			responses: unknown[];
+			intertemporalSummary: { delayedChoiceCount: number } | null;
+		}) =>
+			run.experimentVersionId === 'intertemporal-choice-v1' &&
+			run.responses.length === 8 &&
+			run.intertemporalSummary?.delayedChoiceCount === 8
+	);
+
+	expect(choiceRun).toBeTruthy();
+	expect(choiceRun?.events.map((event: { eventType: string }) => event.eventType)).toEqual(
+		expect.arrayContaining(['run_started', 'choice_made', 'run_completed'])
+	);
+
+	await page.goto('/admin/experiments?experiment=intertemporal-choice');
+	await expect(page.getByRole('heading', { name: 'Experiment runs' })).toBeVisible();
+	await expect(page.getByRole('cell', { name: 'Intertemporal choice' }).first()).toBeVisible();
+	await expect(page.getByText('intertemporal_choice').first()).toBeVisible();
+
+	await page
+		.getByRole('link', { name: /View run/ })
+		.first()
+		.click();
+	await expect(page.getByRole('heading', { name: 'Intertemporal summary' })).toBeVisible();
+	await expect(page.getByText('choice_made').first()).toBeVisible();
 });
 
 test('admin can inspect and export ten item personality inventory data', async ({ page }) => {

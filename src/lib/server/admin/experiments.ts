@@ -54,6 +54,18 @@ export type AdminBanditSummary = {
 	arms: AdminBanditArmSummary[];
 };
 
+export type AdminIntertemporalSummary = {
+	totalTrials: number;
+	totalIncome: number;
+	totalDelaySeconds: number;
+	totalTimeCost: number;
+	netGain: number;
+	finalWealth: number;
+	immediateChoiceCount: number;
+	delayedChoiceCount: number;
+	averageDelaySeconds: number;
+};
+
 export type AdminExperimentRunSummary = {
 	id: string;
 	participantSessionId: string;
@@ -76,6 +88,7 @@ export type AdminExperimentRun = AdminExperimentRunSummary & {
 	events: AdminExperimentEvent[];
 	responses: AdminExperimentResponse[];
 	banditSummary: AdminBanditSummary | null;
+	intertemporalSummary: AdminIntertemporalSummary | null;
 };
 
 export type AdminExperimentRunList = {
@@ -122,6 +135,19 @@ export const adminExperimentDictionary: AdminExperimentDictionaryEntry[] = [
 	},
 	{
 		kind: 'event',
+		name: 'choice_made',
+		source: 'intertemporal-choice',
+		description: 'An immediate or delayed income option was selected and scored.',
+		fields: [
+			'trialIndex',
+			'payload.trialId',
+			'payload.optionId',
+			'payload.netValue',
+			'payload.wealthAfter'
+		]
+	},
+	{
+		kind: 'event',
 		name: 'run_completed',
 		source: 'all experiments',
 		description: 'Recorded once the final result has been calculated.',
@@ -140,6 +166,20 @@ export const adminExperimentDictionary: AdminExperimentDictionaryEntry[] = [
 		source: 'n-armed-bandit',
 		description: 'Generic trial record for one bandit choice.',
 		fields: ['itemId', 'response.armId', 'score.reward', 'score.probability', 'metadata.armLabel']
+	},
+	{
+		kind: 'response',
+		name: 'intertemporal_choice',
+		source: 'intertemporal-choice',
+		description: 'Generic trial record for one reward-delay choice.',
+		fields: [
+			'itemId',
+			'response.optionId',
+			'score.amount',
+			'score.delaySeconds',
+			'score.netValue',
+			'score.wealthAfter'
+		]
 	}
 ];
 
@@ -257,6 +297,73 @@ function createBanditSummary(
 		totalReward,
 		bestArmId,
 		arms: [...armsById.values()]
+	};
+}
+
+function createIntertemporalSummary(
+	events: AdminExperimentEvent[],
+	responses: AdminExperimentResponse[]
+): AdminIntertemporalSummary | null {
+	const choiceResponses = responses.filter(
+		(response) => response.responseType === 'intertemporal_choice'
+	);
+	const startedPayload = getPayloadRecord(
+		events.find((event) => event.eventType === 'run_started')
+	);
+	const completedPayload = getPayloadRecord(
+		events.find((event) => event.eventType === 'run_completed')
+	);
+	const completedResult = isRecord(completedPayload?.result) ? completedPayload.result : null;
+
+	if (choiceResponses.length === 0 && !completedResult) return null;
+
+	const config = isRecord(startedPayload?.config) ? startedPayload.config : null;
+	const initialWealth = numberValue(config?.initialWealth) ?? 0;
+	let totalIncome = 0;
+	let totalDelaySeconds = 0;
+	let totalTimeCost = 0;
+	let netGain = 0;
+	let delayedChoiceCount = 0;
+
+	for (const response of choiceResponses) {
+		const score = isRecord(response.score) ? response.score : null;
+		const amount = numberValue(score?.amount) ?? 0;
+		const delaySeconds = numberValue(score?.delaySeconds) ?? 0;
+		const timeCost = numberValue(score?.timeCost) ?? 0;
+		const netValue = numberValue(score?.netValue) ?? amount - timeCost;
+
+		totalIncome += amount;
+		totalDelaySeconds += delaySeconds;
+		totalTimeCost += timeCost;
+		netGain += netValue;
+
+		if (delaySeconds > 0) {
+			delayedChoiceCount += 1;
+		}
+	}
+
+	const totalTrials =
+		numberValue(completedResult?.totalTrials) ??
+		numberValue(startedPayload?.totalTrials) ??
+		choiceResponses.length;
+	const finalWealth = numberValue(completedResult?.finalWealth) ?? initialWealth + netGain;
+	const immediateChoiceCount =
+		numberValue(completedResult?.immediateChoiceCount) ??
+		choiceResponses.length - delayedChoiceCount;
+	const averageDelaySeconds =
+		numberValue(completedResult?.averageDelaySeconds) ??
+		(choiceResponses.length > 0 ? totalDelaySeconds / choiceResponses.length : 0);
+
+	return {
+		totalTrials,
+		totalIncome: numberValue(completedResult?.totalIncome) ?? totalIncome,
+		totalDelaySeconds: numberValue(completedResult?.totalDelaySeconds) ?? totalDelaySeconds,
+		totalTimeCost: numberValue(completedResult?.totalTimeCost) ?? totalTimeCost,
+		netGain: numberValue(completedResult?.netGain) ?? netGain,
+		finalWealth,
+		immediateChoiceCount,
+		delayedChoiceCount: numberValue(completedResult?.delayedChoiceCount) ?? delayedChoiceCount,
+		averageDelaySeconds
 	};
 }
 
@@ -414,7 +521,8 @@ export async function getAdminExperimentRun(runId: string): Promise<AdminExperim
 		questionOrder: JSON.parse(row.run.questionOrderJson) as string[],
 		events,
 		responses,
-		banditSummary: createBanditSummary(events, responses)
+		banditSummary: createBanditSummary(events, responses),
+		intertemporalSummary: createIntertemporalSummary(events, responses)
 	};
 }
 

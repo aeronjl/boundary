@@ -7,6 +7,12 @@ import {
 	defaultBanditConfig
 } from '../src/lib/experiments/bandit';
 import {
+	defaultIntertemporalConfig,
+	intertemporalExperimentId,
+	intertemporalExperimentSlug,
+	intertemporalVersionId
+} from '../src/lib/experiments/intertemporal';
+import {
 	isTipiScale,
 	isTipiScoringMode,
 	tipiExperimentId,
@@ -61,6 +67,44 @@ await db
 		set: {
 			status: 'published',
 			configJson: JSON.stringify(defaultBanditConfig),
+			publishedAt: now
+		}
+	});
+
+await db
+	.insert(experiments)
+	.values({
+		id: intertemporalExperimentId,
+		slug: intertemporalExperimentSlug,
+		name: 'Intertemporal choice',
+		description: 'A repeated choice task for exploring tradeoffs between reward and delay.',
+		createdAt: now
+	})
+	.onConflictDoUpdate({
+		target: experiments.id,
+		set: {
+			slug: intertemporalExperimentSlug,
+			name: 'Intertemporal choice',
+			description: 'A repeated choice task for exploring tradeoffs between reward and delay.'
+		}
+	});
+
+await db
+	.insert(experimentVersions)
+	.values({
+		id: intertemporalVersionId,
+		experimentId: intertemporalExperimentId,
+		version: 1,
+		status: 'published',
+		configJson: JSON.stringify(defaultIntertemporalConfig),
+		createdAt: now,
+		publishedAt: now
+	})
+	.onConflictDoUpdate({
+		target: experimentVersions.id,
+		set: {
+			status: 'published',
+			configJson: JSON.stringify(defaultIntertemporalConfig),
 			publishedAt: now
 		}
 	});
@@ -138,4 +182,5 @@ const seeded = await db
 
 console.log(`Seeded ${seeded.length} TIPI questions.`);
 console.log(`Seeded ${defaultBanditConfig.armCount}-armed bandit config.`);
+console.log(`Seeded ${defaultIntertemporalConfig.trials.length} intertemporal choice trials.`);
 await closeDatabase();

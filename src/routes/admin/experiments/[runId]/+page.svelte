@@ -8,6 +8,8 @@
 			? new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(value)
 			: '-';
 
+	const formatPoints = (value: number) => value.toFixed(0);
+	const formatSeconds = (value: number) => value.toFixed(0);
 	const formatJson = (value: unknown) => JSON.stringify(value, null, 2) ?? 'undefined';
 </script>
 
@@ -97,6 +99,45 @@
 						{/each}
 					</tbody>
 				</table>
+			</div>
+		</div>
+	{/if}
+
+	{#if data.run.intertemporalSummary}
+		<div>
+			<h2 class="font-serif text-xl">Intertemporal summary</h2>
+			<div class="mt-2 grid grid-cols-2 gap-3 md:grid-cols-4">
+				<div class="border-t border-gray-200 py-3">
+					<p class="text-xs text-gray-500">Final wealth</p>
+					<p>{formatPoints(data.run.intertemporalSummary.finalWealth)}</p>
+				</div>
+				<div class="border-t border-gray-200 py-3">
+					<p class="text-xs text-gray-500">Net gain</p>
+					<p>{formatPoints(data.run.intertemporalSummary.netGain)}</p>
+				</div>
+				<div class="border-t border-gray-200 py-3">
+					<p class="text-xs text-gray-500">Delayed choices</p>
+					<p>
+						{data.run.intertemporalSummary.delayedChoiceCount} of {data.run.intertemporalSummary
+							.totalTrials}
+					</p>
+				</div>
+				<div class="border-t border-gray-200 py-3">
+					<p class="text-xs text-gray-500">Delay taken</p>
+					<p>{formatSeconds(data.run.intertemporalSummary.totalDelaySeconds)} sec</p>
+				</div>
+				<div class="border-t border-gray-200 py-3">
+					<p class="text-xs text-gray-500">Income</p>
+					<p>{formatPoints(data.run.intertemporalSummary.totalIncome)}</p>
+				</div>
+				<div class="border-t border-gray-200 py-3">
+					<p class="text-xs text-gray-500">Time cost</p>
+					<p>{formatPoints(data.run.intertemporalSummary.totalTimeCost)}</p>
+				</div>
+				<div class="border-t border-gray-200 py-3">
+					<p class="text-xs text-gray-500">Mean delay</p>
+					<p>{data.run.intertemporalSummary.averageDelaySeconds.toFixed(1)} sec</p>
+				</div>
 			</div>
 		</div>
 	{/if}

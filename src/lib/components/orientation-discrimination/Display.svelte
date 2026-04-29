@@ -1,52 +1,34 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-
-	let angle = 0; // Angle in degrees
-
-	// Function to randomize the angle
-	function randomizeAngle() {
-		angle = Math.floor(Math.random() * 360) - 180; // Random angle from -180 to 179
-	}
-
-	onMount(() => {
-		randomizeAngle();
-	});
-
-	// Function to handle key presses
-	function handleKeydown(event: KeyboardEvent) {
-		if ((event.key === 'ArrowLeft' && angle < 0) || (event.key === 'ArrowRight' && angle > 0)) {
-			console.log('Correct!');
-			randomizeAngle(); // Randomize again upon correct answer
-		} else {
-			console.log('Incorrect. Try again.');
-		}
-	}
+	export let angleDegrees = 0;
+	export let sizePx = 180;
 </script>
 
-<svelte:window on:keydown={handleKeydown} />
-
-<div class="flex flex-col gap-y-6">
-	<div class="flex h-[300px] items-center justify-center">
-		<svg class="h-20 w-20" viewBox="0 0 100 100" style="transform: rotate({angle}deg);">
-			<pattern
-				id="grating"
-				patternUnits="userSpaceOnUse"
-				width="10"
-				height="10"
-				patternTransform="rotate({angle})"
-			>
-				<line x1="0" y1="0" x2="10" y2="0" stroke="black" stroke-width="2" />
-			</pattern>
-			<rect width="100" height="100" fill="url(#grating)" />
-		</svg>
-	</div>
-
-	<div class="mx-auto flex w-1/2 flex-row items-center justify-between">
-		<button class="border border-r-8 border-b-8 border-black p-2 font-mono text-sm"
-			>Less than</button
-		>
-		<button class="border border-r-8 border-b-8 border-black p-2 font-mono text-sm"
-			>More than</button
-		>
-	</div>
+<div class="flex min-h-[260px] items-center justify-center border-y border-gray-200 bg-gray-50">
+	<svg
+		role="img"
+		aria-label="Tilted visual stimulus"
+		viewBox="0 0 200 200"
+		style={`width: ${sizePx}px; height: ${sizePx}px;`}
+	>
+		<circle cx="100" cy="100" r="86" fill="white" stroke="#d1d5db" stroke-width="2" />
+		<line
+			x1="100"
+			y1="36"
+			x2="100"
+			y2="164"
+			stroke="black"
+			stroke-width="14"
+			stroke-linecap="round"
+			transform={`rotate(${angleDegrees} 100 100)`}
+		/>
+		<line
+			x1="100"
+			y1="24"
+			x2="100"
+			y2="176"
+			stroke="#d1d5db"
+			stroke-width="2"
+			stroke-dasharray="5 7"
+		/>
+	</svg>
 </div>

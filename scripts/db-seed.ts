@@ -13,6 +13,12 @@ import {
 	intertemporalVersionId
 } from '../src/lib/experiments/intertemporal';
 import {
+	defaultOrientationConfig,
+	orientationExperimentId,
+	orientationExperimentSlug,
+	orientationVersionId
+} from '../src/lib/experiments/orientation';
+import {
 	isTipiScale,
 	isTipiScoringMode,
 	tipiExperimentId,
@@ -112,6 +118,44 @@ await db
 await db
 	.insert(experiments)
 	.values({
+		id: orientationExperimentId,
+		slug: orientationExperimentSlug,
+		name: 'Orientation discrimination',
+		description: 'A psychophysics task for judging whether a visual stimulus tilts left or right.',
+		createdAt: now
+	})
+	.onConflictDoUpdate({
+		target: experiments.id,
+		set: {
+			slug: orientationExperimentSlug,
+			name: 'Orientation discrimination',
+			description: 'A psychophysics task for judging whether a visual stimulus tilts left or right.'
+		}
+	});
+
+await db
+	.insert(experimentVersions)
+	.values({
+		id: orientationVersionId,
+		experimentId: orientationExperimentId,
+		version: 1,
+		status: 'published',
+		configJson: JSON.stringify(defaultOrientationConfig),
+		createdAt: now,
+		publishedAt: now
+	})
+	.onConflictDoUpdate({
+		target: experimentVersions.id,
+		set: {
+			status: 'published',
+			configJson: JSON.stringify(defaultOrientationConfig),
+			publishedAt: now
+		}
+	});
+
+await db
+	.insert(experiments)
+	.values({
 		id: tipiExperimentId,
 		slug: tipiExperimentSlug,
 		name: 'Ten Item Personality Inventory',
@@ -183,4 +227,7 @@ const seeded = await db
 console.log(`Seeded ${seeded.length} TIPI questions.`);
 console.log(`Seeded ${defaultBanditConfig.armCount}-armed bandit config.`);
 console.log(`Seeded ${defaultIntertemporalConfig.trials.length} intertemporal choice trials.`);
+console.log(
+	`Seeded ${defaultOrientationConfig.angleMagnitudes.length * defaultOrientationConfig.repetitionsPerDirection * 2} orientation discrimination trials.`
+);
 await closeDatabase();

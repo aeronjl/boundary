@@ -14,6 +14,7 @@ type GenericExportRun = {
 	responses: GenericExportResponse[];
 	events: { eventType: string }[];
 	intertemporalSummary?: { delayedChoiceCount: number } | null;
+	orientationSummary?: { totalTrials: number; correctCount: number } | null;
 };
 
 async function completeTipiRun(page: Page) {
@@ -51,6 +52,20 @@ async function completeIntertemporalRun(page: Page) {
 	}
 
 	await expect(page.getByRole('heading', { name: 'Intertemporal choice complete' })).toBeVisible();
+}
+
+async function completeOrientationRun(page: Page) {
+	await page.goto('/orientation-discrimination');
+	await page.getByRole('button', { name: 'Start' }).click();
+
+	for (let trial = 1; trial <= 16; trial++) {
+		await expect(page.getByText(`${trial} of 16`)).toBeVisible();
+		await page.getByRole('button', { name: 'Choose clockwise' }).click();
+	}
+
+	await expect(
+		page.getByRole('heading', { name: 'Orientation discrimination complete' })
+	).toBeVisible();
 }
 
 test('index page has expected h1', async ({ page }) => {
@@ -150,6 +165,45 @@ test('intertemporal choice records generic trial data', async ({ page }) => {
 		.click();
 	await expect(page.getByRole('heading', { name: 'Intertemporal summary' })).toBeVisible();
 	await expect(page.getByText('choice_made').first()).toBeVisible();
+});
+
+test('orientation discrimination records generic trial data', async ({ page }) => {
+	await completeOrientationRun(page);
+
+	await page.goto('/admin');
+	await page.getByLabel('Admin token').fill('test-admin-token');
+	await page.getByRole('button', { name: 'Sign in' }).click();
+
+	const exportResponse = await page.request.get('/admin/experiments/export.json');
+	expect(exportResponse.status()).toBe(200);
+
+	const exportBody = await exportResponse.json();
+	const orientationRun = exportBody.runs.find(
+		(run: GenericExportRun) =>
+			run.experimentVersionId === 'orientation-discrimination-v1' &&
+			run.responses.length === 16 &&
+			run.orientationSummary?.totalTrials === 16
+	);
+
+	expect(orientationRun).toBeTruthy();
+	expect(orientationRun?.events.map((event: { eventType: string }) => event.eventType)).toEqual(
+		expect.arrayContaining(['run_started', 'trial_started', 'orientation_judged', 'run_completed'])
+	);
+	expect(orientationRun?.responses[0].metadata.timing.responseTimeMs).toEqual(expect.any(Number));
+
+	await page.goto('/admin/experiments?experiment=orientation-discrimination');
+	await expect(page.getByRole('heading', { name: 'Experiment runs' })).toBeVisible();
+	await expect(
+		page.getByRole('cell', { name: 'Orientation discrimination' }).first()
+	).toBeVisible();
+	await expect(page.getByText('orientation_discrimination').first()).toBeVisible();
+
+	await page
+		.getByRole('link', { name: /View run/ })
+		.first()
+		.click();
+	await expect(page.getByRole('heading', { name: 'Orientation summary' })).toBeVisible();
+	await expect(page.getByText('orientation_judged').first()).toBeVisible();
 });
 
 test('admin can inspect and export ten item personality inventory data', async ({ page }) => {

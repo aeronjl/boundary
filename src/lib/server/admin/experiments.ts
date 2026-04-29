@@ -66,6 +66,14 @@ export type AdminIntertemporalSummary = {
 	averageDelaySeconds: number;
 };
 
+export type AdminOrientationSummary = {
+	totalTrials: number;
+	correctCount: number;
+	incorrectCount: number;
+	accuracy: number;
+	meanResponseTimeMs: number | null;
+};
+
 export type AdminExperimentRunSummary = {
 	id: string;
 	participantSessionId: string;
@@ -89,6 +97,7 @@ export type AdminExperimentRun = AdminExperimentRunSummary & {
 	responses: AdminExperimentResponse[];
 	banditSummary: AdminBanditSummary | null;
 	intertemporalSummary: AdminIntertemporalSummary | null;
+	orientationSummary: AdminOrientationSummary | null;
 };
 
 export type AdminExperimentRunList = {
@@ -178,6 +187,19 @@ export const adminExperimentDictionary: AdminExperimentDictionaryEntry[] = [
 	},
 	{
 		kind: 'event',
+		name: 'orientation_judged',
+		source: 'orientation-discrimination',
+		description: 'A clockwise or counterclockwise orientation judgment was selected and scored.',
+		fields: [
+			'trialIndex',
+			'payload.trialId',
+			'payload.response',
+			'payload.correct',
+			'payload.angleDegrees'
+		]
+	},
+	{
+		kind: 'event',
 		name: 'run_completed',
 		source: 'all experiments',
 		description: 'Recorded once the final result has been calculated.',
@@ -223,6 +245,21 @@ export const adminExperimentDictionary: AdminExperimentDictionaryEntry[] = [
 			'score.delaySeconds',
 			'score.netValue',
 			'score.wealthAfter',
+			'metadata.timing.responseTimeMs'
+		]
+	},
+	{
+		kind: 'response',
+		name: 'orientation_discrimination',
+		source: 'orientation-discrimination',
+		description: 'Generic trial record for one orientation judgment.',
+		fields: [
+			'itemId',
+			'response.response',
+			'score.correct',
+			'score.correctDirection',
+			'score.angleDegrees',
+			'score.magnitudeDegrees',
 			'metadata.timing.responseTimeMs'
 		]
 	}
@@ -430,6 +467,56 @@ function createIntertemporalSummary(
 	};
 }
 
+function createOrientationSummary(
+	events: AdminExperimentEvent[],
+	responses: AdminExperimentResponse[]
+): AdminOrientationSummary | null {
+	const orientationResponses = responses.filter(
+		(response) => response.responseType === 'orientation_discrimination'
+	);
+	const startedPayload = getPayloadRecord(
+		events.find((event) => event.eventType === 'run_started')
+	);
+	const completedPayload = getPayloadRecord(
+		events.find((event) => event.eventType === 'run_completed')
+	);
+	const completedResult = isRecord(completedPayload?.result) ? completedPayload.result : null;
+
+	if (orientationResponses.length === 0 && !completedResult) return null;
+
+	const correctCount =
+		numberValue(completedResult?.correctCount) ??
+		orientationResponses.reduce((total, response) => {
+			const score = isRecord(response.score) ? response.score : null;
+			return total + (score?.correct === true ? 1 : 0);
+		}, 0);
+	const totalTrials =
+		numberValue(completedResult?.totalTrials) ??
+		numberValue(startedPayload?.totalTrials) ??
+		orientationResponses.length;
+	const incorrectCount =
+		numberValue(completedResult?.incorrectCount) ?? orientationResponses.length - correctCount;
+	const responseTimes = orientationResponses.flatMap((response) => {
+		const timing = timingRecord(response);
+		const responseTimeMs = numberValue(timing?.responseTimeMs);
+		return responseTimeMs === null ? [] : [responseTimeMs];
+	});
+	const meanResponseTimeMs =
+		numberValue(completedResult?.meanResponseTimeMs) ??
+		(responseTimes.length > 0
+			? responseTimes.reduce((total, time) => total + time, 0) / responseTimes.length
+			: null);
+
+	return {
+		totalTrials,
+		correctCount,
+		incorrectCount,
+		accuracy:
+			numberValue(completedResult?.accuracy) ?? (totalTrials > 0 ? correctCount / totalTrials : 0),
+		meanResponseTimeMs
+	};
+}
+
 async function getRunRows() {
 	return db
 		.select({
@@ -585,7 +672,8 @@ export async function getAdminExperimentRun(runId: string): Promise<AdminExperim
 		events,
 		responses,
 		banditSummary: createBanditSummary(events, responses),
-		intertemporalSummary: createIntertemporalSummary(events, responses)
+		intertemporalSummary: createIntertemporalSummary(events, responses),
+		orientationSummary: createOrientationSummary(events, responses)
 	};
 }
 

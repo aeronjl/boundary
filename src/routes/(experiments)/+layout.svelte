@@ -35,7 +35,7 @@
 </script>
 
 <div>
-	<div class="h-[500px]">
+	<div class="min-h-[500px]">
 		<slot></slot>
 	</div>
 

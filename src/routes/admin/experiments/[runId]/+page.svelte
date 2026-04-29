@@ -8,6 +8,7 @@
 			? new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(value)
 			: '-';
 
+	const formatPercent = (value: number) => `${(value * 100).toFixed(0)}%`;
 	const formatPoints = (value: number) => value.toFixed(0);
 	const formatSeconds = (value: number) => value.toFixed(0);
 	const formatJson = (value: unknown) => JSON.stringify(value, null, 2) ?? 'undefined';
@@ -148,6 +149,32 @@
 				<div class="border-t border-gray-200 py-3">
 					<p class="text-xs text-gray-500">Mean delay</p>
 					<p>{data.run.intertemporalSummary.averageDelaySeconds.toFixed(1)} sec</p>
+				</div>
+			</div>
+		</div>
+	{/if}
+
+	{#if data.run.orientationSummary}
+		<div>
+			<h2 class="font-serif text-xl">Orientation summary</h2>
+			<div class="mt-2 grid grid-cols-2 gap-3 md:grid-cols-4">
+				<div class="border-t border-gray-200 py-3">
+					<p class="text-xs text-gray-500">Accuracy</p>
+					<p class="font-serif text-2xl">{formatPercent(data.run.orientationSummary.accuracy)}</p>
+				</div>
+				<div class="border-t border-gray-200 py-3">
+					<p class="text-xs text-gray-500">Correct</p>
+					<p>
+						{data.run.orientationSummary.correctCount} of {data.run.orientationSummary.totalTrials}
+					</p>
+				</div>
+				<div class="border-t border-gray-200 py-3">
+					<p class="text-xs text-gray-500">Incorrect</p>
+					<p>{data.run.orientationSummary.incorrectCount}</p>
+				</div>
+				<div class="border-t border-gray-200 py-3">
+					<p class="text-xs text-gray-500">Mean response time</p>
+					<p>{formatMs(data.run.orientationSummary.meanResponseTimeMs)}</p>
 				</div>
 			</div>
 		</div>

@@ -9,11 +9,43 @@ import {
 import { db } from '$lib/server/db';
 import { referenceDatasets, referenceMetrics, referenceStudies } from '$lib/server/db/schema';
 
-export type AdminReferenceMetric = typeof referenceMetrics.$inferSelect;
+export type AdminReferenceExcludedRows = {
+	count: number;
+	reason: string;
+};
+
+export type AdminReferenceDatasetImport = {
+	importId: string;
+	importedAt: string;
+	sourceName: string;
+	sourceUrl: string;
+	sourceRevision: string;
+	sourceWarning: string;
+	extractorName: string;
+	extractorVersion: string;
+	reviewNotes: string;
+};
+
+export type AdminReferenceMetricImport = {
+	importId: string;
+	importedAt: string;
+	sourceName: string;
+	sourceUrl: string;
+	sourceRevision: string;
+	sampleSize: number | null;
+	sourceColumns: string[];
+	method: string;
+	excludedRows: AdminReferenceExcludedRows[];
+};
+
+export type AdminReferenceMetric = typeof referenceMetrics.$inferSelect & {
+	importMetadata: AdminReferenceMetricImport | null;
+};
 export type AdminReferenceStudy = typeof referenceStudies.$inferSelect;
 export type AdminReferenceDataset = typeof referenceDatasets.$inferSelect & {
 	study: AdminReferenceStudy | null;
 	metrics: AdminReferenceMetric[];
+	importMetadata: AdminReferenceDatasetImport | null;
 };
 
 export type AdminSetReferenceDatasetInput = {
@@ -78,6 +110,91 @@ function parseOptionalNumber(value: string | null): number | null {
 	return Number.isFinite(parsed) ? parsed : Number.NaN;
 }
 
+function parseJsonRecord(value: string): Record<string, unknown> | null {
+	try {
+		const parsed = JSON.parse(value) as unknown;
+		return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+			? (parsed as Record<string, unknown>)
+			: null;
+	} catch {
+		return null;
+	}
+}
+
+function recordValue(value: unknown): Record<string, unknown> | null {
+	return typeof value === 'object' && value !== null && !Array.isArray(value)
+		? (value as Record<string, unknown>)
+		: null;
+}
+
+function stringValue(value: unknown): string {
+	return typeof value === 'string' ? value : '';
+}
+
+function numberValue(value: unknown): number | null {
+	return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function stringArrayValue(value: unknown): string[] {
+	return Array.isArray(value)
+		? value.filter((item): item is string => typeof item === 'string')
+		: [];
+}
+
+function excludedRowsValue(value: unknown): AdminReferenceExcludedRows[] {
+	if (!Array.isArray(value)) return [];
+
+	return value.flatMap((item) => {
+		const record = recordValue(item);
+		const count = numberValue(record?.count);
+		const reason = stringValue(record?.reason);
+
+		return count === null || reason.length === 0 ? [] : [{ count, reason }];
+	});
+}
+
+function datasetImportMetadata(metricSummaryJson: string): AdminReferenceDatasetImport | null {
+	const root = parseJsonRecord(metricSummaryJson);
+	const referenceImport = recordValue(root?.referenceImport);
+	const source = recordValue(referenceImport?.source);
+	const extractor = recordValue(referenceImport?.extractor);
+	const review = recordValue(referenceImport?.review);
+
+	if (!referenceImport || !source || !extractor) return null;
+
+	return {
+		importId: stringValue(referenceImport.importId),
+		importedAt: stringValue(referenceImport.importedAt),
+		sourceName: stringValue(source.name),
+		sourceUrl: stringValue(source.url),
+		sourceRevision: stringValue(source.revision),
+		sourceWarning: stringValue(source.warning),
+		extractorName: stringValue(extractor.name),
+		extractorVersion: stringValue(extractor.version),
+		reviewNotes: stringValue(review?.notes)
+	};
+}
+
+function metricImportMetadata(metricJson: string): AdminReferenceMetricImport | null {
+	const root = parseJsonRecord(metricJson);
+	const referenceImport = recordValue(root?.referenceImport);
+	const source = recordValue(referenceImport?.source);
+
+	if (!referenceImport || !source) return null;
+
+	return {
+		importId: stringValue(referenceImport.importId),
+		importedAt: stringValue(referenceImport.importedAt),
+		sourceName: stringValue(source.name),
+		sourceUrl: stringValue(source.url),
+		sourceRevision: stringValue(source.revision),
+		sampleSize: numberValue(referenceImport.sampleSize),
+		sourceColumns: stringArrayValue(referenceImport.sourceColumns),
+		method: stringValue(referenceImport.method),
+		excludedRows: excludedRowsValue(referenceImport.excludedRows)
+	};
+}
+
 export async function listAdminReferenceRegistry(): Promise<{
 	studies: AdminReferenceStudy[];
 	datasets: AdminReferenceDataset[];
@@ -96,7 +213,10 @@ export async function listAdminReferenceRegistry(): Promise<{
 
 	for (const metric of metrics) {
 		const existing = metricsByDatasetId.get(metric.referenceDatasetId) ?? [];
-		existing.push(metric);
+		existing.push({
+			...metric,
+			importMetadata: metricImportMetadata(metric.metricJson)
+		});
 		metricsByDatasetId.set(metric.referenceDatasetId, existing);
 	}
 
@@ -105,7 +225,8 @@ export async function listAdminReferenceRegistry(): Promise<{
 		datasets: datasets.map((dataset) => ({
 			...dataset,
 			study: dataset.referenceStudyId ? (studyById.get(dataset.referenceStudyId) ?? null) : null,
-			metrics: metricsByDatasetId.get(dataset.id) ?? []
+			metrics: metricsByDatasetId.get(dataset.id) ?? [],
+			importMetadata: datasetImportMetadata(dataset.metricSummaryJson)
 		})),
 		metricContractCount: referenceMetricContracts.length,
 		metricCount: metrics.length,

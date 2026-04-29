@@ -20,7 +20,8 @@
 		"db:seed": "bun run scripts/db-seed.ts",
 		"db:setup": "bun run db:migrate && bun run db:seed",
 		"db:deploy": "bun run db:migrate && bun run db:seed",
-		"db:studio": "drizzle-kit studio"
+		"db:studio": "drizzle-kit studio",
+		"reference:import": "bun run scripts/reference-import.ts"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",

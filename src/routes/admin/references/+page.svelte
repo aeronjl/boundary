@@ -8,6 +8,10 @@
 		value
 			? new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(value)
 			: '-';
+	const formatImportDate = (value: string) => {
+		const parsed = Date.parse(value);
+		return Number.isFinite(parsed) ? formatDate(parsed) : '-';
+	};
 	const formatNumberInput = (value: number | null) => (value === null ? '' : String(value));
 </script>
 
@@ -112,6 +116,40 @@
 								<span>from {dataset.study.shortCitation}</span>
 							{/if}
 						</p>
+						{#if dataset.importMetadata}
+							<div
+								class="mt-3 max-w-3xl border-l-2 border-gray-200 py-1 pl-3 text-xs text-gray-600"
+							>
+								<p class="font-medium text-gray-700">Imported reference summary</p>
+								<p class="mt-1">
+									<!-- eslint-disable svelte/no-navigation-without-resolve -->
+									<a
+										class="underline"
+										href={dataset.importMetadata.sourceUrl}
+										rel="noreferrer"
+										target="_blank"
+									>
+										{dataset.importMetadata.sourceName}
+									</a>
+									<!-- eslint-enable svelte/no-navigation-without-resolve -->
+									<span>
+										{dataset.importMetadata.sourceRevision}, imported {formatImportDate(
+											dataset.importMetadata.importedAt
+										)}
+									</span>
+								</p>
+								<p class="mt-1">
+									Extractor: {dataset.importMetadata.extractorName}
+									{dataset.importMetadata.extractorVersion}
+								</p>
+								{#if dataset.importMetadata.sourceWarning}
+									<p class="mt-1">{dataset.importMetadata.sourceWarning}</p>
+								{/if}
+								{#if dataset.importMetadata.reviewNotes}
+									<p class="mt-1">{dataset.importMetadata.reviewNotes}</p>
+								{/if}
+							</div>
+						{/if}
 					</div>
 
 					<form
@@ -197,6 +235,13 @@
 										<p class="text-xs text-gray-500">Metric</p>
 										<p class="font-medium">{metric.label}</p>
 										<p class="text-xs text-gray-500">{metric.metricKey}</p>
+										{#if metric.importMetadata}
+											<p class="mt-1 text-xs text-gray-500">
+												Imported n={metric.importMetadata.sampleSize ?? '-'} from {metric.importMetadata.sourceColumns.join(
+													', '
+												)}
+											</p>
+										{/if}
 									</div>
 									<label class="flex flex-col gap-1">
 										<span class="text-xs font-medium text-gray-500">Mean</span>
@@ -242,6 +287,24 @@
 											class="rounded-sm border border-gray-300 px-3 py-2">{metric.notes}</textarea
 										>
 									</label>
+									{#if metric.importMetadata}
+										<div
+											class="border-l-2 border-gray-200 py-1 pl-3 text-xs text-gray-600 md:col-span-5"
+										>
+											<p>{metric.importMetadata.method}</p>
+											{#if metric.importMetadata.excludedRows.length > 0}
+												<p class="mt-1">
+													Excluded:
+													{#each metric.importMetadata.excludedRows as excluded, index (excluded.reason)}
+														{excluded.count}
+														{excluded.reason}{index < metric.importMetadata.excludedRows.length - 1
+															? '; '
+															: ''}
+													{/each}
+												</p>
+											{/if}
+										</div>
+									{/if}
 									<div class="md:col-span-5">
 										<button class="rounded-sm bg-gray-100 px-3 py-2 text-xs"> Save metric </button>
 									</div>

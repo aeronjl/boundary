@@ -16,6 +16,7 @@ import {
 	formatPercentile,
 	percentileFromZScore
 } from '$lib/reference-data/comparison';
+import { parseReferenceImportSummary } from '$lib/reference-data/import-summary';
 import { createReferenceContext } from '$lib/reference-data/summary';
 import { calculateNBackSignalDetectionMetrics, type NBackResult } from '$lib/experiments/n-back';
 import { createNBackInterpretation } from '$lib/experiments/n-back-interpretation';
@@ -26,6 +27,7 @@ import {
 } from '$lib/experiments/orientation';
 import { createOrientationInterpretation } from '$lib/experiments/orientation-interpretation';
 import { createStudyProfileInterpretation } from '$lib/studies/synthesis';
+import openFmriNBackSummary from '../static/reference-data/n-back/openfmri-ds000115-summary.json';
 
 describe('n-back interpretation helpers', () => {
 	it('computes signal-detection rates and sensitivity', () => {
@@ -206,6 +208,18 @@ describe('reference data contracts', () => {
 				percentile
 			})
 		).toContain('above the reference mean');
+	});
+
+	it('validates the OpenfMRI n-back reference import summary', () => {
+		const summary = parseReferenceImportSummary(openFmriNBackSummary);
+		const accuracy = summary.metrics.find((metric) => metric.metricKey === 'accuracy');
+
+		expect(summary.datasetId).toBe('openfmri-ds000115-nback');
+		expect(summary.review.status).toBe('candidate');
+		expect(summary.source.sha256).toHaveLength(64);
+		expect(accuracy?.sampleSize).toBe(98);
+		expect(accuracy?.mean).toBeCloseTo(0.8508);
+		expect(accuracy?.sourceColumns).toEqual(['nback2_nont', 'nback2_targ']);
 	});
 });
 

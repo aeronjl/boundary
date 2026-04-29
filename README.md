@@ -64,6 +64,25 @@ Experiment runs share generic capture tables:
 
 Experiment-specific tables, such as `tipi_responses` and `tipi_results`, should be reserved for scoring and analysis fields that need typed columns.
 
+## Reference Data Imports
+
+Reference comparison stats are imported from reviewed summary JSON files. The OpenfMRI
+ds000115 n-back candidate summary lives at:
+
+```sh
+static/reference-data/n-back/openfmri-ds000115-summary.json
+```
+
+Import it into the configured database with:
+
+```sh
+bun run reference:import static/reference-data/n-back/openfmri-ds000115-summary.json
+```
+
+The importer writes metric stats and provenance, but preserves human review fields by
+default. Use `--dry-run` to inspect changes and `--apply-review` only when the summary
+review fields should update dataset status, compatibility, and notes.
+
 ## Building
 
 Create and preview a production build:

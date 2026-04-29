@@ -803,6 +803,43 @@ test('admin can inspect and export ten item personality inventory data', async (
 	await expect(datasetForm.getByLabel('Dataset status')).toHaveValue('candidate');
 	await expect(datasetForm.getByLabel('Sample size')).toHaveValue('42');
 
+	const cohortLabel = `Boundary Pilot Cohort ${Date.now()}`;
+	const createCohortForm = page.locator('form[aria-label^="Add cohort for"]').first();
+	await createCohortForm.getByLabel('Source').selectOption({ label: sourceCitation });
+	await createCohortForm.getByLabel('Cohort label').fill(cohortLabel);
+	await createCohortForm.getByLabel('Group label').fill('healthy controls');
+	await createCohortForm.getByLabel('Sample size').fill('12');
+	await createCohortForm.getByLabel('Population').fill('Boundary pilot participants');
+	await createCohortForm.getByLabel('Inclusion criteria').fill('Completed pilot reference task');
+	await createCohortForm.getByLabel('Exclusion criteria').fill('Invalid timing metadata');
+	await createCohortForm.getByLabel('Cohort notes').fill('Cohort added during smoke test.');
+	await createCohortForm.getByRole('button', { name: 'Add cohort' }).click();
+	await expect(page.getByText('Reference cohort added.')).toBeVisible();
+
+	const cohortForm = page.locator(`form[aria-label="Edit reference cohort ${cohortLabel}"]`);
+	await expect(cohortForm).toBeVisible();
+	await cohortForm.getByLabel('Cohort notes').fill('Cohort reviewed during smoke test.');
+	await cohortForm.getByRole('button', { name: 'Save cohort' }).click();
+	await expect(page.getByText('Reference cohort updated.')).toBeVisible();
+	await expect(cohortForm.getByLabel('Cohort notes')).toHaveValue(
+		'Cohort reviewed during smoke test.'
+	);
+
+	const mappingForm = page.locator('form[aria-label^="Edit reference mapping Accuracy"]').first();
+	await mappingForm.getByLabel('Reference cohort').selectOption({ label: cohortLabel });
+	await mappingForm.getByLabel('Source metric').fill('pilot_accuracy');
+	await mappingForm.getByLabel('Source columns').fill('pilot_nont, pilot_targ');
+	await mappingForm.getByLabel('Direction').selectOption('same');
+	await mappingForm.getByLabel('Extraction status').selectOption('reviewed');
+	await mappingForm
+		.getByLabel('Transformation')
+		.fill('Mean of pilot target and non-target accuracy.');
+	await mappingForm.getByLabel('Mapping notes').fill('Mapping reviewed during smoke test.');
+	await mappingForm.getByRole('button', { name: 'Save mapping' }).click();
+	await expect(page.getByText('Reference metric mapping updated.')).toBeVisible();
+	await expect(mappingForm.getByLabel('Source metric')).toHaveValue('pilot_accuracy');
+	await expect(mappingForm.getByLabel('Source columns')).toHaveValue('pilot_nont, pilot_targ');
+
 	const validateForm = page.locator('form[aria-label^="Validate reference dataset"]').first();
 	await validateForm.getByLabel('Review compatibility').selectOption('compatible');
 	await validateForm

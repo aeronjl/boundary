@@ -2,14 +2,24 @@ import { asc, eq } from 'drizzle-orm';
 import {
 	referenceCompatibilities,
 	referenceDatasetStatuses,
+	referenceExtractionStatuses,
+	referenceMappingDirections,
 	referenceMetricContracts,
 	referenceSourceTypes,
 	type ReferenceCompatibility,
 	type ReferenceDatasetStatus,
+	type ReferenceExtractionStatus,
+	type ReferenceMappingDirection,
 	type ReferenceSourceType
 } from '$lib/reference-data/catalog';
 import { db } from '$lib/server/db';
-import { referenceDatasets, referenceMetrics, referenceStudies } from '$lib/server/db/schema';
+import {
+	referenceCohorts,
+	referenceDatasets,
+	referenceMetricMappings,
+	referenceMetrics,
+	referenceStudies
+} from '$lib/server/db/schema';
 
 export type AdminReferenceExcludedRows = {
 	count: number;
@@ -40,12 +50,18 @@ export type AdminReferenceMetricImport = {
 	excludedRows: AdminReferenceExcludedRows[];
 };
 
+export type AdminReferenceMetricMapping = typeof referenceMetricMappings.$inferSelect & {
+	sourceColumns: string[];
+};
 export type AdminReferenceMetric = typeof referenceMetrics.$inferSelect & {
 	importMetadata: AdminReferenceMetricImport | null;
+	mapping: AdminReferenceMetricMapping | null;
 };
 export type AdminReferenceStudy = typeof referenceStudies.$inferSelect;
+export type AdminReferenceCohort = typeof referenceCohorts.$inferSelect;
 export type AdminReferenceDataset = typeof referenceDatasets.$inferSelect & {
 	study: AdminReferenceStudy | null;
+	cohorts: AdminReferenceCohort[];
 	metrics: AdminReferenceMetric[];
 	importMetadata: AdminReferenceDatasetImport | null;
 };
@@ -77,12 +93,39 @@ export type AdminSetReferenceStudyInput = {
 
 export type AdminCreateReferenceStudyInput = Omit<AdminSetReferenceStudyInput, 'id'>;
 
+export type AdminSetReferenceCohortInput = {
+	id: string;
+	referenceDatasetId: string;
+	referenceStudyId: string | null;
+	label: string | null;
+	population: string | null;
+	groupLabel: string | null;
+	sampleSize: string | null;
+	inclusionCriteria: string | null;
+	exclusionCriteria: string | null;
+	notes: string | null;
+};
+
+export type AdminCreateReferenceCohortInput = Omit<AdminSetReferenceCohortInput, 'id'>;
+
 export type AdminSetReferenceMetricInput = {
 	id: string;
 	mean: string | null;
 	standardDeviation: string | null;
 	minimum: string | null;
 	maximum: string | null;
+	notes: string | null;
+};
+
+export type AdminSetReferenceMetricMappingInput = {
+	id: string | null;
+	referenceMetricId: string;
+	referenceCohortId: string | null;
+	sourceMetric: string | null;
+	sourceColumns: string | null;
+	transformation: string | null;
+	direction: string;
+	extractionStatus: string;
 	notes: string | null;
 };
 
@@ -119,6 +162,18 @@ function parseReferenceSourceType(value: string): ReferenceSourceType {
 	return referenceSourceTypes.includes(value as ReferenceSourceType)
 		? (value as ReferenceSourceType)
 		: 'literature';
+}
+
+function parseReferenceExtractionStatus(value: string): ReferenceExtractionStatus {
+	return referenceExtractionStatuses.includes(value as ReferenceExtractionStatus)
+		? (value as ReferenceExtractionStatus)
+		: 'candidate';
+}
+
+function parseReferenceMappingDirection(value: string): ReferenceMappingDirection {
+	return referenceMappingDirections.includes(value as ReferenceMappingDirection)
+		? (value as ReferenceMappingDirection)
+		: 'same';
 }
 
 function trimmed(value: string | null): string {
@@ -164,6 +219,20 @@ async function nextReferenceStudyId(base: string): Promise<string> {
 	return `${base}-${Date.now()}`;
 }
 
+async function nextReferenceCohortId(base: string): Promise<string> {
+	for (let suffix = 0; suffix < 100; suffix++) {
+		const id = suffix === 0 ? base : `${base}-${suffix + 1}`;
+		const [existing] = await db
+			.select({ id: referenceCohorts.id })
+			.from(referenceCohorts)
+			.where(eq(referenceCohorts.id, id));
+
+		if (!existing) return id;
+	}
+
+	return `${base}-${Date.now()}`;
+}
+
 function parseJsonRecord(value: string): Record<string, unknown> | null {
 	try {
 		const parsed = JSON.parse(value) as unknown;
@@ -193,6 +262,21 @@ function stringArrayValue(value: unknown): string[] {
 	return Array.isArray(value)
 		? value.filter((item): item is string => typeof item === 'string')
 		: [];
+}
+
+function parseSourceColumnsInput(value: string | null): string[] {
+	return trimmed(value)
+		.split(',')
+		.map((item) => item.trim())
+		.filter((item) => item.length > 0);
+}
+
+function sourceColumnsValue(value: string): string[] {
+	try {
+		return stringArrayValue(JSON.parse(value) as unknown);
+	} catch {
+		return [];
+	}
 }
 
 function excludedRowsValue(value: unknown): AdminReferenceExcludedRows[] {
@@ -297,21 +381,41 @@ export async function listAdminReferenceRegistry(): Promise<{
 	metricCount: number;
 	datasetStatuses: typeof referenceDatasetStatuses;
 	compatibilities: typeof referenceCompatibilities;
+	extractionStatuses: typeof referenceExtractionStatuses;
+	mappingDirections: typeof referenceMappingDirections;
 	sourceTypes: typeof referenceSourceTypes;
 }> {
-	const [studies, datasets, metrics] = await Promise.all([
+	const [studies, datasets, cohorts, metrics, mappings] = await Promise.all([
 		db.select().from(referenceStudies).orderBy(asc(referenceStudies.shortCitation)),
 		db.select().from(referenceDatasets).orderBy(asc(referenceDatasets.experimentSlug)),
-		db.select().from(referenceMetrics).orderBy(asc(referenceMetrics.experimentSlug))
+		db.select().from(referenceCohorts).orderBy(asc(referenceCohorts.label)),
+		db.select().from(referenceMetrics).orderBy(asc(referenceMetrics.experimentSlug)),
+		db.select().from(referenceMetricMappings).orderBy(asc(referenceMetricMappings.sourceMetric))
 	]);
 	const studyById = new Map(studies.map((study) => [study.id, study]));
+	const cohortsByDatasetId = new Map<string, AdminReferenceCohort[]>();
+	const mappingByMetricId = new Map<string, AdminReferenceMetricMapping>();
 	const metricsByDatasetId = new Map<string, AdminReferenceMetric[]>();
+
+	for (const cohort of cohorts) {
+		const existing = cohortsByDatasetId.get(cohort.referenceDatasetId) ?? [];
+		existing.push(cohort);
+		cohortsByDatasetId.set(cohort.referenceDatasetId, existing);
+	}
+
+	for (const mapping of mappings) {
+		mappingByMetricId.set(mapping.referenceMetricId, {
+			...mapping,
+			sourceColumns: sourceColumnsValue(mapping.sourceColumnsJson)
+		});
+	}
 
 	for (const metric of metrics) {
 		const existing = metricsByDatasetId.get(metric.referenceDatasetId) ?? [];
 		existing.push({
 			...metric,
-			importMetadata: metricImportMetadata(metric.metricJson)
+			importMetadata: metricImportMetadata(metric.metricJson),
+			mapping: mappingByMetricId.get(metric.id) ?? null
 		});
 		metricsByDatasetId.set(metric.referenceDatasetId, existing);
 	}
@@ -321,6 +425,7 @@ export async function listAdminReferenceRegistry(): Promise<{
 		datasets: datasets.map((dataset) => ({
 			...dataset,
 			study: dataset.referenceStudyId ? (studyById.get(dataset.referenceStudyId) ?? null) : null,
+			cohorts: cohortsByDatasetId.get(dataset.id) ?? [],
 			metrics: metricsByDatasetId.get(dataset.id) ?? [],
 			importMetadata: datasetImportMetadata(dataset.metricSummaryJson)
 		})),
@@ -328,6 +433,8 @@ export async function listAdminReferenceRegistry(): Promise<{
 		metricCount: metrics.length,
 		datasetStatuses: referenceDatasetStatuses,
 		compatibilities: referenceCompatibilities,
+		extractionStatuses: referenceExtractionStatuses,
+		mappingDirections: referenceMappingDirections,
 		sourceTypes: referenceSourceTypes
 	};
 }
@@ -475,6 +582,119 @@ export async function setAdminReferenceDataset(
 	return { ok: true };
 }
 
+function parsedReferenceCohortFields(input: AdminCreateReferenceCohortInput) {
+	const label = trimmed(input.label);
+	const sampleSize = parseOptionalInteger(input.sampleSize);
+	const referenceStudyId = trimmed(input.referenceStudyId) || null;
+
+	if (label.length === 0) {
+		return { ok: false as const, status: 400, message: 'Cohort label is required.' };
+	}
+
+	if (Number.isNaN(sampleSize)) {
+		return {
+			ok: false as const,
+			status: 400,
+			message: 'Cohort sample size must be a whole number.'
+		};
+	}
+
+	return {
+		ok: true as const,
+		fields: {
+			referenceStudyId,
+			referenceDatasetId: input.referenceDatasetId,
+			label,
+			population: trimmed(input.population),
+			groupLabel: trimmed(input.groupLabel),
+			sampleSize,
+			inclusionCriteria: trimmed(input.inclusionCriteria),
+			exclusionCriteria: trimmed(input.exclusionCriteria),
+			notes: trimmed(input.notes)
+		}
+	};
+}
+
+async function validateReferenceCohortLinks(
+	referenceDatasetId: string,
+	referenceStudyId: string | null
+): Promise<AdminReferenceUpdateResult> {
+	const [dataset] = await db
+		.select({ id: referenceDatasets.id })
+		.from(referenceDatasets)
+		.where(eq(referenceDatasets.id, referenceDatasetId));
+
+	if (!dataset) return { ok: false, status: 404, message: 'Reference dataset not found.' };
+
+	if (referenceStudyId) {
+		const [study] = await db
+			.select({ id: referenceStudies.id })
+			.from(referenceStudies)
+			.where(eq(referenceStudies.id, referenceStudyId));
+
+		if (!study) return { ok: false, status: 400, message: 'Reference source not found.' };
+	}
+
+	return { ok: true };
+}
+
+export async function createAdminReferenceCohort(
+	input: AdminCreateReferenceCohortInput
+): Promise<AdminReferenceUpdateResult> {
+	const parsed = parsedReferenceCohortFields(input);
+	if (!parsed.ok) return parsed;
+
+	const links = await validateReferenceCohortLinks(
+		parsed.fields.referenceDatasetId,
+		parsed.fields.referenceStudyId
+	);
+	if (!links.ok) return links;
+
+	const now = Date.now();
+	const id = await nextReferenceCohortId(
+		slugifyReferenceStudyId(`${parsed.fields.referenceDatasetId}-${parsed.fields.label}`)
+	);
+
+	await db.insert(referenceCohorts).values({
+		id,
+		...parsed.fields,
+		createdAt: now,
+		updatedAt: now
+	});
+
+	return { ok: true };
+}
+
+export async function setAdminReferenceCohort(
+	input: AdminSetReferenceCohortInput
+): Promise<AdminReferenceUpdateResult> {
+	const [cohort] = await db
+		.select({ id: referenceCohorts.id })
+		.from(referenceCohorts)
+		.where(eq(referenceCohorts.id, input.id));
+
+	if (!cohort) return { ok: false, status: 404, message: 'Reference cohort not found.' };
+
+	const parsed = parsedReferenceCohortFields(input);
+	if (!parsed.ok) return parsed;
+
+	const links = await validateReferenceCohortLinks(
+		parsed.fields.referenceDatasetId,
+		parsed.fields.referenceStudyId
+	);
+	if (!links.ok) return links;
+
+	await db
+		.update(referenceCohorts)
+		.set({
+			...parsed.fields,
+			updatedAt: Date.now()
+		})
+		.where(eq(referenceCohorts.id, input.id));
+
+	return { ok: true };
+}
+
 export async function setAdminReferenceReviewStatus(
 	input: AdminSetReferenceReviewInput
 ): Promise<AdminReferenceUpdateResult> {
@@ -500,6 +720,71 @@ export async function setAdminReferenceReviewStatus(
 			updatedAt: Date.now()
 		})
 		.where(eq(referenceDatasets.id, input.id));
+
+	return { ok: true };
+}
+
+export async function setAdminReferenceMetricMapping(
+	input: AdminSetReferenceMetricMappingInput
+): Promise<AdminReferenceUpdateResult> {
+	const [metric] = await db
+		.select({ id: referenceMetrics.id, referenceDatasetId: referenceMetrics.referenceDatasetId })
+		.from(referenceMetrics)
+		.where(eq(referenceMetrics.id, input.referenceMetricId));
+
+	if (!metric) return { ok: false, status: 404, message: 'Reference metric not found.' };
+
+	const referenceCohortId = trimmed(input.referenceCohortId) || null;
+	if (referenceCohortId) {
+		const [cohort] = await db
+			.select({
+				id: referenceCohorts.id,
+				referenceDatasetId: referenceCohorts.referenceDatasetId
+			})
+			.from(referenceCohorts)
+			.where(eq(referenceCohorts.id, referenceCohortId));
+
+		if (!cohort) return { ok: false, status: 400, message: 'Reference cohort not found.' };
+		if (cohort.referenceDatasetId !== metric.referenceDatasetId) {
+			return {
+				ok: false,
+				status: 400,
+				message: 'Reference cohort must belong to the same dataset as the metric.'
+			};
+		}
+	}
+
+	const sourceColumns = parseSourceColumnsInput(input.sourceColumns);
+	const now = Date.now();
+
+	await db
+		.insert(referenceMetricMappings)
+		.values({
+			id: trimmed(input.id) || `${metric.id}-mapping`,
+			referenceMetricId: metric.id,
+			referenceCohortId,
+			sourceMetric: trimmed(input.sourceMetric),
+			sourceColumnsJson: JSON.stringify(sourceColumns),
+			transformation: trimmed(input.transformation),
+			direction: parseReferenceMappingDirection(input.direction),
+			extractionStatus: parseReferenceExtractionStatus(input.extractionStatus),
+			notes: trimmed(input.notes),
+			createdAt: now,
+			updatedAt: now
+		})
+		.onConflictDoUpdate({
+			target: referenceMetricMappings.referenceMetricId,
+			set: {
+				referenceCohortId,
+				sourceMetric: trimmed(input.sourceMetric),
+				sourceColumnsJson: JSON.stringify(sourceColumns),
+				transformation: trimmed(input.transformation),
+				direction: parseReferenceMappingDirection(input.direction),
+				extractionStatus: parseReferenceExtractionStatus(input.extractionStatus),
+				notes: trimmed(input.notes),
+				updatedAt: now
+			}
+		});
 
 	return { ok: true };
 }

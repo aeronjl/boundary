@@ -5,6 +5,8 @@ import { orientationExperimentSlug } from '../experiments/orientation';
 
 export type ReferenceCompatibility = 'compatible' | 'partial' | 'incompatible';
 export type ReferenceDatasetStatus = 'candidate' | 'validated' | 'rejected';
+export type ReferenceExtractionStatus = 'candidate' | 'reviewed' | 'blocked';
+export type ReferenceMappingDirection = 'same' | 'inverted' | 'derived';
 export type ReferenceSourceType = 'literature' | 'dataset';
 export type ReferenceMetricUnit =
 	| 'proportion'
@@ -17,6 +19,8 @@ export type ReferenceComparisonType = 'distribution' | 'threshold' | 'descriptiv
 
 export const referenceDatasetStatuses = ['candidate', 'validated', 'rejected'] as const;
 export const referenceCompatibilities = ['compatible', 'partial', 'incompatible'] as const;
+export const referenceExtractionStatuses = ['candidate', 'reviewed', 'blocked'] as const;
+export const referenceMappingDirections = ['same', 'inverted', 'derived'] as const;
 export const referenceSourceTypes = ['literature', 'dataset'] as const;
 
 export type ReferenceMetricContract = {
@@ -53,6 +57,29 @@ export type ReferenceMetricSeed = {
 	maximum: number | null;
 	metricJson: Record<string, unknown>;
 	notes: string;
+	mapping: ReferenceMetricMappingSeed | null;
+};
+
+export type ReferenceMetricMappingSeed = {
+	id: string;
+	referenceCohortId: string | null;
+	sourceMetric: string;
+	sourceColumns: string[];
+	transformation: string;
+	direction: ReferenceMappingDirection;
+	extractionStatus: ReferenceExtractionStatus;
+	notes: string;
+};
+
+export type ReferenceCohortSeed = {
+	id: string;
+	label: string;
+	population: string;
+	groupLabel: string;
+	sampleSize: number | null;
+	inclusionCriteria: string;
+	exclusionCriteria: string;
+	notes: string;
 };
 
 export type ReferenceDatasetSeed = {
@@ -69,6 +96,7 @@ export type ReferenceDatasetSeed = {
 	taskVariant: string;
 	metricSummaryJson: Record<string, unknown>;
 	notes: string;
+	cohorts: ReferenceCohortSeed[];
 	metrics: ReferenceMetricSeed[];
 };
 
@@ -261,6 +289,21 @@ export const referenceDatasetSeeds: ReferenceDatasetSeed[] = [
 		},
 		notes:
 			'Candidate n-back reference data. Do not draw cohort-similarity or percentile claims until task timing, stimulus load, and participant metadata are mapped.',
+		cohorts: [
+			{
+				id: 'openfmri-ds000115-working-memory-participants',
+				label: 'OpenfMRI ds000115 working-memory participants',
+				population:
+					'Schizophrenia, unaffected sibling, control sibling, and healthy control participants from ds000115.',
+				groupLabel: 'mixed diagnostic and control groups',
+				sampleSize: 99,
+				inclusionCriteria: 'Participants represented in ds000115_R2.0.0 participants.tsv.',
+				exclusionCriteria:
+					'Metric-level exclusions apply where behavioural summary columns are missing or invalid.',
+				notes:
+					'Default mixed cohort for imported participants.tsv summaries; split diagnostic groups before making cohort-similarity claims.'
+			}
+		],
 		metrics: [
 			{
 				id: 'openfmri-ds000115-nback-accuracy',
@@ -273,7 +316,19 @@ export const referenceDatasetSeeds: ReferenceDatasetSeed[] = [
 				minimum: null,
 				maximum: null,
 				metricJson: {},
-				notes: 'Candidate metric; derive from event-level responses after validation.'
+				notes: 'Candidate metric; derive from event-level responses after validation.',
+				mapping: {
+					id: 'openfmri-ds000115-nback-accuracy-mapping',
+					referenceCohortId: 'openfmri-ds000115-working-memory-participants',
+					sourceMetric: '2-back accuracy',
+					sourceColumns: ['nback2_nont', 'nback2_targ'],
+					transformation:
+						'Subject-level 2-back accuracy is the unweighted mean of nback2_nont and nback2_targ because trial counts are not represented in participants.tsv.',
+					direction: 'same',
+					extractionStatus: 'candidate',
+					notes:
+						'Candidate mapping from participants.tsv behavioural summary columns; event-level validation remains pending.'
+				}
 			},
 			{
 				id: 'openfmri-ds000115-nback-sensitivity',
@@ -286,7 +341,19 @@ export const referenceDatasetSeeds: ReferenceDatasetSeed[] = [
 				minimum: null,
 				maximum: null,
 				metricJson: {},
-				notes: 'Candidate metric; requires hit and false-alarm reconstruction.'
+				notes: 'Candidate metric; requires hit and false-alarm reconstruction.',
+				mapping: {
+					id: 'openfmri-ds000115-nback-sensitivity-mapping',
+					referenceCohortId: 'openfmri-ds000115-working-memory-participants',
+					sourceMetric: 'd4prime',
+					sourceColumns: ['d4prime'],
+					transformation:
+						'Summary of d4prime values in participants.tsv after removing missing values and one out-of-range row.',
+					direction: 'derived',
+					extractionStatus: 'candidate',
+					notes:
+						"Candidate mapping from source d4prime column; validate alignment with Boundary's signal-detection definition."
+				}
 			}
 		]
 	}

@@ -72,6 +72,32 @@ export const referenceDatasets = sqliteTable(
 	]
 );
 
+export const referenceCohorts = sqliteTable(
+	'reference_cohorts',
+	{
+		id: text('id').primaryKey(),
+		referenceStudyId: text('reference_study_id').references(() => referenceStudies.id, {
+			onDelete: 'set null'
+		}),
+		referenceDatasetId: text('reference_dataset_id')
+			.notNull()
+			.references(() => referenceDatasets.id, { onDelete: 'cascade' }),
+		label: text('label').notNull(),
+		population: text('population').notNull().default(''),
+		groupLabel: text('group_label').notNull().default(''),
+		sampleSize: integer('sample_size'),
+		inclusionCriteria: text('inclusion_criteria').notNull().default(''),
+		exclusionCriteria: text('exclusion_criteria').notNull().default(''),
+		notes: text('notes').notNull().default(''),
+		createdAt: integer('created_at').notNull(),
+		updatedAt: integer('updated_at').notNull()
+	},
+	(table) => [
+		index('reference_cohorts_study_idx').on(table.referenceStudyId),
+		index('reference_cohorts_dataset_idx').on(table.referenceDatasetId)
+	]
+);
+
 export const referenceMetrics = sqliteTable(
 	'reference_metrics',
 	{
@@ -100,6 +126,32 @@ export const referenceMetrics = sqliteTable(
 			table.referenceDatasetId,
 			table.metricKey
 		)
+	]
+);
+
+export const referenceMetricMappings = sqliteTable(
+	'reference_metric_mappings',
+	{
+		id: text('id').primaryKey(),
+		referenceMetricId: text('reference_metric_id')
+			.notNull()
+			.references(() => referenceMetrics.id, { onDelete: 'cascade' }),
+		referenceCohortId: text('reference_cohort_id').references(() => referenceCohorts.id, {
+			onDelete: 'set null'
+		}),
+		sourceMetric: text('source_metric').notNull().default(''),
+		sourceColumnsJson: text('source_columns_json').notNull().default('[]'),
+		transformation: text('transformation').notNull().default(''),
+		direction: text('direction').notNull().default('same'),
+		extractionStatus: text('extraction_status').notNull().default('candidate'),
+		notes: text('notes').notNull().default(''),
+		createdAt: integer('created_at').notNull(),
+		updatedAt: integer('updated_at').notNull()
+	},
+	(table) => [
+		index('reference_metric_mappings_metric_idx').on(table.referenceMetricId),
+		index('reference_metric_mappings_cohort_idx').on(table.referenceCohortId),
+		uniqueIndex('reference_metric_mappings_metric_unique').on(table.referenceMetricId)
 	]
 );
 

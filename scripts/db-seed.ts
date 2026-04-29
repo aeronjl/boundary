@@ -36,7 +36,9 @@ import { closeDatabase, db } from '../src/lib/server/db';
 import {
 	experimentVersions,
 	experiments,
+	referenceCohorts,
 	referenceDatasets,
+	referenceMetricMappings,
 	referenceMetrics,
 	referenceStudies,
 	tipiQuestions
@@ -348,6 +350,40 @@ for (const dataset of referenceDatasetSeeds) {
 			}
 		});
 
+	for (const cohort of dataset.cohorts) {
+		await db
+			.insert(referenceCohorts)
+			.values({
+				id: cohort.id,
+				referenceStudyId: dataset.referenceStudyId,
+				referenceDatasetId: dataset.id,
+				label: cohort.label,
+				population: cohort.population,
+				groupLabel: cohort.groupLabel,
+				sampleSize: cohort.sampleSize,
+				inclusionCriteria: cohort.inclusionCriteria,
+				exclusionCriteria: cohort.exclusionCriteria,
+				notes: cohort.notes,
+				createdAt: now,
+				updatedAt: now
+			})
+			.onConflictDoUpdate({
+				target: referenceCohorts.id,
+				set: {
+					referenceStudyId: dataset.referenceStudyId,
+					referenceDatasetId: dataset.id,
+					label: cohort.label,
+					population: cohort.population,
+					groupLabel: cohort.groupLabel,
+					sampleSize: cohort.sampleSize,
+					inclusionCriteria: cohort.inclusionCriteria,
+					exclusionCriteria: cohort.exclusionCriteria,
+					notes: cohort.notes,
+					updatedAt: now
+				}
+			});
+	}
+
 	for (const metric of dataset.metrics) {
 		await db
 			.insert(referenceMetrics)
@@ -379,6 +415,37 @@ for (const dataset of referenceDatasetSeeds) {
 					comparisonType: metric.comparisonType
 				}
 			});
+
+		if (metric.mapping) {
+			await db
+				.insert(referenceMetricMappings)
+				.values({
+					id: metric.mapping.id,
+					referenceMetricId: metric.id,
+					referenceCohortId: metric.mapping.referenceCohortId,
+					sourceMetric: metric.mapping.sourceMetric,
+					sourceColumnsJson: JSON.stringify(metric.mapping.sourceColumns),
+					transformation: metric.mapping.transformation,
+					direction: metric.mapping.direction,
+					extractionStatus: metric.mapping.extractionStatus,
+					notes: metric.mapping.notes,
+					createdAt: now,
+					updatedAt: now
+				})
+				.onConflictDoUpdate({
+					target: referenceMetricMappings.referenceMetricId,
+					set: {
+						referenceCohortId: metric.mapping.referenceCohortId,
+						sourceMetric: metric.mapping.sourceMetric,
+						sourceColumnsJson: JSON.stringify(metric.mapping.sourceColumns),
+						transformation: metric.mapping.transformation,
+						direction: metric.mapping.direction,
+						extractionStatus: metric.mapping.extractionStatus,
+						notes: metric.mapping.notes,
+						updatedAt: now
+					}
+				});
+		}
 	}
 }
 

@@ -7,7 +7,12 @@ import {
 	parseReferenceImportSummary
 } from '../src/lib/reference-data/import-summary';
 import { closeDatabase, db } from '../src/lib/server/db';
-import { referenceDatasets, referenceMetrics } from '../src/lib/server/db/schema';
+import {
+	referenceCohorts,
+	referenceDatasets,
+	referenceMetricMappings,
+	referenceMetrics
+} from '../src/lib/server/db/schema';
 
 const usage = `Usage: bun run reference:import <summary.json> [--dry-run] [--apply-review]
 
@@ -43,6 +48,12 @@ if (!dataset) {
 		`Reference dataset ${summary.datasetId} does not exist. Run bun run db:setup first.`
 	);
 }
+
+const cohorts = await db
+	.select()
+	.from(referenceCohorts)
+	.where(eq(referenceCohorts.referenceDatasetId, summary.datasetId));
+const defaultCohortId = cohorts[0]?.id ?? null;
 
 const metricUpdates = [];
 for (const metric of summary.metrics) {
@@ -123,6 +134,31 @@ for (const { existingMetric, metric } of metricUpdates) {
 			.update(referenceMetrics)
 			.set(metricUpdate)
 			.where(eq(referenceMetrics.id, existingMetric.id));
+
+		await db
+			.insert(referenceMetricMappings)
+			.values({
+				id: `${existingMetric.id}-mapping`,
+				referenceMetricId: existingMetric.id,
+				referenceCohortId: defaultCohortId,
+				sourceMetric: metric.metricKey,
+				sourceColumnsJson: JSON.stringify(metric.sourceColumns),
+				transformation: metric.method,
+				direction: 'same',
+				extractionStatus: 'candidate',
+				notes: metric.notes,
+				createdAt: now,
+				updatedAt: now
+			})
+			.onConflictDoUpdate({
+				target: referenceMetricMappings.referenceMetricId,
+				set: {
+					sourceMetric: metric.metricKey,
+					sourceColumnsJson: JSON.stringify(metric.sourceColumns),
+					transformation: metric.method,
+					updatedAt: now
+				}
+			});
 	}
 }
 

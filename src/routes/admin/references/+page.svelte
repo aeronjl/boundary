@@ -14,6 +14,7 @@
 	};
 	const formatNumberInput = (value: number | null) => (value === null ? '' : String(value));
 	const formatTextInput = (value: string | null) => value ?? '';
+	const formatColumnsInput = (value: string[]) => value.join(', ');
 </script>
 
 <svelte:head>
@@ -286,6 +287,157 @@
 						</div>
 					</form>
 
+					<div class="mt-4 space-y-3 border-t border-gray-100 pt-3">
+						<h4 class="font-medium">Cohorts</h4>
+						<form
+							method="POST"
+							action="?/createCohort"
+							aria-label={`Add cohort for ${dataset.name}`}
+							class="grid gap-3 md:grid-cols-4"
+						>
+							<input type="hidden" name="referenceDatasetId" value={dataset.id} />
+							<label class="flex flex-col gap-1">
+								<span class="text-xs font-medium text-gray-500">Source</span>
+								<select name="referenceStudyId" class="rounded-sm border border-gray-300 px-3 py-2">
+									<option value="">Use dataset source</option>
+									{#each data.studies as study (study.id)}
+										<option value={study.id} selected={dataset.referenceStudyId === study.id}>
+											{study.shortCitation}
+										</option>
+									{/each}
+								</select>
+							</label>
+							<label class="flex flex-col gap-1">
+								<span class="text-xs font-medium text-gray-500">Cohort label</span>
+								<input name="label" required class="rounded-sm border border-gray-300 px-3 py-2" />
+							</label>
+							<label class="flex flex-col gap-1">
+								<span class="text-xs font-medium text-gray-500">Group label</span>
+								<input name="groupLabel" class="rounded-sm border border-gray-300 px-3 py-2" />
+							</label>
+							<label class="flex flex-col gap-1">
+								<span class="text-xs font-medium text-gray-500">Sample size</span>
+								<input
+									name="sampleSize"
+									inputmode="numeric"
+									class="rounded-sm border border-gray-300 px-3 py-2"
+								/>
+							</label>
+							<label class="flex flex-col gap-1 md:col-span-2">
+								<span class="text-xs font-medium text-gray-500">Population</span>
+								<input name="population" class="rounded-sm border border-gray-300 px-3 py-2" />
+							</label>
+							<label class="flex flex-col gap-1 md:col-span-2">
+								<span class="text-xs font-medium text-gray-500">Inclusion criteria</span>
+								<input
+									name="inclusionCriteria"
+									class="rounded-sm border border-gray-300 px-3 py-2"
+								/>
+							</label>
+							<label class="flex flex-col gap-1 md:col-span-2">
+								<span class="text-xs font-medium text-gray-500">Exclusion criteria</span>
+								<input
+									name="exclusionCriteria"
+									class="rounded-sm border border-gray-300 px-3 py-2"
+								/>
+							</label>
+							<label class="flex flex-col gap-1 md:col-span-2">
+								<span class="text-xs font-medium text-gray-500">Cohort notes</span>
+								<input name="notes" class="rounded-sm border border-gray-300 px-3 py-2" />
+							</label>
+							<div class="md:col-span-4">
+								<button class="rounded-sm bg-gray-100 px-3 py-2 text-xs">Add cohort</button>
+							</div>
+						</form>
+
+						{#each dataset.cohorts as cohort (cohort.id)}
+							<form
+								method="POST"
+								action="?/cohort"
+								aria-label={`Edit reference cohort ${cohort.label}`}
+								class="grid gap-3 border-t border-gray-100 pt-3 md:grid-cols-4"
+							>
+								<input type="hidden" name="cohortId" value={cohort.id} />
+								<input type="hidden" name="referenceDatasetId" value={dataset.id} />
+								<label class="flex flex-col gap-1">
+									<span class="text-xs font-medium text-gray-500">Source</span>
+									<select
+										name="referenceStudyId"
+										class="rounded-sm border border-gray-300 px-3 py-2"
+									>
+										<option value="">Use dataset source</option>
+										{#each data.studies as study (study.id)}
+											<option value={study.id} selected={cohort.referenceStudyId === study.id}>
+												{study.shortCitation}
+											</option>
+										{/each}
+									</select>
+								</label>
+								<label class="flex flex-col gap-1">
+									<span class="text-xs font-medium text-gray-500">Cohort label</span>
+									<input
+										name="label"
+										required
+										value={cohort.label}
+										class="rounded-sm border border-gray-300 px-3 py-2"
+									/>
+								</label>
+								<label class="flex flex-col gap-1">
+									<span class="text-xs font-medium text-gray-500">Group label</span>
+									<input
+										name="groupLabel"
+										value={cohort.groupLabel}
+										class="rounded-sm border border-gray-300 px-3 py-2"
+									/>
+								</label>
+								<label class="flex flex-col gap-1">
+									<span class="text-xs font-medium text-gray-500">Sample size</span>
+									<input
+										name="sampleSize"
+										inputmode="numeric"
+										value={formatNumberInput(cohort.sampleSize)}
+										class="rounded-sm border border-gray-300 px-3 py-2"
+									/>
+								</label>
+								<label class="flex flex-col gap-1 md:col-span-2">
+									<span class="text-xs font-medium text-gray-500">Population</span>
+									<input
+										name="population"
+										value={cohort.population}
+										class="rounded-sm border border-gray-300 px-3 py-2"
+									/>
+								</label>
+								<label class="flex flex-col gap-1 md:col-span-2">
+									<span class="text-xs font-medium text-gray-500">Inclusion criteria</span>
+									<input
+										name="inclusionCriteria"
+										value={cohort.inclusionCriteria}
+										class="rounded-sm border border-gray-300 px-3 py-2"
+									/>
+								</label>
+								<label class="flex flex-col gap-1 md:col-span-2">
+									<span class="text-xs font-medium text-gray-500">Exclusion criteria</span>
+									<input
+										name="exclusionCriteria"
+										value={cohort.exclusionCriteria}
+										class="rounded-sm border border-gray-300 px-3 py-2"
+									/>
+								</label>
+								<label class="flex flex-col gap-1 md:col-span-2">
+									<span class="text-xs font-medium text-gray-500">Cohort notes</span>
+									<input
+										name="notes"
+										value={cohort.notes}
+										class="rounded-sm border border-gray-300 px-3 py-2"
+									/>
+								</label>
+								<div class="md:col-span-4">
+									<button class="rounded-sm bg-gray-100 px-3 py-2 text-xs">Save cohort</button>
+								</div>
+							</form>
+						{/each}
+					</div>
+
 					{#if dataset.metrics.length > 0}
 						<div class="mt-4 space-y-3">
 							{#each dataset.metrics as metric (metric.id)}
@@ -372,6 +524,97 @@
 									{/if}
 									<div class="md:col-span-5">
 										<button class="rounded-sm bg-gray-100 px-3 py-2 text-xs"> Save metric </button>
+									</div>
+								</form>
+								<form
+									method="POST"
+									action="?/mapping"
+									aria-label={`Edit reference mapping ${metric.label} for ${dataset.name}`}
+									class="grid gap-3 border-t border-gray-100 pt-3 md:grid-cols-4"
+								>
+									<input type="hidden" name="metricId" value={metric.id} />
+									<input type="hidden" name="mappingId" value={metric.mapping?.id ?? ''} />
+									<label class="flex flex-col gap-1">
+										<span class="text-xs font-medium text-gray-500">Reference cohort</span>
+										<select
+											name="referenceCohortId"
+											class="rounded-sm border border-gray-300 px-3 py-2"
+										>
+											<option value="">Unassigned</option>
+											{#each dataset.cohorts as cohort (cohort.id)}
+												<option
+													value={cohort.id}
+													selected={metric.mapping?.referenceCohortId === cohort.id}
+												>
+													{cohort.label}
+												</option>
+											{/each}
+										</select>
+									</label>
+									<label class="flex flex-col gap-1">
+										<span class="text-xs font-medium text-gray-500">Source metric</span>
+										<input
+											name="sourceMetric"
+											value={metric.mapping?.sourceMetric ?? ''}
+											class="rounded-sm border border-gray-300 px-3 py-2"
+										/>
+									</label>
+									<label class="flex flex-col gap-1">
+										<span class="text-xs font-medium text-gray-500">Source columns</span>
+										<input
+											name="sourceColumns"
+											value={formatColumnsInput(metric.mapping?.sourceColumns ?? [])}
+											class="rounded-sm border border-gray-300 px-3 py-2"
+										/>
+									</label>
+									<label class="flex flex-col gap-1">
+										<span class="text-xs font-medium text-gray-500">Direction</span>
+										<select name="direction" class="rounded-sm border border-gray-300 px-3 py-2">
+											{#each data.mappingDirections as direction (direction)}
+												<option
+													value={direction}
+													selected={(metric.mapping?.direction ?? 'same') === direction}
+												>
+													{direction}
+												</option>
+											{/each}
+										</select>
+									</label>
+									<label class="flex flex-col gap-1">
+										<span class="text-xs font-medium text-gray-500">Extraction status</span>
+										<select
+											name="extractionStatus"
+											class="rounded-sm border border-gray-300 px-3 py-2"
+										>
+											{#each data.extractionStatuses as status (status)}
+												<option
+													value={status}
+													selected={(metric.mapping?.extractionStatus ?? 'candidate') === status}
+												>
+													{status}
+												</option>
+											{/each}
+										</select>
+									</label>
+									<label class="flex flex-col gap-1 md:col-span-3">
+										<span class="text-xs font-medium text-gray-500">Transformation</span>
+										<input
+											name="transformation"
+											value={metric.mapping?.transformation ?? ''}
+											class="rounded-sm border border-gray-300 px-3 py-2"
+										/>
+									</label>
+									<label class="flex flex-col gap-1 md:col-span-4">
+										<span class="text-xs font-medium text-gray-500">Mapping notes</span>
+										<textarea
+											name="notes"
+											rows="2"
+											class="rounded-sm border border-gray-300 px-3 py-2"
+											>{metric.mapping?.notes ?? ''}</textarea
+										>
+									</label>
+									<div class="md:col-span-4">
+										<button class="rounded-sm bg-gray-100 px-3 py-2 text-xs"> Save mapping </button>
 									</div>
 								</form>
 							{/each}

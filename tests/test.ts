@@ -753,6 +753,7 @@ test('admin can inspect and export ten item personality inventory data', async (
 	await expect(page.getByRole('link', { name: 'Analysis', exact: true })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Participants' })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Reference registry' })).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Literature extractions' })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Relationship registry' })).toBeVisible();
 
 	await page.getByRole('link', { name: 'Relationship registry' }).click();
@@ -760,6 +761,30 @@ test('admin can inspect and export ten item personality inventory data', async (
 	await expect(page.getByText('n-back-to-orientation-perceptual-control')).toBeVisible();
 	await expect(page.getByText('meule-2017')).toBeVisible();
 	await expect(page.getByText('This relationship supports follow-up task selection')).toBeVisible();
+
+	await page.goto('/admin');
+
+	await page.getByRole('link', { name: 'Literature extractions' }).click();
+	await expect(page.getByRole('heading', { name: 'Literature extractions' })).toBeVisible();
+	await expect(page.getByText('openfmri-ds000115-nback-participants-summary')).toBeVisible();
+	await expect(page.getByText('2-back accuracy')).toBeVisible();
+	await expect(page.getByText('candidate comparison claim').first()).toBeVisible();
+
+	const literatureJsonResponse = await page.request.get('/admin/literature/export.json');
+	expect(literatureJsonResponse.status()).toBe(200);
+	const literatureJson = await literatureJsonResponse.json();
+	expect(literatureJson.summary).toMatchObject({
+		extractionCount: 1,
+		resultCount: 2,
+		comparisonClaimCount: 2
+	});
+	expect(literatureJson.extractions[0].comparisonClaims[0]).toMatchObject({
+		participantUse: 'internal_review'
+	});
+
+	const literatureCsvResponse = await page.request.get('/admin/literature/export.csv');
+	expect(literatureCsvResponse.status()).toBe(200);
+	expect(await literatureCsvResponse.text()).toContain('"extraction_id"');
 
 	await page.goto('/admin');
 

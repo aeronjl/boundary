@@ -3,6 +3,13 @@
 		nBackEvidenceReferences,
 		nBackOpenDatasetCandidates
 	} from '$lib/experiments/n-back-interpretation';
+	import { literatureMetricSummariesForExperiment } from '$lib/reference-data/literature';
+
+	const extractedMetrics = literatureMetricSummariesForExperiment('n-back');
+	const formatMetricValue = (value: number | null) =>
+		value === null
+			? 'pending'
+			: new Intl.NumberFormat('en-GB', { maximumFractionDigits: 3 }).format(value);
 </script>
 
 <div class="prose prose-sm max-w-2xl">
@@ -40,4 +47,18 @@
 			</li>
 		{/each}
 	</ul>
+	{#if extractedMetrics.length > 0}
+		<h2>Structured Extraction</h2>
+		<ul>
+			{#each extractedMetrics as metric (`${metric.extractionId}-${metric.metricKey}`)}
+				<li>
+					<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+					<a href={metric.sourceUrl} rel="noreferrer" target="_blank">{metric.sourceCitation}</a>:
+					{metric.label} mean {formatMetricValue(metric.mean)}, SD {formatMetricValue(
+						metric.standardDeviation
+					)}, n={formatMetricValue(metric.sampleSize)} ({metric.status}; {metric.comparisonReadiness}).
+				</li>
+			{/each}
+		</ul>
+	{/if}
 </div>

@@ -20,6 +20,12 @@ import {
 	type ReferenceComparison
 } from '$lib/reference-data/comparison';
 import { parseReferenceImportSummary } from '$lib/reference-data/import-summary';
+import {
+	getLiteratureExtractionExport,
+	literatureExtractionValidations,
+	literatureExtractions,
+	literatureMetricSummariesForExperiment
+} from '$lib/reference-data/literature';
 import { crossTaskRelationshipsForMetric } from '$lib/reference-data/relationships';
 import { createReferenceContext } from '$lib/reference-data/summary';
 import { calculateNBackSignalDetectionMetrics, type NBackResult } from '$lib/experiments/n-back';
@@ -271,6 +277,32 @@ describe('reference data contracts', () => {
 		expect(accuracy?.sampleSize).toBe(98);
 		expect(accuracy?.mean).toBeCloseTo(0.8508);
 		expect(accuracy?.sourceColumns).toEqual(['nback2_nont', 'nback2_targ']);
+	});
+
+	it('exposes structured literature extractions for n-back reference comparisons', () => {
+		const exportData = getLiteratureExtractionExport();
+		const nBackMetrics = literatureMetricSummariesForExperiment('n-back');
+		const accuracy = nBackMetrics.find((metric) => metric.metricKey === 'accuracy');
+		const extraction = literatureExtractions.find(
+			(candidate) => candidate.id === 'openfmri-ds000115-nback-participants-summary'
+		);
+
+		expect(literatureExtractionValidations).toEqual([]);
+		expect(exportData.summary).toMatchObject({
+			extractionCount: 1,
+			resultCount: 2,
+			comparisonClaimCount: 2
+		});
+		expect(extraction?.comparisonClaims.map((claim) => claim.participantUse)).toEqual([
+			'internal_review',
+			'internal_review'
+		]);
+		expect(accuracy).toMatchObject({
+			sourceId: 'openfmri-ds000115',
+			sampleSize: 98,
+			mean: 0.8508194948622451,
+			comparisonReadiness: 'candidate'
+		});
 	});
 });
 

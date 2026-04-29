@@ -1,10 +1,13 @@
 import { and, asc, eq } from 'drizzle-orm';
 import {
+	estimateOrientationThresholdDegrees,
 	orientationDirectionForAngle,
 	orientationVersionId,
 	parseOrientationConfig,
+	summarizeOrientationMagnitudes,
 	type OrientationConfig,
 	type OrientationDirection,
+	type OrientationMagnitudeObservation,
 	type OrientationOutcome,
 	type OrientationResult,
 	type OrientationRunState,
@@ -127,6 +130,18 @@ function meanResponseTime(responses: ResponseRow[]): number | null {
 	return times.reduce((total, time) => total + time, 0) / times.length;
 }
 
+function orientationMagnitudeObservations(
+	responses: ResponseRow[]
+): OrientationMagnitudeObservation[] {
+	return responses.flatMap((response) => {
+		const score = response.scoreJson ? parseJson<OrientationScore>(response.scoreJson) : null;
+
+		return typeof score?.magnitudeDegrees === 'number' && Number.isFinite(score.magnitudeDegrees)
+			? [{ magnitudeDegrees: score.magnitudeDegrees, correct: score.correct }]
+			: [];
+	});
+}
+
 async function getOrientationContext(runId: string): Promise<OrientationStartedPayload> {
 	const [startedEvent] = await db
 		.select()
@@ -183,6 +198,9 @@ function createResult(
 ): OrientationResult {
 	const correctCount = correctCountFromResponses(responses);
 	const totalTrials = context.totalTrials;
+	const magnitudeSummaries = summarizeOrientationMagnitudes(
+		orientationMagnitudeObservations(responses)
+	);
 
 	return {
 		runId,
@@ -191,7 +209,9 @@ function createResult(
 		correctCount,
 		incorrectCount: responses.length - correctCount,
 		accuracy: totalTrials > 0 ? correctCount / totalTrials : 0,
-		meanResponseTimeMs: meanResponseTime(responses)
+		meanResponseTimeMs: meanResponseTime(responses),
+		magnitudeSummaries,
+		estimatedThresholdDegrees: estimateOrientationThresholdDegrees(magnitudeSummaries)
 	};
 }
 

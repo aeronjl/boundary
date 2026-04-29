@@ -10,6 +10,8 @@
 		value === null ? '-' : `${(value * 100).toFixed(0)}%`;
 	const formatMs = (value: number | null) =>
 		value === null ? '-' : `${formatNumber(value, 0)} ms`;
+	const formatDegrees = (value: number | null) =>
+		value === null ? '-' : `${formatNumber(value, 1)} deg`;
 	const formatLabel = (value: string) => value.replaceAll('-', ' ');
 </script>
 
@@ -229,7 +231,7 @@
 
 				{#if summary.orientation}
 					<h3 class="mt-3 text-xs font-medium text-gray-500 uppercase">Orientation</h3>
-					<dl class="mt-2 grid grid-cols-2 gap-2 text-xs">
+					<dl class="mt-2 grid grid-cols-3 gap-2 text-xs">
 						<div>
 							<dt class="text-gray-500">Accuracy</dt>
 							<dd class="font-serif text-lg">{formatPercent(summary.orientation.accuracy)}</dd>
@@ -238,6 +240,12 @@
 							<dt class="text-gray-500">Median RT</dt>
 							<dd class="font-serif text-lg">
 								{formatMs(summary.orientation.medianResponseTimeMs)}
+							</dd>
+						</div>
+						<div>
+							<dt class="text-gray-500">Threshold</dt>
+							<dd class="font-serif text-lg">
+								{formatDegrees(summary.orientation.medianThresholdDegrees)}
 							</dd>
 						</div>
 					</dl>

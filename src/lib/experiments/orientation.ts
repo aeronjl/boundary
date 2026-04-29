@@ -35,6 +35,20 @@ export type OrientationResult = {
 	incorrectCount: number;
 	accuracy: number;
 	meanResponseTimeMs: number | null;
+	magnitudeSummaries: OrientationMagnitudeSummary[];
+	estimatedThresholdDegrees: number | null;
+};
+
+export type OrientationMagnitudeSummary = {
+	magnitudeDegrees: number;
+	totalTrials: number;
+	correctCount: number;
+	accuracy: number | null;
+};
+
+export type OrientationMagnitudeObservation = {
+	magnitudeDegrees: number;
+	correct: boolean;
 };
 
 export type OrientationRunState = {
@@ -104,4 +118,41 @@ export function parseOrientationConfig(configJson: string): OrientationConfig {
 
 export function orientationDirectionForAngle(angleDegrees: number): OrientationDirection {
 	return angleDegrees < 0 ? 'counterclockwise' : 'clockwise';
+}
+
+export function summarizeOrientationMagnitudes(
+	observations: OrientationMagnitudeObservation[]
+): OrientationMagnitudeSummary[] {
+	const groups = new Map<number, { totalTrials: number; correctCount: number }>();
+
+	for (const observation of observations) {
+		const current = groups.get(observation.magnitudeDegrees) ?? {
+			totalTrials: 0,
+			correctCount: 0
+		};
+		current.totalTrials += 1;
+		current.correctCount += observation.correct ? 1 : 0;
+		groups.set(observation.magnitudeDegrees, current);
+	}
+
+	return [...groups.entries()]
+		.map(([magnitudeDegrees, summary]) => ({
+			magnitudeDegrees,
+			totalTrials: summary.totalTrials,
+			correctCount: summary.correctCount,
+			accuracy: summary.totalTrials > 0 ? summary.correctCount / summary.totalTrials : null
+		}))
+		.sort((left, right) => left.magnitudeDegrees - right.magnitudeDegrees);
+}
+
+export function estimateOrientationThresholdDegrees(
+	summaries: OrientationMagnitudeSummary[],
+	targetAccuracy = 0.75
+): number | null {
+	const thresholdSummary = summaries
+		.filter((summary) => summary.accuracy !== null)
+		.sort((left, right) => left.magnitudeDegrees - right.magnitudeDegrees)
+		.find((summary) => (summary.accuracy ?? 0) >= targetAccuracy);
+
+	return thresholdSummary?.magnitudeDegrees ?? null;
 }

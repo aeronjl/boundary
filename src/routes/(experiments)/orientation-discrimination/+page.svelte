@@ -3,7 +3,9 @@
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
 	import ExperimentStartGate from '$lib/components/ExperimentStartGate.svelte';
+	import InterpretationPanel from '$lib/components/InterpretationPanel.svelte';
 	import { getExperimentCatalogEntry } from '$lib/experiments/catalog';
+	import { createOrientationInterpretation } from '$lib/experiments/orientation-interpretation';
 	import {
 		clearStoredExperimentRunId,
 		getStoredExperimentRunId,
@@ -34,9 +36,15 @@
 		: state && state.totalTrials > 0
 			? ((state.trialNumber - 1) / state.totalTrials) * 100
 			: 0;
+	$: interpretation = result ? createOrientationInterpretation(result) : null;
+	$: smallestMagnitudeSummary = result?.magnitudeSummaries[0] ?? null;
 
 	const formatPercent = (value: number) => `${(value * 100).toFixed(0)}%`;
+	const formatOptionalPercent = (value: number | null) =>
+		value === null ? '-' : formatPercent(value);
 	const formatMs = (value: number | null) => (value === null ? '-' : `${value.toFixed(0)} ms`);
+	const formatDegrees = (value: number | null) =>
+		value === null ? '-' : `${value.toFixed(1)} deg`;
 
 	async function parseJsonResponse<T>(response: Response): Promise<T> {
 		const body = (await response.json()) as T & { message?: string };
@@ -257,7 +265,25 @@
 					<p class="text-xs text-gray-500">Mean response time</p>
 					<p>{formatMs(result.meanResponseTimeMs)}</p>
 				</div>
+				<div class="border-t border-gray-200 py-3">
+					<p class="text-xs text-gray-500">Estimated threshold</p>
+					<p>{formatDegrees(result.estimatedThresholdDegrees)}</p>
+				</div>
+				<div class="border-t border-gray-200 py-3">
+					<p class="text-xs text-gray-500">Smallest tilt</p>
+					<p>
+						{#if smallestMagnitudeSummary}
+							{smallestMagnitudeSummary.magnitudeDegrees} deg,
+							{formatOptionalPercent(smallestMagnitudeSummary.accuracy)}
+						{:else}
+							-
+						{/if}
+					</p>
+				</div>
 			</div>
+			{#if interpretation}
+				<InterpretationPanel {interpretation} />
+			{/if}
 			{#if studySessionId}
 				<a
 					class="mt-4 inline-block rounded-sm bg-black px-3 py-2 text-xs text-white"

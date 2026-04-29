@@ -501,6 +501,15 @@ const studyMetricDefinitions = [
 	},
 	{
 		taskSlug: 'orientation-discrimination',
+		key: 'estimated_threshold_degrees',
+		label: 'Threshold',
+		format: 'number',
+		aggregate: 'median',
+		showInSummary: true,
+		extract: (result) => numberValue(result.estimatedThresholdDegrees)
+	},
+	{
+		taskSlug: 'orientation-discrimination',
 		key: 'mean_response_time_ms',
 		label: 'Mean RT',
 		format: 'duration-ms',
@@ -744,6 +753,11 @@ function createRunMetrics(run: AdminExperimentRun | null): string[] {
 	if (run.experimentSlug === 'orientation-discrimination' && run.orientationSummary) {
 		return [
 			`accuracy ${(run.orientationSummary.accuracy * 100).toFixed(0)}%`,
+			`threshold ${
+				run.orientationSummary.estimatedThresholdDegrees === null
+					? '-'
+					: `${run.orientationSummary.estimatedThresholdDegrees.toFixed(1)} deg`
+			}`,
 			`correct ${run.orientationSummary.correctCount}/${run.orientationSummary.totalTrials}`
 		];
 	}

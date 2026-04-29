@@ -1,5 +1,10 @@
 import { desc, eq } from 'drizzle-orm';
 import { calculateNBackSignalDetectionMetrics } from '$lib/experiments/n-back';
+import {
+	estimateOrientationThresholdDegrees,
+	summarizeOrientationMagnitudes,
+	type OrientationMagnitudeObservation
+} from '$lib/experiments/orientation';
 import { tipiScales, type TipiScale } from '$lib/experiments/tipi';
 import { db } from '$lib/server/db';
 import {
@@ -65,6 +70,7 @@ export type AdminAnalysisOrientationSummary = {
 	runCount: number;
 	accuracy: number | null;
 	medianResponseTimeMs: number | null;
+	medianThresholdDegrees: number | null;
 };
 
 export type AdminAnalysisNBackSummary = {
@@ -160,6 +166,7 @@ const analysisCsvHeaders = [
 	'intertemporal_average_final_wealth',
 	'orientation_accuracy',
 	'orientation_median_response_time_ms',
+	'orientation_median_threshold_degrees',
 	'n_back_accuracy',
 	'n_back_hits',
 	'n_back_misses',
@@ -498,11 +505,33 @@ function createOrientationSummary(runs: AnalysisRun[]): AdminAnalysisOrientation
 		const score = isRecord(response.score) ? response.score : null;
 		return total + (score?.correct === true ? 1 : 0);
 	}, 0);
+	const responsesByRunId = new Map<string, AnalysisResponse[]>();
+
+	for (const response of responses) {
+		pushGrouped(responsesByRunId, response.runId, response);
+	}
+
+	const thresholds = [...responsesByRunId.values()].flatMap((runResponses) => {
+		const observations: OrientationMagnitudeObservation[] = runResponses.flatMap((response) => {
+			const score = isRecord(response.score) ? response.score : null;
+			const magnitudeDegrees = numberValue(score?.magnitudeDegrees);
+
+			return magnitudeDegrees === null
+				? []
+				: [{ magnitudeDegrees, correct: score?.correct === true }];
+		});
+		const threshold = estimateOrientationThresholdDegrees(
+			summarizeOrientationMagnitudes(observations)
+		);
+
+		return threshold === null ? [] : [threshold];
+	});
 
 	return {
 		runCount: runIds.size,
 		accuracy: ratio(correctCount, responses.length),
-		medianResponseTimeMs: median(responseTimesFor(runs, 'orientation_discrimination'))
+		medianResponseTimeMs: median(responseTimesFor(runs, 'orientation_discrimination')),
+		medianThresholdDegrees: median(thresholds)
 	};
 }
 
@@ -589,6 +618,13 @@ function createMetrics(summary: {
 			{
 				label: 'median RT',
 				value: `${formatNumber(summary.orientation.medianResponseTimeMs, 0)} ms`
+			},
+			{
+				label: 'threshold',
+				value:
+					summary.orientation.medianThresholdDegrees === null
+						? '-'
+						: `${formatNumber(summary.orientation.medianThresholdDegrees, 1)} deg`
 			}
 		);
 	}
@@ -787,6 +823,7 @@ export async function getAdminAnalysisCsv(filters: AdminAnalysisFilters): Promis
 				summary.intertemporal?.averageFinalWealth,
 				summary.orientation?.accuracy,
 				summary.orientation?.medianResponseTimeMs,
+				summary.orientation?.medianThresholdDegrees,
 				summary.nBack?.accuracy,
 				summary.nBack?.hits,
 				summary.nBack?.misses,

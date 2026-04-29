@@ -14,6 +14,8 @@
 	const formatPoints = (value: number) => value.toFixed(0);
 	const formatSeconds = (value: number) => value.toFixed(0);
 	const formatJson = (value: unknown) => JSON.stringify(value, null, 2) ?? 'undefined';
+	const formatDegrees = (value: number | null) =>
+		value === null ? '-' : `${value.toFixed(1)} deg`;
 	const timingValue = (metadata: unknown, key: string) => {
 		if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return null;
 
@@ -251,7 +253,33 @@
 					<p class="text-xs text-gray-500">Mean response time</p>
 					<p>{formatMs(data.run.orientationSummary.meanResponseTimeMs)}</p>
 				</div>
+				<div class="border-t border-gray-200 py-3">
+					<p class="text-xs text-gray-500">Estimated threshold</p>
+					<p>{formatDegrees(data.run.orientationSummary.estimatedThresholdDegrees)}</p>
+				</div>
 			</div>
+			{#if data.run.orientationSummary.magnitudeSummaries.length > 0}
+				<div class="mt-2 overflow-x-auto border-t border-gray-200">
+					<table class="w-full min-w-[420px] text-left text-xs">
+						<thead class="text-gray-500">
+							<tr>
+								<th class="py-2 pr-3 font-medium">Tilt</th>
+								<th class="py-2 pr-3 font-medium">Correct</th>
+								<th class="py-2 pr-3 font-medium">Accuracy</th>
+							</tr>
+						</thead>
+						<tbody>
+							{#each data.run.orientationSummary.magnitudeSummaries as summary (summary.magnitudeDegrees)}
+								<tr class="border-t border-gray-100">
+									<td class="py-2 pr-3">{formatDegrees(summary.magnitudeDegrees)}</td>
+									<td class="py-2 pr-3">{summary.correctCount} of {summary.totalTrials}</td>
+									<td class="py-2 pr-3">{formatPercent(summary.accuracy)}</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				</div>
+			{/if}
 		</div>
 	{/if}
 

@@ -16,7 +16,12 @@ type GenericExportRun = {
 	responses: GenericExportResponse[];
 	events: { eventType: string }[];
 	intertemporalSummary?: { delayedChoiceCount: number } | null;
-	orientationSummary?: { totalTrials: number; correctCount: number } | null;
+	orientationSummary?: {
+		totalTrials: number;
+		correctCount: number;
+		magnitudeSummaries: unknown[];
+		estimatedThresholdDegrees: number | null;
+	} | null;
 	nBackSummary?: {
 		totalTrials: number;
 		correctCount: number;
@@ -106,6 +111,8 @@ async function completeOrientationRun(page: Page) {
 	await expect(
 		page.getByRole('heading', { name: 'Orientation discrimination complete' })
 	).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'How this compares' })).toBeVisible();
+	await expect(page.getByText('Perceptual accuracy')).toBeVisible();
 }
 
 async function completeNBackRun(page: Page) {
@@ -519,6 +526,7 @@ test('study runner completes the full protocol and exposes analysis', async ({ p
 	expect(participantCsv).toContain('"needs_review","quality_flag_count","quality_flags"');
 	expect(participantCsv).toContain('"ten_item_personality_inventory_status"');
 	expect(participantCsv).toContain('"orientation_discrimination_accuracy"');
+	expect(participantCsv).toContain('"orientation_discrimination_estimated_threshold_degrees"');
 	expect(participantCsv).toContain('"intertemporal_choice_final_wealth"');
 	expect(participantCsv).toContain('"ten_item_personality_inventory_extroversion"');
 	expect(participantCsv).toContain('"completed"');
@@ -642,10 +650,12 @@ test('orientation discrimination records generic trial data', async ({ page }) =
 		(run: GenericExportRun) =>
 			run.experimentVersionId === 'orientation-discrimination-v1' &&
 			run.responses.length === 16 &&
-			run.orientationSummary?.totalTrials === 16
+			run.orientationSummary?.totalTrials === 16 &&
+			run.orientationSummary.magnitudeSummaries.length === 4
 	);
 
 	expect(orientationRun).toBeTruthy();
+	expect(orientationRun?.orientationSummary?.estimatedThresholdDegrees).toBeNull();
 	expect(orientationRun?.events.map((event: { eventType: string }) => event.eventType)).toEqual(
 		expect.arrayContaining(['run_started', 'trial_started', 'orientation_judged', 'run_completed'])
 	);

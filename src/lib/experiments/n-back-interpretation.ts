@@ -1,45 +1,17 @@
 import type { NBackResult } from './n-back';
+import {
+	formatInterpretationMs,
+	formatInterpretationPercent,
+	formatInterpretationScore,
+	researchContextDisclaimer,
+	type EvidenceReference,
+	type ExperimentInterpretation,
+	type InterpretationCard,
+	type OpenDatasetCandidate,
+	type RelatedTaskPrompt
+} from './interpretation';
 
-export type NBackEvidenceReference = {
-	id: string;
-	shortCitation: string;
-	title: string;
-	url: string;
-	doi?: string;
-	takeaway: string;
-};
-
-export type NBackOpenDatasetCandidate = {
-	id: string;
-	name: string;
-	url: string;
-	status: 'candidate';
-	note: string;
-};
-
-export type NBackInterpretationCard = {
-	title: string;
-	value: string;
-	tone: 'strong' | 'neutral' | 'watch';
-	body: string;
-	evidenceIds: string[];
-};
-
-export type NBackRelatedPrompt = {
-	title: string;
-	body: string;
-	href: '/orientation-discrimination' | '/n-armed-bandit';
-	evidenceIds: string[];
-};
-
-export type NBackInterpretation = {
-	disclaimer: string;
-	cards: NBackInterpretationCard[];
-	relatedPrompts: NBackRelatedPrompt[];
-	references: NBackEvidenceReference[];
-};
-
-export const nBackEvidenceReferences: NBackEvidenceReference[] = [
+export const nBackEvidenceReferences: EvidenceReference[] = [
 	{
 		id: 'meule-2017',
 		shortCitation: 'Meule, 2017',
@@ -70,7 +42,7 @@ export const nBackEvidenceReferences: NBackEvidenceReference[] = [
 	}
 ];
 
-export const nBackOpenDatasetCandidates: NBackOpenDatasetCandidate[] = [
+export const nBackOpenDatasetCandidates: OpenDatasetCandidate[] = [
 	{
 		id: 'openfmri-ds000115',
 		name: 'OpenfMRI ds000115 working-memory task data',
@@ -80,12 +52,7 @@ export const nBackOpenDatasetCandidates: NBackOpenDatasetCandidate[] = [
 	}
 ];
 
-const formatPercent = (value: number | null) =>
-	value === null ? '-' : `${(value * 100).toFixed(0)}%`;
-const formatScore = (value: number | null) => (value === null ? '-' : value.toFixed(2));
-const formatMs = (value: number | null) => (value === null ? '-' : `${Math.round(value)} ms`);
-
-function sensitivityTone(value: number | null): NBackInterpretationCard['tone'] {
+function sensitivityTone(value: number | null): InterpretationCard['tone'] {
 	if (value === null) return 'neutral';
 	if (value >= 1.8) return 'strong';
 	if (value < 0.8) return 'watch';
@@ -136,18 +103,18 @@ function speedBody(result: NBackResult): string {
 	return 'Response speed was available for later comparison against Boundary and open reference samples.';
 }
 
-export function createNBackInterpretation(result: NBackResult): NBackInterpretation {
-	const cards: NBackInterpretationCard[] = [
+export function createNBackInterpretation(result: NBackResult): ExperimentInterpretation {
+	const cards: InterpretationCard[] = [
 		{
 			title: 'Signal sensitivity',
-			value: `d' ${formatScore(result.sensitivityIndex)}`,
+			value: `d' ${formatInterpretationScore(result.sensitivityIndex)}`,
 			tone: sensitivityTone(result.sensitivityIndex),
 			body: sensitivityBody(result.sensitivityIndex),
 			evidenceIds: ['meule-2017', 'owen-2005']
 		},
 		{
 			title: 'Error profile',
-			value: `hit ${formatPercent(result.hitRate)} / false alarm ${formatPercent(result.falseAlarmRate)}`,
+			value: `hit ${formatInterpretationPercent(result.hitRate)} / false alarm ${formatInterpretationPercent(result.falseAlarmRate)}`,
 			tone:
 				(result.falseAlarmRate ?? 0) >= 0.25 || (result.missRate ?? 0) >= 0.45
 					? 'watch'
@@ -157,7 +124,7 @@ export function createNBackInterpretation(result: NBackResult): NBackInterpretat
 		},
 		{
 			title: 'Speed and accuracy',
-			value: `${formatPercent(result.accuracy)} at ${formatMs(result.meanResponseTimeMs)}`,
+			value: `${formatInterpretationPercent(result.accuracy)} at ${formatInterpretationMs(result.meanResponseTimeMs)}`,
 			tone:
 				result.meanResponseTimeMs !== null && result.meanResponseTimeMs < 350 ? 'watch' : 'neutral',
 			body: speedBody(result),
@@ -172,7 +139,7 @@ export function createNBackInterpretation(result: NBackResult): NBackInterpretat
 		}
 	];
 
-	const relatedPrompts: NBackRelatedPrompt[] = [
+	const relatedPrompts: RelatedTaskPrompt[] = [
 		{
 			title: 'Try orientation discrimination',
 			body: 'This helps separate simple perceptual signal/noise from working-memory updating errors.',
@@ -188,8 +155,7 @@ export function createNBackInterpretation(result: NBackResult): NBackInterpretat
 	];
 
 	return {
-		disclaimer:
-			'These comparisons are research context for a short task run. They are not medical, diagnostic, or eligibility advice.',
+		disclaimer: researchContextDisclaimer,
 		cards,
 		relatedPrompts,
 		references: nBackEvidenceReferences

@@ -2,6 +2,12 @@ import { asc, desc, eq } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { calculateNBackSignalDetectionMetrics } from '$lib/experiments/n-back';
 import {
+	estimateOrientationThresholdDegrees,
+	summarizeOrientationMagnitudes,
+	type OrientationMagnitudeObservation,
+	type OrientationMagnitudeSummary
+} from '$lib/experiments/orientation';
+import {
 	experimentEvents,
 	experimentResponses,
 	experimentRunReviews,
@@ -81,6 +87,8 @@ export type AdminOrientationSummary = {
 	incorrectCount: number;
 	accuracy: number;
 	meanResponseTimeMs: number | null;
+	magnitudeSummaries: OrientationMagnitudeSummary[];
+	estimatedThresholdDegrees: number | null;
 };
 
 export type AdminNBackSummary = {
@@ -547,6 +555,16 @@ function createOrientationSummary(
 
 	if (orientationResponses.length === 0) return null;
 
+	const observations: OrientationMagnitudeObservation[] = orientationResponses.flatMap(
+		(response) => {
+			const score = isRecord(response.score) ? response.score : null;
+			const magnitudeDegrees = numberValue(score?.magnitudeDegrees);
+			const correct = score?.correct === true;
+
+			return magnitudeDegrees === null ? [] : [{ magnitudeDegrees, correct }];
+		}
+	);
+	const magnitudeSummaries = summarizeOrientationMagnitudes(observations);
 	const correctCount =
 		numberValue(completedResult?.correctCount) ??
 		orientationResponses.reduce((total, response) => {
@@ -576,7 +594,11 @@ function createOrientationSummary(
 		incorrectCount,
 		accuracy:
 			numberValue(completedResult?.accuracy) ?? (totalTrials > 0 ? correctCount / totalTrials : 0),
-		meanResponseTimeMs
+		meanResponseTimeMs,
+		magnitudeSummaries,
+		estimatedThresholdDegrees:
+			numberValue(completedResult?.estimatedThresholdDegrees) ??
+			estimateOrientationThresholdDegrees(magnitudeSummaries)
 	};
 }
 

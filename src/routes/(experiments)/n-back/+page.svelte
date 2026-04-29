@@ -9,6 +9,7 @@
 		getStoredExperimentRunId,
 		storeExperimentRunId
 	} from '$lib/experiments/run-storage';
+	import { createNBackInterpretation } from '$lib/experiments/n-back-interpretation';
 	import type {
 		NBackOutcome,
 		NBackResponseChoice,
@@ -35,9 +36,13 @@
 		: state && state.totalTrials > 0
 			? ((state.trialNumber - 1) / state.totalTrials) * 100
 			: 0;
+	$: interpretation = result ? createNBackInterpretation(result) : null;
 
 	const formatPercent = (value: number) => `${(value * 100).toFixed(0)}%`;
+	const formatOptionalPercent = (value: number | null) =>
+		value === null ? '-' : formatPercent(value);
 	const formatMs = (value: number | null) => (value === null ? '-' : `${value.toFixed(0)} ms`);
+	const formatScore = (value: number | null) => (value === null ? '-' : value.toFixed(2));
 
 	async function parseJsonResponse<T>(response: Response): Promise<T> {
 		const body = (await response.json()) as T & { message?: string };
@@ -274,6 +279,22 @@
 					<p>{result.falseAlarms}</p>
 				</div>
 				<div class="border-t border-gray-200 py-3">
+					<p class="text-xs text-gray-500">Hit rate</p>
+					<p>{formatOptionalPercent(result.hitRate)}</p>
+				</div>
+				<div class="border-t border-gray-200 py-3">
+					<p class="text-xs text-gray-500">False alarm rate</p>
+					<p>{formatOptionalPercent(result.falseAlarmRate)}</p>
+				</div>
+				<div class="border-t border-gray-200 py-3">
+					<p class="text-xs text-gray-500">Sensitivity d'</p>
+					<p>{formatScore(result.sensitivityIndex)}</p>
+				</div>
+				<div class="border-t border-gray-200 py-3">
+					<p class="text-xs text-gray-500">Response bias</p>
+					<p>{formatScore(result.responseBias)}</p>
+				</div>
+				<div class="border-t border-gray-200 py-3">
 					<p class="text-xs text-gray-500">Misses</p>
 					<p>{result.misses}</p>
 				</div>
@@ -286,6 +307,44 @@
 					<p>{formatMs(result.meanResponseTimeMs)}</p>
 				</div>
 			</div>
+			{#if interpretation}
+				<div class="mt-6">
+					<h3 class="font-serif text-xl">How this compares</h3>
+					<div class="mt-2 grid gap-3 border-t border-gray-200 pt-3 md:grid-cols-2">
+						{#each interpretation.cards as card (card.title)}
+							<section
+								class="border-l-2 py-1 pl-3 {card.tone === 'strong'
+									? 'border-green-500'
+									: card.tone === 'watch'
+										? 'border-amber-500'
+										: 'border-gray-300'}"
+							>
+								<p class="text-xs text-gray-500">{card.title}</p>
+								<p class="font-serif text-xl">{card.value}</p>
+								<p class="mt-1 text-gray-600">{card.body}</p>
+							</section>
+						{/each}
+					</div>
+					<div class="mt-4 grid gap-3 md:grid-cols-2">
+						{#each interpretation.relatedPrompts as prompt (prompt.href)}
+							<a class="border-t border-gray-200 py-3" href={resolve(prompt.href)}>
+								<span class="font-medium underline">{prompt.title}</span>
+								<span class="mt-1 block text-gray-600">{prompt.body}</span>
+							</a>
+						{/each}
+					</div>
+					<p class="mt-4 max-w-2xl text-xs text-gray-500">{interpretation.disclaimer}</p>
+					<p class="mt-2 text-xs text-gray-500">
+						Sources:
+						{#each interpretation.references as reference, index (reference.id)}
+							<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+							<a class="underline" href={reference.url} rel="noreferrer" target="_blank">
+								{reference.shortCitation}</a
+							>{index < interpretation.references.length - 1 ? ', ' : ''}
+						{/each}
+					</p>
+				</div>
+			{/if}
 			{#if studySessionId}
 				<a
 					class="mt-4 inline-block rounded-sm bg-black px-3 py-2 text-xs text-white"

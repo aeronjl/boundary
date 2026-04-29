@@ -8,7 +8,9 @@
 			? new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(value)
 			: '-';
 
-	const formatPercent = (value: number) => `${(value * 100).toFixed(0)}%`;
+	const formatPercent = (value: number | null) =>
+		value === null ? '-' : `${(value * 100).toFixed(0)}%`;
+	const formatNumber = (value: number | null) => (value === null ? '-' : value.toFixed(2));
 	const formatPoints = (value: number) => value.toFixed(0);
 	const formatSeconds = (value: number) => value.toFixed(0);
 	const formatJson = (value: unknown) => JSON.stringify(value, null, 2) ?? 'undefined';
@@ -276,6 +278,22 @@
 				<div class="border-t border-gray-200 py-3">
 					<p class="text-xs text-gray-500">False alarms</p>
 					<p>{data.run.nBackSummary.falseAlarms}</p>
+				</div>
+				<div class="border-t border-gray-200 py-3">
+					<p class="text-xs text-gray-500">Hit rate</p>
+					<p>{formatPercent(data.run.nBackSummary.hitRate)}</p>
+				</div>
+				<div class="border-t border-gray-200 py-3">
+					<p class="text-xs text-gray-500">False alarm rate</p>
+					<p>{formatPercent(data.run.nBackSummary.falseAlarmRate)}</p>
+				</div>
+				<div class="border-t border-gray-200 py-3">
+					<p class="text-xs text-gray-500">Sensitivity d'</p>
+					<p>{formatNumber(data.run.nBackSummary.sensitivityIndex)}</p>
+				</div>
+				<div class="border-t border-gray-200 py-3">
+					<p class="text-xs text-gray-500">Response bias</p>
+					<p>{formatNumber(data.run.nBackSummary.responseBias)}</p>
 				</div>
 				<div class="border-t border-gray-200 py-3">
 					<p class="text-xs text-gray-500">Correct rejections</p>

@@ -17,7 +17,11 @@ type GenericExportRun = {
 	events: { eventType: string }[];
 	intertemporalSummary?: { delayedChoiceCount: number } | null;
 	orientationSummary?: { totalTrials: number; correctCount: number } | null;
-	nBackSummary?: { totalTrials: number; correctCount: number } | null;
+	nBackSummary?: {
+		totalTrials: number;
+		correctCount: number;
+		sensitivityIndex: number | null;
+	} | null;
 };
 
 type StudyExportTask = {
@@ -114,6 +118,8 @@ async function completeNBackRun(page: Page) {
 	}
 
 	await expect(page.getByRole('heading', { name: 'n-back complete' })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'How this compares' })).toBeVisible();
+	await expect(page.getByText('Signal sensitivity')).toBeVisible();
 }
 
 test('index page has expected h1', async ({ page }) => {
@@ -675,7 +681,8 @@ test('n-back records generic trial data', async ({ page }) => {
 		(run: GenericExportRun) =>
 			run.experimentVersionId === 'n-back-v1' &&
 			run.responses.length === 16 &&
-			run.nBackSummary?.totalTrials === 16
+			run.nBackSummary?.totalTrials === 16 &&
+			run.nBackSummary.sensitivityIndex !== null
 	);
 
 	expect(nBackRun).toBeTruthy();

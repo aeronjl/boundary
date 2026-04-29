@@ -251,6 +251,18 @@
 							<dd class="font-serif text-lg">{formatPercent(summary.nBack.accuracy)}</dd>
 						</div>
 						<div>
+							<dt class="text-gray-500">d'</dt>
+							<dd class="font-serif text-lg">{formatNumber(summary.nBack.sensitivityIndex)}</dd>
+						</div>
+						<div>
+							<dt class="text-gray-500">Hit rate</dt>
+							<dd class="font-serif text-lg">{formatPercent(summary.nBack.hitRate)}</dd>
+						</div>
+						<div>
+							<dt class="text-gray-500">FA rate</dt>
+							<dd class="font-serif text-lg">{formatPercent(summary.nBack.falseAlarmRate)}</dd>
+						</div>
+						<div>
 							<dt class="text-gray-500">Hits</dt>
 							<dd class="font-serif text-lg">{summary.nBack.hits}</dd>
 						</div>

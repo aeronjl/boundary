@@ -1,4 +1,5 @@
 import { desc, eq } from 'drizzle-orm';
+import { calculateNBackSignalDetectionMetrics } from '$lib/experiments/n-back';
 import { tipiScales, type TipiScale } from '$lib/experiments/tipi';
 import { db } from '$lib/server/db';
 import {
@@ -73,6 +74,9 @@ export type AdminAnalysisNBackSummary = {
 	misses: number;
 	falseAlarms: number;
 	correctRejections: number;
+	hitRate: number | null;
+	falseAlarmRate: number | null;
+	sensitivityIndex: number | null;
 };
 
 export type AdminAnalysisExperimentSummary = {
@@ -160,7 +164,10 @@ const analysisCsvHeaders = [
 	'n_back_hits',
 	'n_back_misses',
 	'n_back_false_alarms',
-	'n_back_correct_rejections'
+	'n_back_correct_rejections',
+	'n_back_hit_rate',
+	'n_back_false_alarm_rate',
+	'n_back_sensitivity_index'
 ] as const;
 
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
@@ -524,6 +531,12 @@ function createNBackSummary(runs: AnalysisRun[]): AdminAnalysisNBackSummary | nu
 		if (!expectedMatch && respondedMatch) falseAlarms += 1;
 		if (!expectedMatch && !respondedMatch) correctRejections += 1;
 	}
+	const signalMetrics = calculateNBackSignalDetectionMetrics({
+		hits,
+		misses,
+		falseAlarms,
+		correctRejections
+	});
 
 	return {
 		runCount: runIds.size,
@@ -531,7 +544,10 @@ function createNBackSummary(runs: AnalysisRun[]): AdminAnalysisNBackSummary | nu
 		hits,
 		misses,
 		falseAlarms,
-		correctRejections
+		correctRejections,
+		hitRate: signalMetrics.hitRate,
+		falseAlarmRate: signalMetrics.falseAlarmRate,
+		sensitivityIndex: signalMetrics.sensitivityIndex
 	};
 }
 
@@ -580,6 +596,7 @@ function createMetrics(summary: {
 	if (summary.nBack) {
 		metrics.push(
 			{ label: 'accuracy', value: formatPercent(summary.nBack.accuracy) },
+			{ label: "d'", value: formatNumber(summary.nBack.sensitivityIndex, 2) },
 			{ label: 'hits', value: String(summary.nBack.hits) },
 			{ label: 'false alarms', value: String(summary.nBack.falseAlarms) }
 		);
@@ -774,7 +791,10 @@ export async function getAdminAnalysisCsv(filters: AdminAnalysisFilters): Promis
 				summary.nBack?.hits,
 				summary.nBack?.misses,
 				summary.nBack?.falseAlarms,
-				summary.nBack?.correctRejections
+				summary.nBack?.correctRejections,
+				summary.nBack?.hitRate,
+				summary.nBack?.falseAlarmRate,
+				summary.nBack?.sensitivityIndex
 			]
 				.map(csvCell)
 				.join(',')

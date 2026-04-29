@@ -1,5 +1,6 @@
 import { asc, desc, eq } from 'drizzle-orm';
 import { db } from '$lib/server/db';
+import { calculateNBackSignalDetectionMetrics } from '$lib/experiments/n-back';
 import {
 	experimentEvents,
 	experimentResponses,
@@ -91,6 +92,14 @@ export type AdminNBackSummary = {
 	misses: number;
 	falseAlarms: number;
 	correctRejections: number;
+	targetCount: number;
+	nonTargetCount: number;
+	hitRate: number | null;
+	missRate: number | null;
+	falseAlarmRate: number | null;
+	correctRejectionRate: number | null;
+	sensitivityIndex: number | null;
+	responseBias: number | null;
 	meanResponseTimeMs: number | null;
 };
 
@@ -625,6 +634,12 @@ function createNBackSummary(
 		(responseTimes.length > 0
 			? responseTimes.reduce((total, time) => total + time, 0) / responseTimes.length
 			: null);
+	const signalMetrics = calculateNBackSignalDetectionMetrics({
+		hits,
+		misses,
+		falseAlarms,
+		correctRejections
+	});
 
 	return {
 		totalTrials,
@@ -636,6 +651,16 @@ function createNBackSummary(
 		misses: numberValue(completedResult?.misses) ?? misses,
 		falseAlarms: numberValue(completedResult?.falseAlarms) ?? falseAlarms,
 		correctRejections: numberValue(completedResult?.correctRejections) ?? correctRejections,
+		targetCount: numberValue(completedResult?.targetCount) ?? signalMetrics.targetCount,
+		nonTargetCount: numberValue(completedResult?.nonTargetCount) ?? signalMetrics.nonTargetCount,
+		hitRate: numberValue(completedResult?.hitRate) ?? signalMetrics.hitRate,
+		missRate: numberValue(completedResult?.missRate) ?? signalMetrics.missRate,
+		falseAlarmRate: numberValue(completedResult?.falseAlarmRate) ?? signalMetrics.falseAlarmRate,
+		correctRejectionRate:
+			numberValue(completedResult?.correctRejectionRate) ?? signalMetrics.correctRejectionRate,
+		sensitivityIndex:
+			numberValue(completedResult?.sensitivityIndex) ?? signalMetrics.sensitivityIndex,
+		responseBias: numberValue(completedResult?.responseBias) ?? signalMetrics.responseBias,
 		meanResponseTimeMs
 	};
 }

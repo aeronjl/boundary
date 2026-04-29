@@ -564,6 +564,15 @@ const studyMetricDefinitions = [
 	},
 	{
 		taskSlug: 'n-back',
+		key: 'hit_rate',
+		label: 'Hit rate',
+		format: 'percent',
+		aggregate: 'mean',
+		showInSummary: true,
+		extract: (result) => numberValue(result.hitRate)
+	},
+	{
+		taskSlug: 'n-back',
 		key: 'misses',
 		label: 'Misses',
 		format: 'number',
@@ -579,6 +588,24 @@ const studyMetricDefinitions = [
 		aggregate: 'mean',
 		showInSummary: true,
 		extract: (result) => numberValue(result.falseAlarms)
+	},
+	{
+		taskSlug: 'n-back',
+		key: 'false_alarm_rate',
+		label: 'False alarm rate',
+		format: 'percent',
+		aggregate: 'mean',
+		showInSummary: true,
+		extract: (result) => numberValue(result.falseAlarmRate)
+	},
+	{
+		taskSlug: 'n-back',
+		key: 'sensitivity_index',
+		label: "Sensitivity d'",
+		format: 'number',
+		aggregate: 'mean',
+		showInSummary: true,
+		extract: (result) => numberValue(result.sensitivityIndex)
 	},
 	{
 		taskSlug: 'n-back',

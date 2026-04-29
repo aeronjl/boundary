@@ -1,5 +1,6 @@
 import { and, asc, eq } from 'drizzle-orm';
 import {
+	calculateNBackSignalDetectionMetrics,
 	nBackResponseIsMatch,
 	nBackVersionId,
 	parseNBackConfig,
@@ -221,18 +222,21 @@ function createResult(
 ): NBackResult {
 	const correctCount = correctCountFromResponses(responses);
 	const { hits, misses, falseAlarms, correctRejections } = summarizeResponses(responses);
+	const signalMetrics = calculateNBackSignalDetectionMetrics({
+		hits,
+		misses,
+		falseAlarms,
+		correctRejections
+	});
 
 	return {
+		...signalMetrics,
 		runId,
 		completedAt: new Date(completedAt).toISOString(),
 		totalTrials: context.totalTrials,
 		correctCount,
 		incorrectCount: responses.length - correctCount,
 		accuracy: context.totalTrials > 0 ? correctCount / context.totalTrials : 0,
-		hits,
-		misses,
-		falseAlarms,
-		correctRejections,
 		meanResponseTimeMs: meanResponseTime(responses)
 	};
 }

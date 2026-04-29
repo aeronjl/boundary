@@ -109,6 +109,9 @@
 			<a class="rounded-sm bg-gray-100 px-3 py-2 text-xs" href={resolve('/admin/references')}>
 				Reference registry
 			</a>
+			<a class="rounded-sm bg-gray-100 px-3 py-2 text-xs" href={resolve('/admin/relationships')}>
+				Relationship registry
+			</a>
 			<a class="rounded-sm bg-gray-100 px-3 py-2 text-xs" href={resolve('/admin/tipi/export.csv')}>
 				CSV export
 			</a>

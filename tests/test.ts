@@ -753,6 +753,15 @@ test('admin can inspect and export ten item personality inventory data', async (
 	await expect(page.getByRole('link', { name: 'Analysis', exact: true })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Participants' })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Reference registry' })).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Relationship registry' })).toBeVisible();
+
+	await page.getByRole('link', { name: 'Relationship registry' }).click();
+	await expect(page.getByRole('heading', { name: 'Relationship registry' })).toBeVisible();
+	await expect(page.getByText('n-back-to-orientation-perceptual-control')).toBeVisible();
+	await expect(page.getByText('meule-2017')).toBeVisible();
+	await expect(page.getByText('This relationship supports follow-up task selection')).toBeVisible();
+
+	await page.goto('/admin');
 
 	await page.getByRole('link', { name: 'Reference registry' }).click();
 	await expect(page.getByRole('heading', { name: 'Reference registry' })).toBeVisible();

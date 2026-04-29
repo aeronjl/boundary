@@ -41,6 +41,7 @@ type StudyExportStudy = {
 	id: string;
 	completedTasks: number;
 	totalTasks: number;
+	profileInterpretation: { cards: { title: string }[] } | null;
 	integrityFlags: { code: string; label: string }[];
 	qualityFlags: { code: string; label: string }[];
 	needsReview: boolean;
@@ -414,6 +415,7 @@ test('study runner tracks task progress across experiments', async ({ page }) =>
 	await expect(page.getByText('Study session is incomplete')).toBeVisible();
 	await expect(page.getByRole('heading', { name: 'Integrity checks' })).toBeVisible();
 	await expect(page.getByText('Partial session')).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Study profile' })).toBeVisible();
 	await expect(page.getByRole('heading', { name: 'Task timeline' })).toBeVisible();
 	await expect(page.getByRole('link', { name: /View run/ }).first()).toBeVisible();
 	await expect(page.getByText(/accuracy [0-9]+%/).first()).toBeVisible();
@@ -423,10 +425,13 @@ test('study runner tracks task progress across experiments', async ({ page }) =>
 	const detailJson = await detailJsonResponse.json();
 	expect(detailJson.studies).toHaveLength(1);
 	expect(detailJson.studies[0].id).toBe(studyHref?.split('/').at(-1));
+	expect(detailJson.studies[0].profileInterpretation.cards.length).toBeGreaterThan(0);
 
 	const detailCsvResponse = await page.request.get(`${studyHref}/export.csv`);
 	expect(detailCsvResponse.status()).toBe(200);
-	expect(await detailCsvResponse.text()).toContain('"result_summary_json"');
+	const detailCsv = await detailCsvResponse.text();
+	expect(detailCsv).toContain('"profile_interpretation_json"');
+	expect(detailCsv).toContain('"result_summary_json"');
 });
 
 test('study runner completes the full protocol and exposes analysis', async ({ page }) => {
@@ -490,6 +495,8 @@ test('study runner completes the full protocol and exposes analysis', async ({ p
 	await expect(page).toHaveURL(/\/study$/);
 	await expect(page.getByText('5 of 5')).toBeVisible();
 	await expect(page.getByRole('heading', { name: 'Study complete' })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Study profile' })).toBeVisible();
+	await expect(page.getByText('Working-memory contrast')).toBeVisible();
 
 	await page.goto('/admin');
 	await page.getByLabel('Admin token').fill('test-admin-token');
@@ -498,13 +505,17 @@ test('study runner completes the full protocol and exposes analysis', async ({ p
 	const studiesJsonResponse = await page.request.get('/admin/studies/export.json');
 	expect(studiesJsonResponse.status()).toBe(200);
 	const studiesJson = await studiesJsonResponse.json();
-	const completedStudy = studiesJson.studies.find(
-		(study: StudyExportStudy) =>
+	const completedStudy = (studiesJson.studies as StudyExportStudy[]).find(
+		(study) =>
 			study.completedTasks === 5 &&
 			study.totalTasks === 5 &&
 			study.tasks.every((task) => task.status === 'completed' && task.resultSummary !== null)
 	);
 	expect(completedStudy).toBeTruthy();
+	if (!completedStudy) throw new Error('Completed study export was not found.');
+	expect(completedStudy?.profileInterpretation?.cards.map((card) => card.title)).toContain(
+		'Profile coverage'
+	);
 
 	await page.getByRole('link', { name: 'Study analysis' }).click();
 	await expect(page.getByRole('heading', { name: 'Study analysis' })).toBeVisible();
@@ -524,6 +535,7 @@ test('study runner completes the full protocol and exposes analysis', async ({ p
 	const participantCsv = await participantCsvResponse.text();
 	expect(participantCsv).toContain('"study_session_id","participant_session_id"');
 	expect(participantCsv).toContain('"needs_review","quality_flag_count","quality_flags"');
+	expect(participantCsv).toContain('"profile_observations","profile_recommendations"');
 	expect(participantCsv).toContain('"ten_item_personality_inventory_status"');
 	expect(participantCsv).toContain('"orientation_discrimination_accuracy"');
 	expect(participantCsv).toContain('"orientation_discrimination_estimated_threshold_degrees"');

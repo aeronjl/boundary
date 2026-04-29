@@ -228,6 +228,7 @@
 						<th class="py-2 pr-3 font-medium">Progress</th>
 						<th class="py-2 pr-3 font-medium">Duration</th>
 						<th class="py-2 pr-3 font-medium">Current task</th>
+						<th class="py-2 pr-3 font-medium">Profile</th>
 						<th class="py-2 pr-3 font-medium">Quality</th>
 						<th class="py-2 pr-3 font-medium">Integrity flags</th>
 					</tr>
@@ -264,6 +265,15 @@
 							<td class="py-2 pr-3">{formatDuration(participant.studyDurationMs)}</td>
 							<td class="py-2 pr-3">{participant.currentTaskName ?? '-'}</td>
 							<td class="py-2 pr-3">
+								{#if participant.profileObservations.length > 0}
+									<div class="max-w-72 text-gray-600">
+										{participant.profileObservations.slice(0, 2).join('; ')}
+									</div>
+								{:else}
+									-
+								{/if}
+							</td>
+							<td class="py-2 pr-3">
 								<span>{participant.needsReview ? 'needs review' : 'clear'}</span>
 								{#if participant.qualityFlags.length > 0}
 									<div class="mt-1 max-w-56 text-gray-600">
@@ -279,7 +289,7 @@
 						</tr>
 					{:else}
 						<tr>
-							<td class="py-4 text-gray-500" colspan="9">No study sessions match this filter.</td>
+							<td class="py-4 text-gray-500" colspan="10">No study sessions match this filter.</td>
 						</tr>
 					{/each}
 				</tbody>

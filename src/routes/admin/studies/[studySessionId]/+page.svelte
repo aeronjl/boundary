@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import InterpretationPanel from '$lib/components/InterpretationPanel.svelte';
 
 	export let data;
 
@@ -180,6 +181,12 @@
 			{/if}
 		</div>
 	</div>
+
+	{#if study.profileInterpretation}
+		<div class="border-t border-gray-200 pt-3">
+			<InterpretationPanel interpretation={study.profileInterpretation} title="Study profile" />
+		</div>
+	{/if}
 
 	<div>
 		<h2 class="font-serif text-xl">Task timeline</h2>

@@ -32,13 +32,15 @@
 		{/each}
 	</div>
 	<p class="mt-4 max-w-2xl text-xs text-gray-500">{interpretation.disclaimer}</p>
-	<p class="mt-2 text-xs text-gray-500">
-		Sources:
-		{#each interpretation.references as reference, index (reference.id)}
-			<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
-			<a class="underline" href={reference.url} rel="noreferrer" target="_blank">
-				{reference.shortCitation}</a
-			>{index < interpretation.references.length - 1 ? ', ' : ''}
-		{/each}
-	</p>
+	{#if interpretation.references.length > 0}
+		<p class="mt-2 text-xs text-gray-500">
+			Sources:
+			{#each interpretation.references as reference, index (reference.id)}
+				<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+				<a class="underline" href={reference.url} rel="noreferrer" target="_blank">
+					{reference.shortCitation}</a
+				>{index < interpretation.references.length - 1 ? ', ' : ''}
+			{/each}
+		</p>
+	{/if}
 </div>

@@ -1,6 +1,8 @@
 import { asc, desc, eq, inArray } from 'drizzle-orm';
+import type { ExperimentInterpretation } from '$lib/experiments/interpretation';
 import { tipiScales } from '$lib/experiments/tipi';
 import { boundaryStudyProtocol, type StudyProtocolTask } from '$lib/studies/protocol';
+import { createStudyProfileInterpretation } from '$lib/studies/synthesis';
 import { db } from '$lib/server/db';
 import {
 	experimentEvents,
@@ -124,6 +126,7 @@ export type AdminStudySessionSummary = {
 	qualityFlags: AdminStudyIntegrityFlag[];
 	needsReview: boolean;
 	review: AdminStudyReview;
+	profileInterpretation: ExperimentInterpretation | null;
 };
 
 export type AdminStudySessionDetail = AdminStudySessionSummary & {
@@ -193,6 +196,8 @@ export type AdminStudyParticipantSummaryRow = {
 	taskRunIds: Record<string, string | null>;
 	taskDurationsMs: Record<string, number | null>;
 	taskMetricValues: Record<string, Record<string, number | string | null>>;
+	profileObservations: string[];
+	profileRecommendations: string[];
 };
 
 export type AdminStudyAnalysis = {
@@ -231,6 +236,7 @@ const studyCsvHeaders = [
 	'needs_review',
 	'quality_flags',
 	'session_integrity_flags',
+	'profile_interpretation_json',
 	'task_position',
 	'task_slug',
 	'task_name',
@@ -268,6 +274,8 @@ const studyAnalysisBaseCsvHeaders = [
 	'quality_flags',
 	'current_task_slug',
 	'current_task_name',
+	'profile_observations',
+	'profile_recommendations',
 	'integrity_flag_count',
 	'integrity_flags'
 ] as const;
@@ -1199,7 +1207,8 @@ function toAdminStudySession(
 		qualityFlags: [] as AdminStudyIntegrityFlag[],
 		needsReview: false,
 		timeline: [] as AdminStudyTimelineEntry[],
-		review
+		review,
+		profileInterpretation: createStudyProfileInterpretation(tasks)
 	};
 
 	summary.integrityFlags = createSessionFlags(session, tasks);
@@ -1534,7 +1543,11 @@ function toParticipantSummaryRow(study: AdminStudySessionSummary): AdminStudyPar
 		taskStatuses,
 		taskRunIds,
 		taskDurationsMs,
-		taskMetricValues
+		taskMetricValues,
+		profileObservations:
+			study.profileInterpretation?.cards.map((card) => `${card.title}: ${card.value}`) ?? [],
+		profileRecommendations:
+			study.profileInterpretation?.relatedPrompts.map((prompt) => prompt.title) ?? []
 	};
 }
 
@@ -1685,6 +1698,8 @@ export async function getAdminStudyParticipantSummaryCsv(
 				participant.qualityFlags.join('|'),
 				participant.currentTaskSlug,
 				participant.currentTaskName,
+				participant.profileObservations.join('|'),
+				participant.profileRecommendations.join('|'),
 				participant.integrityFlags.length,
 				participant.integrityFlags.join('|'),
 				...boundaryStudyProtocol.tasks.flatMap((task) => {
@@ -1775,6 +1790,7 @@ export async function getAdminStudyCsv(studySessionId?: string): Promise<string>
 					study.needsReview,
 					study.qualityFlags.map((flag) => flag.code).join('|'),
 					study.integrityFlags.map((flag) => flag.code).join('|'),
+					jsonCell(study.profileInterpretation),
 					task.position,
 					task.slug,
 					task.name,

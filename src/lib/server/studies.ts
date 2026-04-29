@@ -5,9 +5,12 @@ import {
 	isBoundaryStudyTaskSlug,
 	type StudyProtocolTask
 } from '$lib/studies/protocol';
+import { createStudyProfileInterpretation } from '$lib/studies/synthesis';
 import { db } from '$lib/server/db';
 import { studySessions, studyTasks } from '$lib/server/db/schema';
+import { getAdminExperimentRun, type AdminExperimentRun } from './admin/experiments';
 import { ensureParticipantSession } from './experiments/lifecycle';
+import type { ExperimentInterpretation } from '$lib/experiments/interpretation';
 
 export type StudyTaskStatus = 'pending' | 'started' | 'completed';
 
@@ -16,6 +19,7 @@ export type StudyTaskProgress = StudyProtocolTask & {
 	runId: string | null;
 	startedAt: number | null;
 	completedAt: number | null;
+	resultSummary: unknown;
 };
 
 export type StudySessionProgress = {
@@ -30,6 +34,7 @@ export type StudySessionProgress = {
 	completedTasks: number;
 	currentTask: StudyTaskProgress | null;
 	tasks: StudyTaskProgress[];
+	profileInterpretation: ExperimentInterpretation | null;
 };
 
 export class StudySessionError extends Error {
@@ -60,18 +65,52 @@ function taskDefinitionBySlug(slug: string): StudyProtocolTask {
 	return task;
 }
 
-function toProgress(
+function completedResult(run: AdminExperimentRun): Record<string, unknown> | null {
+	const completedEvent = run.events.find((event) => event.eventType === 'run_completed');
+	const payload =
+		completedEvent?.payload && typeof completedEvent.payload === 'object'
+			? (completedEvent.payload as Record<string, unknown>)
+			: null;
+	const result = payload?.result;
+
+	return result && typeof result === 'object' && !Array.isArray(result)
+		? (result as Record<string, unknown>)
+		: null;
+}
+
+function createResultSummary(run: AdminExperimentRun | null): unknown {
+	if (!run) return null;
+
+	if (run.experimentSlug === 'orientation-discrimination') return run.orientationSummary;
+	if (run.experimentSlug === 'intertemporal-choice') return run.intertemporalSummary;
+	if (run.experimentSlug === 'n-back') return run.nBackSummary;
+	if (run.experimentSlug === 'n-armed-bandit') return run.banditSummary;
+
+	return completedResult(run);
+}
+
+async function getRunDetailsById(runIds: string[]): Promise<Map<string, AdminExperimentRun>> {
+	if (runIds.length === 0) return new Map();
+
+	const details = await Promise.all(runIds.map((runId) => getAdminExperimentRun(runId)));
+	return new Map(details.flatMap((detail) => (detail ? [[detail.id, detail]] : [])));
+}
+
+async function toProgress(
 	session: typeof studySessions.$inferSelect,
 	tasks: (typeof studyTasks.$inferSelect)[]
-): StudySessionProgress {
+): Promise<StudySessionProgress> {
 	const orderedTasks = tasks.sort((left, right) => left.position - right.position);
+	const runIds = orderedTasks.flatMap((task) => (task.runId ? [task.runId] : []));
+	const runDetailsById = await getRunDetailsById(runIds);
 	const progressTasks: StudyTaskProgress[] = orderedTasks.map((task) => ({
 		...taskDefinitionBySlug(task.experimentSlug),
 		position: task.position,
 		status: toStudyTaskStatus(task.status),
 		runId: task.runId,
 		startedAt: task.startedAt,
-		completedAt: task.completedAt
+		completedAt: task.completedAt,
+		resultSummary: createResultSummary(task.runId ? (runDetailsById.get(task.runId) ?? null) : null)
 	}));
 	const completedTasks = progressTasks.filter((task) => task.status === 'completed').length;
 
@@ -86,7 +125,8 @@ function toProgress(
 		totalTasks: progressTasks.length,
 		completedTasks,
 		currentTask: progressTasks.find((task) => task.status !== 'completed') ?? null,
-		tasks: progressTasks
+		tasks: progressTasks,
+		profileInterpretation: createStudyProfileInterpretation(progressTasks)
 	};
 }
 

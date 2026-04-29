@@ -7,6 +7,7 @@ import {
 	type OrientationResult
 } from '$lib/experiments/orientation';
 import { createOrientationInterpretation } from '$lib/experiments/orientation-interpretation';
+import { createStudyProfileInterpretation } from '$lib/studies/synthesis';
 
 describe('n-back interpretation helpers', () => {
 	it('computes signal-detection rates and sensitivity', () => {
@@ -83,5 +84,43 @@ describe('orientation interpretation helpers', () => {
 		expect(interpretation.cards.map((card) => card.title)).toContain('Approximate threshold');
 		expect(interpretation.relatedPrompts.map((prompt) => prompt.href)).toContain('/n-back');
 		expect(interpretation.disclaimer).toContain('not medical');
+	});
+});
+
+describe('study profile synthesis', () => {
+	it('contrasts n-back performance with the orientation baseline', () => {
+		const interpretation = createStudyProfileInterpretation([
+			{
+				slug: 'orientation-discrimination',
+				name: 'Orientation discrimination',
+				status: 'completed',
+				resultSummary: {
+					accuracy: 0.88,
+					estimatedThresholdDegrees: 4
+				}
+			},
+			{
+				slug: 'n-back',
+				name: 'n-back',
+				status: 'completed',
+				resultSummary: {
+					accuracy: 0.56,
+					sensitivityIndex: 0.4
+				}
+			},
+			{
+				slug: 'n-armed-bandit',
+				name: 'n-armed bandit',
+				status: 'pending',
+				resultSummary: null
+			}
+		]);
+
+		expect(interpretation?.cards.map((card) => card.title)).toContain('Working-memory contrast');
+		expect(interpretation?.cards.find((card) => card.title === 'Profile coverage')?.tone).toBe(
+			'watch'
+		);
+		expect(interpretation?.relatedPrompts.map((prompt) => prompt.href)).toContain('/study');
+		expect(interpretation?.disclaimer).toContain('not medical');
 	});
 });

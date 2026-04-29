@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import InterpretationPanel from '$lib/components/InterpretationPanel.svelte';
 
 	export let data;
 	export let form;
@@ -118,6 +119,9 @@
 					All tasks in this protocol are complete. Thank you for taking part.
 				</p>
 			</div>
+			{#if study.profileInterpretation}
+				<InterpretationPanel interpretation={study.profileInterpretation} title="Study profile" />
+			{/if}
 		{/if}
 
 		<div>

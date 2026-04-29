@@ -298,6 +298,7 @@ test('admin can inspect and export ten item personality inventory data', async (
 	await expect(page.getByRole('link', { name: 'All experiment CSV' })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Experiment runs' })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Analysis' })).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Participants' })).toBeVisible();
 
 	const csvResponse = await page.request.get('/admin/tipi/export.csv');
 	expect(csvResponse.status()).toBe(200);
@@ -331,6 +332,26 @@ test('admin can inspect and export ten item personality inventory data', async (
 	expect(await analysisCsvResponse.text()).toContain(
 		'"experiment_slug","experiment_name","total_runs"'
 	);
+
+	await page.getByRole('link', { name: 'Participant sessions' }).click();
+	await expect(page.getByRole('heading', { name: 'Participants' })).toBeVisible();
+	await expect(page.getByText('Visible sessions')).toBeVisible();
+	await expect(page.locator('p', { hasText: 'Consented' }).first()).toBeVisible();
+	await expect(page.getByRole('link', { name: /View participant/ }).first()).toBeVisible();
+	await page
+		.getByRole('link', { name: /View participant/ })
+		.first()
+		.click();
+	await expect(page.getByRole('heading', { name: 'Participant detail' })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Run history' })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Consents' })).toBeVisible();
+	await expect(page.getByRole('link', { name: /View run/ }).first()).toBeVisible();
+	await page
+		.getByRole('link', { name: /View run/ })
+		.first()
+		.click();
+	await expect(page.getByRole('heading', { name: 'Run detail' })).toBeVisible();
+	await expect(page.getByRole('link', { name: /[0-9a-f-]{36}/ }).first()).toBeVisible();
 
 	await page.goto('/admin');
 	await page

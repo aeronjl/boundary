@@ -51,7 +51,12 @@
 		</div>
 		<div class="border-t border-gray-200 py-3">
 			<p class="text-xs text-gray-500">Participant</p>
-			<p class="font-mono text-xs break-all">{data.run.participantSessionId}</p>
+			<a
+				class="font-mono text-xs break-all underline"
+				href={resolve(`/admin/participants/${data.run.participantSessionId}`)}
+			>
+				{data.run.participantSessionId}
+			</a>
 		</div>
 		<div class="border-t border-gray-200 py-3">
 			<p class="text-xs text-gray-500">Started</p>

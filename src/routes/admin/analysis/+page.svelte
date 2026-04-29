@@ -22,6 +22,9 @@
 		<a href={resolve('/admin')} class="font-mono text-xs underline">Admin</a>
 		<h1 class="mt-2 font-serif text-3xl">Analysis</h1>
 		<p class="mt-1 text-gray-500">Aggregate experiment health and scoring summaries.</p>
+		<a class="mt-2 inline-block font-mono text-xs underline" href={resolve('/admin/participants')}>
+			Participant sessions
+		</a>
 	</div>
 
 	<form method="GET" class="flex flex-wrap items-end gap-3 border-t border-gray-200 pt-4">

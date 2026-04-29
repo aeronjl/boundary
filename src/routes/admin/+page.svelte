@@ -25,7 +25,7 @@
 	<div class="flex items-start justify-between gap-4">
 		<div>
 			<h1 class="font-serif text-3xl">Admin</h1>
-			<p class="mt-1 text-gray-500">Ten Item Personality Inventory data</p>
+			<p class="mt-1 text-gray-500">Experiment data overview</p>
 		</div>
 		{#if data.authenticated}
 			<form method="POST" action="?/logout">
@@ -90,6 +90,9 @@
 				href={resolve('/admin/experiments')}
 			>
 				Experiment runs
+			</a>
+			<a class="rounded-sm bg-gray-100 px-3 py-2 text-xs" href={resolve('/admin/analysis')}>
+				Analysis
 			</a>
 			<a class="rounded-sm bg-gray-100 px-3 py-2 text-xs" href={resolve('/admin/tipi/export.csv')}>
 				CSV export

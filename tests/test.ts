@@ -291,12 +291,13 @@ test('admin can inspect and export ten item personality inventory data', async (
 	await page.getByRole('button', { name: 'Sign in' }).click();
 
 	await expect(page.getByRole('heading', { name: 'Admin' })).toBeVisible();
-	await expect(page.getByText('Ten Item Personality Inventory data')).toBeVisible();
+	await expect(page.getByText('Experiment data overview')).toBeVisible();
 	await expect(page.getByRole('link', { name: 'CSV export' })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'JSON export' })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'All experiment JSON' })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'All experiment CSV' })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Experiment runs' })).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Analysis' })).toBeVisible();
 
 	const csvResponse = await page.request.get('/admin/tipi/export.csv');
 	expect(csvResponse.status()).toBe(200);
@@ -315,6 +316,23 @@ test('admin can inspect and export ten item personality inventory data', async (
 	expect(genericCsvResponse.status()).toBe(200);
 	expect(await genericCsvResponse.text()).toContain('response_time_ms');
 
+	await page.getByRole('link', { name: 'Analysis' }).click();
+	await expect(page.getByRole('heading', { name: 'Analysis' })).toBeVisible();
+	await expect(page.getByText('Total participants')).toBeVisible();
+	await expect(page.getByText('Completion rate')).toBeVisible();
+	await expect(page.getByText('Median response time')).toBeVisible();
+	await expect(
+		page.getByRole('cell', { name: 'Ten Item Personality Inventory' }).first()
+	).toBeVisible();
+	await expect(page.getByText('TIPI trait means').first()).toBeVisible();
+
+	const analysisCsvResponse = await page.request.get('/admin/analysis/export.csv');
+	expect(analysisCsvResponse.status()).toBe(200);
+	expect(await analysisCsvResponse.text()).toContain(
+		'"experiment_slug","experiment_name","total_runs"'
+	);
+
+	await page.goto('/admin');
 	await page
 		.getByRole('link', { name: /View run/ })
 		.first()

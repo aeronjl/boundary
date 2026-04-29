@@ -1,4 +1,8 @@
-import type { OrientationResult } from './orientation';
+import {
+	evidenceReferencesWithRelationships,
+	relatedTaskPromptsForExperiment
+} from '$lib/reference-data/relationships';
+import { orientationExperimentSlug, type OrientationResult } from './orientation';
 import {
 	formatInterpretationDegrees,
 	formatInterpretationMs,
@@ -7,8 +11,7 @@ import {
 	type EvidenceReference,
 	type ExperimentInterpretation,
 	type InterpretationCard,
-	type OpenDatasetCandidate,
-	type RelatedTaskPrompt
+	type OpenDatasetCandidate
 } from './interpretation';
 
 export const orientationEvidenceReferences: EvidenceReference[] = [
@@ -136,25 +139,13 @@ export function createOrientationInterpretation(
 		}
 	];
 
-	const relatedPrompts: RelatedTaskPrompt[] = [
-		{
-			title: 'Try n-back',
-			body: 'Adds a working-memory updating profile that can be compared against this visual baseline.',
-			href: '/n-back',
-			evidenceIds: ['farell-pelli-1998']
-		},
-		{
-			title: 'Try the bandit task',
-			body: 'Adds a reward-learning and exploration profile for a different kind of task comparison.',
-			href: '/n-armed-bandit',
-			evidenceIds: ['edden-2009']
-		}
-	];
-
 	return {
 		disclaimer: researchContextDisclaimer,
 		cards,
-		relatedPrompts,
-		references: orientationEvidenceReferences
+		relatedPrompts: relatedTaskPromptsForExperiment(orientationExperimentSlug),
+		references: evidenceReferencesWithRelationships(
+			orientationEvidenceReferences,
+			orientationExperimentSlug
+		)
 	};
 }

@@ -1,4 +1,8 @@
-import type { IntertemporalResult } from './intertemporal';
+import {
+	evidenceReferencesWithRelationships,
+	relatedTaskPromptsForExperiment
+} from '$lib/reference-data/relationships';
+import { intertemporalExperimentSlug, type IntertemporalResult } from './intertemporal';
 import {
 	formatInterpretationPercent,
 	formatInterpretationScore,
@@ -6,8 +10,7 @@ import {
 	type EvidenceReference,
 	type ExperimentInterpretation,
 	type InterpretationCard,
-	type OpenDatasetCandidate,
-	type RelatedTaskPrompt
+	type OpenDatasetCandidate
 } from './interpretation';
 
 export const intertemporalEvidenceReferences: EvidenceReference[] = [
@@ -130,25 +133,13 @@ export function createIntertemporalInterpretation(
 		}
 	];
 
-	const relatedPrompts: RelatedTaskPrompt[] = [
-		{
-			title: 'Try the bandit task',
-			body: 'Adds reward learning under uncertainty to compare with delay-value choices.',
-			href: '/n-armed-bandit',
-			evidenceIds: ['green-myerson-2004']
-		},
-		{
-			title: 'Try the personality inventory',
-			body: 'Adds self-report context that can later be compared with decision-task patterns.',
-			href: '/ten-item-personality-inventory',
-			evidenceIds: ['frederick-2002']
-		}
-	];
-
 	return {
 		disclaimer: researchContextDisclaimer,
 		cards,
-		relatedPrompts,
-		references: intertemporalEvidenceReferences
+		relatedPrompts: relatedTaskPromptsForExperiment(intertemporalExperimentSlug),
+		references: evidenceReferencesWithRelationships(
+			intertemporalEvidenceReferences,
+			intertemporalExperimentSlug
+		)
 	};
 }

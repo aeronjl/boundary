@@ -67,8 +67,13 @@ describe('n-back interpretation helpers', () => {
 		const interpretation = createNBackInterpretation(result);
 
 		expect(interpretation.cards.map((card) => card.title)).toContain('Clinical context');
+		expect(interpretation.relatedPrompts.map((prompt) => prompt.href)).toContain(
+			'/orientation-discrimination'
+		);
 		expect(interpretation.disclaimer).toContain('not medical');
-		expect(interpretation.references).toHaveLength(3);
+		expect(interpretation.references.map((reference) => reference.id)).toEqual(
+			expect.arrayContaining(['meule-2017', 'farell-pelli-1998', 'wilson-2014'])
+		);
 	});
 });
 
@@ -133,7 +138,9 @@ describe('bandit interpretation helpers', () => {
 		expect(interpretation.relatedPrompts.map((prompt) => prompt.href)).toContain(
 			'/intertemporal-choice'
 		);
-		expect(interpretation.references).toHaveLength(3);
+		expect(interpretation.references.map((reference) => reference.id)).toEqual(
+			expect.arrayContaining(['steyvers-2009', 'green-myerson-2004', 'owen-2005'])
+		);
 	});
 });
 
@@ -157,7 +164,9 @@ describe('intertemporal interpretation helpers', () => {
 		expect(intertemporalDelayedChoiceRate(result)).toBe(5 / 8);
 		expect(interpretation.cards.map((card) => card.title)).toContain('Delay preference');
 		expect(interpretation.relatedPrompts.map((prompt) => prompt.href)).toContain('/n-armed-bandit');
-		expect(interpretation.references).toHaveLength(3);
+		expect(interpretation.references.map((reference) => reference.id)).toEqual(
+			expect.arrayContaining(['green-myerson-2004', 'sutton-barto-2018', 'gosling-2003'])
+		);
 	});
 });
 

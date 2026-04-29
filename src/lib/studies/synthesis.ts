@@ -12,6 +12,11 @@ import { banditEvidenceReferences } from '$lib/experiments/bandit-interpretation
 import { intertemporalEvidenceReferences } from '$lib/experiments/intertemporal-interpretation';
 import { nBackEvidenceReferences } from '$lib/experiments/n-back-interpretation';
 import { orientationEvidenceReferences } from '$lib/experiments/orientation-interpretation';
+import {
+	crossTaskRelationshipsForExperiment,
+	relationshipEvidenceReferencesForExperiment,
+	relatedTaskPromptFromRelationship
+} from '$lib/reference-data/relationships';
 
 export type StudySynthesisTask = {
 	slug: string;
@@ -145,6 +150,26 @@ function traitCard(tipi: Record<string, unknown> | null): InterpretationCard | n
 	};
 }
 
+function uniquePromptsByHref(prompts: RelatedTaskPrompt[]): RelatedTaskPrompt[] {
+	const byHref = new Map(prompts.map((prompt) => [prompt.href, prompt]));
+	return [...byHref.values()];
+}
+
+function registryPromptsForStudy(tasks: StudySynthesisTask[]): RelatedTaskPrompt[] {
+	const completedTaskSlugs = new Set(
+		tasks.filter((task) => task.status === 'completed').map((task) => task.slug)
+	);
+	const incompleteTaskSlugs = new Set(
+		tasks.filter((task) => task.status !== 'completed').map((task) => task.slug)
+	);
+
+	return [...completedTaskSlugs].flatMap((slug) =>
+		crossTaskRelationshipsForExperiment(slug)
+			.filter((relationship) => incompleteTaskSlugs.has(relationship.targetExperimentSlug))
+			.map(relatedTaskPromptFromRelationship)
+	);
+}
+
 function createPrompts(
 	tasks: StudySynthesisTask[],
 	orientation: Record<string, unknown> | null,
@@ -185,16 +210,9 @@ function createPrompts(
 		});
 	}
 
-	if (!tasks.some((task) => task.slug === 'n-armed-bandit' && task.status === 'completed')) {
-		prompts.push({
-			title: 'Try the bandit task',
-			body: 'Adds reward-learning and exploration context to the profile.',
-			href: '/n-armed-bandit',
-			evidenceIds: ['steyvers-2009']
-		});
-	}
+	prompts.push(...registryPromptsForStudy(tasks));
 
-	return prompts.slice(0, 2);
+	return uniquePromptsByHref(prompts).slice(0, 2);
 }
 
 function uniqueReferences(references: EvidenceReference[]): EvidenceReference[] {
@@ -238,7 +256,10 @@ export function createStudyProfileInterpretation(
 			...orientationEvidenceReferences,
 			...nBackEvidenceReferences,
 			...banditEvidenceReferences,
-			...intertemporalEvidenceReferences
+			...intertemporalEvidenceReferences,
+			...tasks
+				.filter((task) => task.status === 'completed')
+				.flatMap((task) => relationshipEvidenceReferencesForExperiment(task.slug))
 		],
 		cards,
 		relatedPrompts

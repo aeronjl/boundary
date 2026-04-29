@@ -1,4 +1,8 @@
-import type { NBackResult } from './n-back';
+import {
+	evidenceReferencesWithRelationships,
+	relatedTaskPromptsForExperiment
+} from '$lib/reference-data/relationships';
+import { nBackExperimentSlug, type NBackResult } from './n-back';
 import {
 	formatInterpretationMs,
 	formatInterpretationPercent,
@@ -7,8 +11,7 @@ import {
 	type EvidenceReference,
 	type ExperimentInterpretation,
 	type InterpretationCard,
-	type OpenDatasetCandidate,
-	type RelatedTaskPrompt
+	type OpenDatasetCandidate
 } from './interpretation';
 
 export const nBackEvidenceReferences: EvidenceReference[] = [
@@ -139,25 +142,10 @@ export function createNBackInterpretation(result: NBackResult): ExperimentInterp
 		}
 	];
 
-	const relatedPrompts: RelatedTaskPrompt[] = [
-		{
-			title: 'Try orientation discrimination',
-			body: 'This helps separate simple perceptual signal/noise from working-memory updating errors.',
-			href: '/orientation-discrimination',
-			evidenceIds: ['meule-2017']
-		},
-		{
-			title: 'Try the bandit task',
-			body: 'This adds a reward-learning profile that Boundary can later compare with working-memory updating.',
-			href: '/n-armed-bandit',
-			evidenceIds: ['owen-2005']
-		}
-	];
-
 	return {
 		disclaimer: researchContextDisclaimer,
 		cards,
-		relatedPrompts,
-		references: nBackEvidenceReferences
+		relatedPrompts: relatedTaskPromptsForExperiment(nBackExperimentSlug),
+		references: evidenceReferencesWithRelationships(nBackEvidenceReferences, nBackExperimentSlug)
 	};
 }

@@ -1,4 +1,5 @@
 import type { BanditArmSummary, BanditResult } from './bandit';
+import { banditExperimentSlug } from './bandit';
 import {
 	formatInterpretationPercent,
 	formatInterpretationScore,
@@ -6,9 +7,12 @@ import {
 	type EvidenceReference,
 	type ExperimentInterpretation,
 	type InterpretationCard,
-	type OpenDatasetCandidate,
-	type RelatedTaskPrompt
+	type OpenDatasetCandidate
 } from './interpretation';
+import {
+	evidenceReferencesWithRelationships,
+	relatedTaskPromptsForExperiment
+} from '$lib/reference-data/relationships';
 
 export const banditEvidenceReferences: EvidenceReference[] = [
 	{
@@ -138,25 +142,10 @@ export function createBanditInterpretation(result: BanditResult): ExperimentInte
 		}
 	];
 
-	const relatedPrompts: RelatedTaskPrompt[] = [
-		{
-			title: 'Try intertemporal choice',
-			body: 'Adds a delay-vs-value decision profile to compare with reward learning under uncertainty.',
-			href: '/intertemporal-choice',
-			evidenceIds: ['steyvers-2009']
-		},
-		{
-			title: 'Try n-back',
-			body: 'Adds a working-memory updating signal that can contextualize noisy reward choices.',
-			href: '/n-back',
-			evidenceIds: ['wilson-2014']
-		}
-	];
-
 	return {
 		disclaimer: researchContextDisclaimer,
 		cards,
-		relatedPrompts,
-		references: banditEvidenceReferences
+		relatedPrompts: relatedTaskPromptsForExperiment(banditExperimentSlug),
+		references: evidenceReferencesWithRelationships(banditEvidenceReferences, banditExperimentSlug)
 	};
 }

@@ -14,6 +14,9 @@ export type ReferenceMetricUnit =
 	| 'count';
 export type ReferenceComparisonType = 'distribution' | 'threshold' | 'descriptive';
 
+export const referenceDatasetStatuses = ['candidate', 'validated', 'rejected'] as const;
+export const referenceCompatibilities = ['compatible', 'partial', 'incompatible'] as const;
+
 export type ReferenceMetricContract = {
 	experimentSlug: string;
 	metricKey: string;

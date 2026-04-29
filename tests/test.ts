@@ -758,6 +758,27 @@ test('admin can inspect and export ten item personality inventory data', async (
 	await expect(page.getByRole('heading', { name: 'Reference registry' })).toBeVisible();
 	await expect(page.getByText('OpenfMRI ds000115').first()).toBeVisible();
 	await expect(page.getByText('Metric contracts', { exact: true })).toBeVisible();
+
+	const datasetForm = page.locator('form[aria-label^="Edit reference dataset"]').first();
+	await datasetForm.getByLabel('Dataset status').selectOption('validated');
+	await datasetForm.locator('select[name="compatibility"]').selectOption('compatible');
+	await datasetForm.getByLabel('Sample size').fill('42');
+	await datasetForm.getByLabel('Compatibility notes').fill('Validated for smoke-test review flow.');
+	await datasetForm.getByRole('button', { name: 'Save dataset' }).click();
+	await expect(page.getByText('Reference dataset updated.')).toBeVisible();
+	await expect(datasetForm.getByLabel('Dataset status')).toHaveValue('validated');
+	await expect(datasetForm.getByLabel('Sample size')).toHaveValue('42');
+
+	const metricForm = page.locator('form[aria-label^="Edit reference metric Accuracy"]').first();
+	await metricForm.getByLabel('Mean').fill('0.72');
+	await metricForm.getByLabel('SD').fill('0.11');
+	await metricForm.getByLabel('Metric notes').fill('Accuracy extractable after event validation.');
+	await metricForm.getByRole('button', { name: 'Save metric' }).click();
+	await expect(page.getByText('Reference metric updated.')).toBeVisible();
+	await expect(metricForm.getByLabel('Mean')).toHaveValue('0.72');
+	await expect(metricForm.getByLabel('Metric notes')).toHaveValue(
+		'Accuracy extractable after event validation.'
+	);
 	await page.goto('/admin');
 
 	const csvResponse = await page.request.get('/admin/tipi/export.csv');

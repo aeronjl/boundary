@@ -2,11 +2,13 @@
 	import { resolve } from '$app/paths';
 
 	export let data;
+	export let form;
 
 	const formatDate = (value: number | null) =>
 		value
 			? new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(value)
 			: '-';
+	const formatNumberInput = (value: number | null) => (value === null ? '' : String(value));
 </script>
 
 <svelte:head>
@@ -22,6 +24,17 @@
 			cohort comparisons.
 		</p>
 	</div>
+
+	{#if data.message || form?.message}
+		<p
+			role="status"
+			class="rounded-sm border {form?.message
+				? 'border-red-200 bg-red-50 text-red-800'
+				: 'border-green-200 bg-green-50 text-green-800'} p-3"
+		>
+			{form?.message ?? data.message}
+		</p>
+	{/if}
 
 	<div class="grid grid-cols-2 gap-3 md:grid-cols-4">
 		<div class="border-t border-gray-200 py-3">
@@ -83,6 +96,161 @@
 					{/each}
 				</tbody>
 			</table>
+		</div>
+	</div>
+
+	<div>
+		<h2 class="font-serif text-2xl">Dataset review</h2>
+		<div class="mt-3 space-y-6 border-t border-gray-200 pt-3">
+			{#each data.datasets as dataset (dataset.id)}
+				<section class="border-t border-gray-100 pt-4">
+					<div>
+						<h3 class="font-medium">{dataset.name}</h3>
+						<p class="mt-1 max-w-2xl text-xs text-gray-500">
+							{dataset.experimentSlug}
+							{#if dataset.study}
+								<span>from {dataset.study.shortCitation}</span>
+							{/if}
+						</p>
+					</div>
+
+					<form
+						method="POST"
+						action="?/dataset"
+						aria-label={`Edit reference dataset ${dataset.name}`}
+						class="mt-3 grid gap-3 md:grid-cols-3"
+					>
+						<input type="hidden" name="datasetId" value={dataset.id} />
+						<label class="flex flex-col gap-1">
+							<span class="text-xs font-medium text-gray-500">Dataset status</span>
+							<select name="status" class="rounded-sm border border-gray-300 px-3 py-2">
+								{#each data.datasetStatuses as status (status)}
+									<option value={status} selected={dataset.status === status}>{status}</option>
+								{/each}
+							</select>
+						</label>
+						<label class="flex flex-col gap-1">
+							<span class="text-xs font-medium text-gray-500">Compatibility</span>
+							<select name="compatibility" class="rounded-sm border border-gray-300 px-3 py-2">
+								{#each data.compatibilities as compatibility (compatibility)}
+									<option value={compatibility} selected={dataset.compatibility === compatibility}>
+										{compatibility}
+									</option>
+								{/each}
+							</select>
+						</label>
+						<label class="flex flex-col gap-1">
+							<span class="text-xs font-medium text-gray-500">Sample size</span>
+							<input
+								name="sampleSize"
+								inputmode="numeric"
+								value={formatNumberInput(dataset.sampleSize)}
+								class="rounded-sm border border-gray-300 px-3 py-2"
+							/>
+						</label>
+						<label class="flex flex-col gap-1">
+							<span class="text-xs font-medium text-gray-500">License</span>
+							<input
+								name="license"
+								value={dataset.license}
+								class="rounded-sm border border-gray-300 px-3 py-2"
+							/>
+						</label>
+						<label class="flex flex-col gap-1">
+							<span class="text-xs font-medium text-gray-500">Population</span>
+							<input
+								name="population"
+								value={dataset.population}
+								class="rounded-sm border border-gray-300 px-3 py-2"
+							/>
+						</label>
+						<label class="flex flex-col gap-1">
+							<span class="text-xs font-medium text-gray-500">Task variant</span>
+							<input
+								name="taskVariant"
+								value={dataset.taskVariant}
+								class="rounded-sm border border-gray-300 px-3 py-2"
+							/>
+						</label>
+						<label class="flex flex-col gap-1 md:col-span-3">
+							<span class="text-xs font-medium text-gray-500">Compatibility notes</span>
+							<textarea name="notes" rows="3" class="rounded-sm border border-gray-300 px-3 py-2"
+								>{dataset.notes}</textarea
+							>
+						</label>
+						<div class="md:col-span-3">
+							<button class="rounded-sm bg-black px-3 py-2 text-xs text-white">Save dataset</button>
+						</div>
+					</form>
+
+					{#if dataset.metrics.length > 0}
+						<div class="mt-4 space-y-3">
+							{#each dataset.metrics as metric (metric.id)}
+								<form
+									method="POST"
+									action="?/metric"
+									aria-label={`Edit reference metric ${metric.label} for ${dataset.name}`}
+									class="grid gap-3 border-t border-gray-100 pt-3 md:grid-cols-5"
+								>
+									<input type="hidden" name="metricId" value={metric.id} />
+									<div>
+										<p class="text-xs text-gray-500">Metric</p>
+										<p class="font-medium">{metric.label}</p>
+										<p class="text-xs text-gray-500">{metric.metricKey}</p>
+									</div>
+									<label class="flex flex-col gap-1">
+										<span class="text-xs font-medium text-gray-500">Mean</span>
+										<input
+											name="mean"
+											inputmode="decimal"
+											value={formatNumberInput(metric.mean)}
+											class="rounded-sm border border-gray-300 px-3 py-2"
+										/>
+									</label>
+									<label class="flex flex-col gap-1">
+										<span class="text-xs font-medium text-gray-500">SD</span>
+										<input
+											name="standardDeviation"
+											inputmode="decimal"
+											value={formatNumberInput(metric.standardDeviation)}
+											class="rounded-sm border border-gray-300 px-3 py-2"
+										/>
+									</label>
+									<label class="flex flex-col gap-1">
+										<span class="text-xs font-medium text-gray-500">Minimum</span>
+										<input
+											name="minimum"
+											inputmode="decimal"
+											value={formatNumberInput(metric.minimum)}
+											class="rounded-sm border border-gray-300 px-3 py-2"
+										/>
+									</label>
+									<label class="flex flex-col gap-1">
+										<span class="text-xs font-medium text-gray-500">Maximum</span>
+										<input
+											name="maximum"
+											inputmode="decimal"
+											value={formatNumberInput(metric.maximum)}
+											class="rounded-sm border border-gray-300 px-3 py-2"
+										/>
+									</label>
+									<label class="flex flex-col gap-1 md:col-span-5">
+										<span class="text-xs font-medium text-gray-500">Metric notes</span>
+										<textarea
+											name="notes"
+											rows="2"
+											class="rounded-sm border border-gray-300 px-3 py-2">{metric.notes}</textarea
+										>
+									</label>
+									<div class="md:col-span-5">
+										<button class="rounded-sm bg-gray-100 px-3 py-2 text-xs"> Save metric </button>
+									</div>
+								</form>
+							{/each}
+						</div>
+					{/if}
+				</section>
+			{/each}
 		</div>
 	</div>
 

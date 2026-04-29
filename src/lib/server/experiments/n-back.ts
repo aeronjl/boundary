@@ -428,6 +428,34 @@ export async function submitNBackResponse(
 	};
 }
 
+export async function getNBackRunState(
+	runId: string,
+	participantSessionId: string
+): Promise<NBackSubmitResult | null> {
+	const run = await getExperimentRun(runId, nBackVersionId, participantSessionId);
+
+	if (!run) {
+		return null;
+	}
+
+	const context = await getNBackContext(runId);
+	const responses = await getNBackResponses(runId);
+
+	if (run.status === 'completed') {
+		const completedAt = run.completedAt ?? Date.now();
+		const result = createResult(runId, context, responses, completedAt);
+		const lastOutcome = createLastOutcome(responses);
+
+		if (!lastOutcome) {
+			throw new Error('n-back run has no response outcome.');
+		}
+
+		return { completed: true, runId, result, lastOutcome };
+	}
+
+	return getNBackCurrentStateOrResult(runId, context, responses);
+}
+
 async function getNBackCurrentStateOrResult(
 	runId: string,
 	context: NBackStartedPayload,

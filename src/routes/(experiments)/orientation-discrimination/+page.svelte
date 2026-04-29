@@ -1,6 +1,12 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import ExperimentStartGate from '$lib/components/ExperimentStartGate.svelte';
 	import { getExperimentCatalogEntry } from '$lib/experiments/catalog';
+	import {
+		clearStoredExperimentRunId,
+		getStoredExperimentRunId,
+		storeExperimentRunId
+	} from '$lib/experiments/run-storage';
 	import type {
 		OrientationDirection,
 		OrientationOutcome,
@@ -17,6 +23,7 @@
 	let lastOutcome: OrientationOutcome | null = null;
 	let pending = false;
 	let errorMessage = '';
+	let resumeChecked = false;
 
 	$: trial = state?.trial ?? null;
 	$: progressPercent = result
@@ -38,6 +45,63 @@
 		return body;
 	}
 
+	function applyRunState(nextState: OrientationRunState) {
+		state = nextState;
+		result = null;
+		lastOutcome = nextState.lastOutcome;
+		storeExperimentRunId(experiment.slug, nextState.runId);
+	}
+
+	function applyRunResult(update: Extract<OrientationSubmitResult, { completed: true }>) {
+		result = update.result;
+		state = null;
+		lastOutcome = update.lastOutcome;
+		storeExperimentRunId(experiment.slug, update.runId);
+	}
+
+	function applyRunUpdate(update: OrientationSubmitResult) {
+		if (update.completed) {
+			applyRunResult(update);
+			return;
+		}
+
+		applyRunState(update);
+	}
+
+	async function resumeStoredRun() {
+		const storedRunId = getStoredExperimentRunId(experiment.slug);
+
+		if (!storedRunId) {
+			resumeChecked = true;
+			return;
+		}
+
+		pending = true;
+		errorMessage = '';
+
+		try {
+			const response = await fetch(
+				`/api/experiments/orientation-discrimination/runs/${storedRunId}`
+			);
+
+			if (response.status === 403 || response.status === 404) {
+				clearStoredExperimentRunId(experiment.slug);
+				return;
+			}
+
+			applyRunUpdate(await parseJsonResponse<OrientationSubmitResult>(response));
+		} catch (error) {
+			errorMessage = error instanceof Error ? error.message : 'Could not resume the saved run.';
+		} finally {
+			pending = false;
+			resumeChecked = true;
+		}
+	}
+
+	onMount(() => {
+		void resumeStoredRun();
+	});
+
 	async function startRun() {
 		pending = true;
 		errorMessage = '';
@@ -48,7 +112,7 @@
 			const response = await fetch('/api/experiments/orientation-discrimination/runs', {
 				method: 'POST'
 			});
-			state = await parseJsonResponse<OrientationRunState>(response);
+			applyRunState(await parseJsonResponse<OrientationRunState>(response));
 		} catch (error) {
 			errorMessage = error instanceof Error ? error.message : 'Could not start the task.';
 		} finally {
@@ -79,14 +143,7 @@
 			);
 			const payload = await parseJsonResponse<OrientationSubmitResult>(response);
 
-			lastOutcome = payload.lastOutcome;
-
-			if (payload.completed) {
-				result = payload.result;
-				state = null;
-			} else {
-				state = payload;
-			}
+			applyRunUpdate(payload);
 		} catch (error) {
 			errorMessage = error instanceof Error ? error.message : 'Could not record that response.';
 		} finally {
@@ -125,7 +182,9 @@
 		</p>
 	{/if}
 
-	{#if !state && !result}
+	{#if !resumeChecked}
+		<p class="border-t border-gray-200 pt-4 text-gray-500">Checking for saved run...</p>
+	{:else if !state && !result}
 		<ExperimentStartGate {experiment} busy={pending} on:start={startRun} />
 	{/if}
 

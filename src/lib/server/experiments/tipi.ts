@@ -268,6 +268,32 @@ export async function submitTipiResponse(
 	};
 }
 
+export async function getTipiRunState(
+	runId: string,
+	participantSessionId: string
+): Promise<TipiSubmitResult | null> {
+	const run = await getExperimentRun(runId, tipiVersionId, participantSessionId);
+
+	if (!run) {
+		return null;
+	}
+
+	const questionOrder = parseExperimentRunItemOrder(run);
+	const responses = await db
+		.select()
+		.from(tipiResponses)
+		.where(eq(tipiResponses.runId, runId))
+		.orderBy(asc(tipiResponses.trialIndex));
+
+	if (run.status === 'completed') {
+		const existingResult = await getTipiResult(runId);
+		const result = existingResult ?? (await completeTipiRun(runId));
+		return { completed: true, runId, result };
+	}
+
+	return getTipiCurrentStateOrResult(runId, questionOrder, responses.length);
+}
+
 async function getTipiCurrentStateOrResult(
 	runId: string,
 	questionOrder: string[],

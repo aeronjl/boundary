@@ -1,6 +1,12 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import ExperimentStartGate from '$lib/components/ExperimentStartGate.svelte';
 	import { getExperimentCatalogEntry } from '$lib/experiments/catalog';
+	import {
+		clearStoredExperimentRunId,
+		getStoredExperimentRunId,
+		storeExperimentRunId
+	} from '$lib/experiments/run-storage';
 	import type {
 		BanditArm,
 		BanditPullResult,
@@ -21,6 +27,7 @@
 	let result: BanditResult | null = null;
 	let isBusy = false;
 	let errorMessage = '';
+	let resumeChecked = false;
 
 	$: progressLabel =
 		totalTrials > 0 ? `Trial ${Math.min(trialNumber, totalTrials)} of ${totalTrials}` : '';
@@ -44,7 +51,62 @@
 		score = state.score;
 		arms = state.arms;
 		lastReward = state.lastOutcome?.reward ?? null;
+		result = null;
+		storeExperimentRunId(experiment.slug, state.runId);
 	}
+
+	function applyRunResult(update: Extract<BanditPullResult, { completed: true }>) {
+		runId = update.runId;
+		result = update.result;
+		score = update.result.totalReward;
+		trialNumber = update.result.totalTrials;
+		totalTrials = update.result.totalTrials;
+		trialStartedAt = null;
+		arms = update.result.arms;
+		lastReward = update.lastOutcome?.reward ?? null;
+		storeExperimentRunId(experiment.slug, update.runId);
+	}
+
+	function applyRunUpdate(update: BanditPullResult) {
+		if (update.completed) {
+			applyRunResult(update);
+			return;
+		}
+
+		applyRunState(update);
+	}
+
+	async function resumeStoredRun() {
+		const storedRunId = getStoredExperimentRunId(experiment.slug);
+
+		if (!storedRunId) {
+			resumeChecked = true;
+			return;
+		}
+
+		isBusy = true;
+		errorMessage = '';
+
+		try {
+			const response = await fetch(`/api/experiments/n-armed-bandit/runs/${storedRunId}`);
+
+			if (response.status === 403 || response.status === 404) {
+				clearStoredExperimentRunId(experiment.slug);
+				return;
+			}
+
+			applyRunUpdate(await parseJsonResponse<BanditPullResult>(response));
+		} catch (error) {
+			errorMessage = error instanceof Error ? error.message : 'Could not resume the saved run.';
+		} finally {
+			isBusy = false;
+			resumeChecked = true;
+		}
+	}
+
+	onMount(() => {
+		void resumeStoredRun();
+	});
 
 	async function startRun() {
 		isBusy = true;
@@ -87,15 +149,7 @@
 			const update = await parseJsonResponse<BanditPullResult>(response);
 
 			lastReward = update.lastOutcome?.reward ?? null;
-
-			if (update.completed) {
-				result = update.result;
-				score = update.result.totalReward;
-				trialNumber = totalTrials;
-				trialStartedAt = null;
-			} else {
-				applyRunState(update);
-			}
+			applyRunUpdate(update);
 		} catch (error) {
 			errorMessage = error instanceof Error ? error.message : 'Could not record that choice.';
 		} finally {
@@ -117,7 +171,15 @@
 		</p>
 	</div>
 
-	{#if !runId}
+	{#if errorMessage && !runId}
+		<p role="alert" class="rounded-sm border border-red-200 bg-red-50 p-3 text-red-800">
+			{errorMessage}
+		</p>
+	{/if}
+
+	{#if !resumeChecked}
+		<p class="border-t border-gray-200 pt-4 text-gray-500">Checking for saved run...</p>
+	{:else if !runId}
 		<ExperimentStartGate {experiment} busy={isBusy} on:start={startRun} />
 	{:else}
 		<div class="grid gap-3 border-t border-gray-200 pt-4 md:grid-cols-3">

@@ -328,6 +328,35 @@ export async function submitBanditPull(
 	};
 }
 
+export async function getBanditRunState(
+	runId: string,
+	participantSessionId: string
+): Promise<BanditPullResult | null> {
+	const run = await getExperimentRun(runId, banditVersionId, participantSessionId);
+
+	if (!run) {
+		return null;
+	}
+
+	const context = await getBanditContext(runId);
+	const responses = await getBanditResponses(runId);
+
+	if (run.status === 'completed') {
+		const completedAt = run.completedAt ?? Date.now();
+		const result = createResult(runId, context, responses, completedAt);
+		const lastOutcome = createLastOutcome(responses) ?? {
+			trialIndex: context.totalTrials - 1,
+			armId: context.arms[0].id,
+			reward: 0,
+			totalReward: result.totalReward
+		};
+
+		return { completed: true, runId, result, lastOutcome };
+	}
+
+	return getBanditCurrentStateOrResult(runId, context, responses);
+}
+
 async function getBanditCurrentStateOrResult(
 	runId: string,
 	context: BanditStartedPayload,

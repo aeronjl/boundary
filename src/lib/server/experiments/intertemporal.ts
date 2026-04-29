@@ -388,6 +388,34 @@ export async function submitIntertemporalChoice(
 	};
 }
 
+export async function getIntertemporalRunState(
+	runId: string,
+	participantSessionId: string
+): Promise<IntertemporalSubmitResult | null> {
+	const run = await getExperimentRun(runId, intertemporalVersionId, participantSessionId);
+
+	if (!run) {
+		return null;
+	}
+
+	const context = await getIntertemporalContext(runId);
+	const responses = await getIntertemporalResponses(runId);
+
+	if (run.status === 'completed') {
+		const completedAt = run.completedAt ?? Date.now();
+		const result = createResult(runId, context, responses, completedAt);
+		const lastOutcome = createLastOutcome(responses);
+
+		if (!lastOutcome) {
+			throw new Error('Intertemporal choice run has no choice outcome.');
+		}
+
+		return { completed: true, runId, result, lastOutcome };
+	}
+
+	return getIntertemporalCurrentStateOrResult(runId, context, responses);
+}
+
 async function getIntertemporalCurrentStateOrResult(
 	runId: string,
 	context: IntertemporalStartedPayload,

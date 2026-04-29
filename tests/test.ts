@@ -257,6 +257,40 @@ test('ten item personality inventory records and displays results', async ({ pag
 	await expect(page.getByText('/ 7').first()).toBeVisible();
 });
 
+test('ten item personality inventory resumes saved runs after reload', async ({ page }) => {
+	await page.goto('/ten-item-personality-inventory');
+	await acceptConsentAndStart(page);
+
+	await expect(page.getByText('Question 1 of 10')).toBeVisible();
+	await page.getByRole('radio', { name: 'Agree a little', exact: true }).check();
+	await page.getByRole('button', { name: 'Submit' }).click();
+	await expect(page.getByText('Question 2 of 10')).toBeVisible();
+
+	await page.reload();
+	await expect(page.getByText('Question 2 of 10')).toBeVisible();
+
+	for (let trial = 2; trial <= 10; trial++) {
+		await expect(page.getByText(`Question ${trial} of 10`)).toBeVisible();
+		await page.getByRole('radio', { name: 'Agree a little', exact: true }).check();
+		await page.getByRole('button', { name: 'Submit' }).click();
+	}
+
+	await expect(page.getByText('You have completed the inventory.')).toBeVisible();
+
+	await page.reload();
+	await expect(page.getByText('You have completed the inventory.')).toBeVisible();
+
+	await page.evaluate(() => {
+		localStorage.setItem('boundary:run:ten-item-personality-inventory', 'not-a-run');
+	});
+	await page.goto('/ten-item-personality-inventory');
+	await expect(page.getByRole('heading', { name: 'Before you start' })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Start' })).toBeVisible();
+	expect(
+		await page.evaluate(() => localStorage.getItem('boundary:run:ten-item-personality-inventory'))
+	).toBeNull();
+});
+
 test('n-armed bandit records generic trial data', async ({ page }) => {
 	await completeBanditRun(page);
 

@@ -1,7 +1,13 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import ExperimentStartGate from '$lib/components/ExperimentStartGate.svelte';
 	import Display from '$lib/components/ten-item-personality-inventory/Display.svelte';
 	import { getExperimentCatalogEntry } from '$lib/experiments/catalog';
+	import {
+		clearStoredExperimentRunId,
+		getStoredExperimentRunId,
+		storeExperimentRunId
+	} from '$lib/experiments/run-storage';
 	import type { TipiQuestion, TipiResult, TipiRunState } from '$lib/experiments/tipi';
 	import { tipiResult } from '../../../stores/ten-item-personality-inventory/experimentData';
 
@@ -16,6 +22,7 @@
 	let showScoringThemes = false;
 	let isBusy = false;
 	let errorMessage = '';
+	let resumeChecked = false;
 
 	type SubmitResponse =
 		| ({ completed: false } & TipiRunState)
@@ -35,6 +42,64 @@
 		return body;
 	}
 
+	function applyRunState(run: TipiRunState) {
+		runId = run.runId;
+		currentQuestion = run.question;
+		trialNumber = run.trialNumber;
+		totalTrials = run.totalTrials;
+		trialStartedAt = run.trialStartedAt;
+		finishExperiment = false;
+		tipiResult.set(null);
+		storeExperimentRunId(experiment.slug, run.runId);
+	}
+
+	function applySubmitResponse(update: SubmitResponse) {
+		runId = update.runId;
+		storeExperimentRunId(experiment.slug, update.runId);
+
+		if (update.completed) {
+			currentQuestion = null;
+			finishExperiment = true;
+			trialStartedAt = null;
+			tipiResult.set(update.result);
+			return;
+		}
+
+		applyRunState(update);
+	}
+
+	async function resumeStoredRun() {
+		const storedRunId = getStoredExperimentRunId(experiment.slug);
+
+		if (!storedRunId) {
+			resumeChecked = true;
+			return;
+		}
+
+		isBusy = true;
+		errorMessage = '';
+
+		try {
+			const response = await fetch(`/api/experiments/tipi/runs/${storedRunId}`);
+
+			if (response.status === 403 || response.status === 404) {
+				clearStoredExperimentRunId(experiment.slug);
+				return;
+			}
+
+			applySubmitResponse(await parseJsonResponse<SubmitResponse>(response));
+		} catch (error) {
+			errorMessage = error instanceof Error ? error.message : 'Could not resume the saved run.';
+		} finally {
+			isBusy = false;
+			resumeChecked = true;
+		}
+	}
+
+	onMount(() => {
+		void resumeStoredRun();
+	});
+
 	async function handleStart() {
 		isBusy = true;
 		errorMessage = '';
@@ -46,11 +111,7 @@
 			const response = await fetch('/api/experiments/tipi/runs', { method: 'POST' });
 			const run = await parseJsonResponse<TipiRunState>(response);
 
-			runId = run.runId;
-			currentQuestion = run.question;
-			trialNumber = run.trialNumber;
-			totalTrials = run.totalTrials;
-			trialStartedAt = run.trialStartedAt;
+			applyRunState(run);
 		} catch (error) {
 			errorMessage = error instanceof Error ? error.message : 'Could not start the inventory.';
 		} finally {
@@ -85,17 +146,7 @@
 			});
 			const update = await parseJsonResponse<SubmitResponse>(response);
 
-			if (update.completed) {
-				currentQuestion = null;
-				finishExperiment = true;
-				trialStartedAt = null;
-				tipiResult.set(update.result);
-			} else {
-				currentQuestion = update.question;
-				trialNumber = update.trialNumber;
-				totalTrials = update.totalTrials;
-				trialStartedAt = update.trialStartedAt;
-			}
+			applySubmitResponse(update);
 		} catch (error) {
 			errorMessage = error instanceof Error ? error.message : 'Could not save your response.';
 		} finally {
@@ -112,6 +163,7 @@
 		finishExperiment = false;
 		errorMessage = '';
 		tipiResult.set(null);
+		clearStoredExperimentRunId(experiment.slug);
 	}
 </script>
 
@@ -126,7 +178,15 @@
 	</p>
 {/if}
 
-{#if !runId && !finishExperiment}
+{#if errorMessage && !runId && !finishExperiment}
+	<p role="alert" class="my-3 rounded-sm border border-red-200 bg-red-50 p-3 text-red-800">
+		{errorMessage}
+	</p>
+{/if}
+
+{#if !resumeChecked}
+	<p class="border-t border-gray-200 pt-4 text-sm text-gray-500">Checking for saved run...</p>
+{:else if !runId && !finishExperiment}
 	<ExperimentStartGate {experiment} busy={isBusy} on:start={handleStart} />
 {:else}
 	<Display

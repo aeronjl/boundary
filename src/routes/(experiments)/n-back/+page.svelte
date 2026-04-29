@@ -1,6 +1,12 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import ExperimentStartGate from '$lib/components/ExperimentStartGate.svelte';
 	import { getExperimentCatalogEntry } from '$lib/experiments/catalog';
+	import {
+		clearStoredExperimentRunId,
+		getStoredExperimentRunId,
+		storeExperimentRunId
+	} from '$lib/experiments/run-storage';
 	import type {
 		NBackOutcome,
 		NBackResponseChoice,
@@ -16,6 +22,7 @@
 	let lastOutcome: NBackOutcome | null = null;
 	let pending = false;
 	let errorMessage = '';
+	let resumeChecked = false;
 
 	$: trial = state?.trial ?? null;
 	$: gridSize = state?.gridSize ?? 3;
@@ -39,6 +46,61 @@
 		return body;
 	}
 
+	function applyRunState(nextState: NBackRunState) {
+		state = nextState;
+		result = null;
+		lastOutcome = nextState.lastOutcome;
+		storeExperimentRunId(experiment.slug, nextState.runId);
+	}
+
+	function applyRunResult(update: Extract<NBackSubmitResult, { completed: true }>) {
+		result = update.result;
+		state = null;
+		lastOutcome = update.lastOutcome;
+		storeExperimentRunId(experiment.slug, update.runId);
+	}
+
+	function applyRunUpdate(update: NBackSubmitResult) {
+		if (update.completed) {
+			applyRunResult(update);
+			return;
+		}
+
+		applyRunState(update);
+	}
+
+	async function resumeStoredRun() {
+		const storedRunId = getStoredExperimentRunId(experiment.slug);
+
+		if (!storedRunId) {
+			resumeChecked = true;
+			return;
+		}
+
+		pending = true;
+		errorMessage = '';
+
+		try {
+			const response = await fetch(`/api/experiments/n-back/runs/${storedRunId}`);
+
+			if (response.status === 403 || response.status === 404) {
+				clearStoredExperimentRunId(experiment.slug);
+				return;
+			}
+
+			applyRunUpdate(await parseJsonResponse<NBackSubmitResult>(response));
+		} catch (error) {
+			errorMessage = error instanceof Error ? error.message : 'Could not resume the saved run.';
+		} finally {
+			pending = false;
+			resumeChecked = true;
+		}
+	}
+
+	onMount(() => {
+		void resumeStoredRun();
+	});
+
 	async function startRun() {
 		pending = true;
 		errorMessage = '';
@@ -49,7 +111,7 @@
 			const response = await fetch('/api/experiments/n-back/runs', {
 				method: 'POST'
 			});
-			state = await parseJsonResponse<NBackRunState>(response);
+			applyRunState(await parseJsonResponse<NBackRunState>(response));
 		} catch (error) {
 			errorMessage = error instanceof Error ? error.message : 'Could not start the task.';
 		} finally {
@@ -77,14 +139,7 @@
 			});
 			const payload = await parseJsonResponse<NBackSubmitResult>(response);
 
-			lastOutcome = payload.lastOutcome;
-
-			if (payload.completed) {
-				result = payload.result;
-				state = null;
-			} else {
-				state = payload;
-			}
+			applyRunUpdate(payload);
 		} catch (error) {
 			errorMessage = error instanceof Error ? error.message : 'Could not record that response.';
 		} finally {
@@ -123,7 +178,9 @@
 		</p>
 	{/if}
 
-	{#if !state && !result}
+	{#if !resumeChecked}
+		<p class="border-t border-gray-200 pt-4 text-gray-500">Checking for saved run...</p>
+	{:else if !state && !result}
 		<ExperimentStartGate {experiment} busy={pending} on:start={startRun} />
 	{/if}
 

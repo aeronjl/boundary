@@ -386,6 +386,34 @@ export async function submitOrientationResponse(
 	};
 }
 
+export async function getOrientationRunState(
+	runId: string,
+	participantSessionId: string
+): Promise<OrientationSubmitResult | null> {
+	const run = await getExperimentRun(runId, orientationVersionId, participantSessionId);
+
+	if (!run) {
+		return null;
+	}
+
+	const context = await getOrientationContext(runId);
+	const responses = await getOrientationResponses(runId);
+
+	if (run.status === 'completed') {
+		const completedAt = run.completedAt ?? Date.now();
+		const result = createResult(runId, context, responses, completedAt);
+		const lastOutcome = createLastOutcome(responses);
+
+		if (!lastOutcome) {
+			throw new Error('Orientation discrimination run has no response outcome.');
+		}
+
+		return { completed: true, runId, result, lastOutcome };
+	}
+
+	return getOrientationCurrentStateOrResult(runId, context, responses);
+}
+
 async function getOrientationCurrentStateOrResult(
 	runId: string,
 	context: OrientationStartedPayload,

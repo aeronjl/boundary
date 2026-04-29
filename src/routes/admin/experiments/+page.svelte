@@ -83,13 +83,15 @@
 	</div>
 
 	<div class="overflow-x-auto border-t border-gray-200">
-		<table class="w-full min-w-[860px] text-left text-xs">
+		<table class="w-full min-w-[1040px] text-left text-xs">
 			<thead class="text-gray-500">
 				<tr>
 					<th class="py-2 pr-3 font-medium">Run</th>
 					<th class="py-2 pr-3 font-medium">Experiment</th>
 					<th class="py-2 pr-3 font-medium">Version</th>
 					<th class="py-2 pr-3 font-medium">Status</th>
+					<th class="py-2 pr-3 font-medium">Review</th>
+					<th class="py-2 pr-3 font-medium">Quality</th>
 					<th class="py-2 pr-3 font-medium">Started</th>
 					<th class="py-2 pr-3 font-medium">Completed</th>
 					<th class="py-2 pr-3 font-medium">Responses</th>
@@ -107,6 +109,16 @@
 						<td class="py-2 pr-3">{run.experimentName}</td>
 						<td class="py-2 pr-3 font-mono">{run.experimentVersionId}</td>
 						<td class="py-2 pr-3">{run.status}</td>
+						<td class="py-2 pr-3">{run.review.status}</td>
+						<td class="py-2 pr-3">
+							<div class="flex flex-wrap gap-x-2 gap-y-1">
+								{#each run.qualityFlags as flag (flag.code)}
+									<span>{flag.label}</span>
+								{:else}
+									<span class="text-gray-500">-</span>
+								{/each}
+							</div>
+						</td>
 						<td class="py-2 pr-3">{formatDate(run.startedAt)}</td>
 						<td class="py-2 pr-3">{formatDate(run.completedAt)}</td>
 						<td class="py-2 pr-3">{run.responseCount}</td>
@@ -114,7 +126,7 @@
 					</tr>
 				{:else}
 					<tr>
-						<td class="py-4 text-gray-500" colspan="8">No runs match these filters.</td>
+						<td class="py-4 text-gray-500" colspan="10">No runs match these filters.</td>
 					</tr>
 				{/each}
 			</tbody>

@@ -345,12 +345,27 @@ test('admin can inspect and export ten item personality inventory data', async (
 	await expect(page.getByRole('heading', { name: 'Participant detail' })).toBeVisible();
 	await expect(page.getByRole('heading', { name: 'Run history' })).toBeVisible();
 	await expect(page.getByRole('heading', { name: 'Consents' })).toBeVisible();
+	const reviewForm = page.locator('form[aria-label^="Review run"]').first();
+	await reviewForm.getByLabel('Review status').selectOption('excluded');
+	await reviewForm.getByLabel('Review reason').selectOption('test_data');
+	await reviewForm.getByLabel('Review note').fill('Playwright exclusion check');
+	await reviewForm.getByRole('button', { name: 'Save review' }).click();
+	await expect(reviewForm.getByLabel('Review status')).toHaveValue('excluded');
+	await expect(page.getByText('excluded (test data)').first()).toBeVisible();
+
+	const excludedAnalysisCsvResponse = await page.request.get(
+		'/admin/analysis/export.csv?review=excluded'
+	);
+	expect(excludedAnalysisCsvResponse.status()).toBe(200);
+	expect(await excludedAnalysisCsvResponse.text()).toContain('"excluded"');
+
 	await expect(page.getByRole('link', { name: /View run/ }).first()).toBeVisible();
 	await page
 		.getByRole('link', { name: /View run/ })
 		.first()
 		.click();
 	await expect(page.getByRole('heading', { name: 'Run detail' })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Review status' })).toBeVisible();
 	await expect(page.getByRole('link', { name: /[0-9a-f-]{36}/ }).first()).toBeVisible();
 
 	await page.goto('/admin');

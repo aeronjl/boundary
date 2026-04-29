@@ -54,6 +54,21 @@
 		</label>
 
 		<label class="flex flex-col gap-1">
+			<span class="text-xs font-medium text-gray-500">Review</span>
+			<select name="review" class="rounded-sm border border-gray-300 px-3 py-2">
+				<option value="included" selected={data.filters.reviewStatus === 'included'}
+					>Included</option
+				>
+				<option value="review" selected={data.filters.reviewStatus === 'review'}>Review</option>
+				<option value="excluded" selected={data.filters.reviewStatus === 'excluded'}
+					>Excluded</option
+				>
+				<option value="all" selected={data.filters.reviewStatus === 'all'}>All review states</option
+				>
+			</select>
+		</label>
+
+		<label class="flex flex-col gap-1">
 			<span class="text-xs font-medium text-gray-500">From</span>
 			<input
 				name="from"

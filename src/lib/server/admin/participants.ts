@@ -4,6 +4,7 @@ import { db } from '$lib/server/db';
 import {
 	experimentEvents,
 	experimentResponses,
+	experimentRunReviews,
 	experimentRuns,
 	experimentVersions,
 	experiments,
@@ -11,6 +12,12 @@ import {
 	participantSessions
 } from '$lib/server/db/schema';
 import type { AdminExperimentOption } from './experiments';
+import {
+	createRunQualityFlags,
+	toAdminRunReview,
+	type AdminRunQualityFlag,
+	type AdminRunReview
+} from './reviews';
 
 export type AdminParticipantFilters = {
 	experimentSlug: string;
@@ -58,6 +65,8 @@ export type AdminParticipantRunSummary = {
 	responseCount: number;
 	eventCount: number;
 	metrics: string[];
+	review: AdminRunReview;
+	qualityFlags: AdminRunQualityFlag[];
 };
 
 export type AdminParticipantList = {
@@ -362,7 +371,9 @@ function toParticipantSummary(
 function toParticipantRunSummary(
 	{ run, version, experiment }: ParticipantRunRow,
 	responses: ParticipantResponse[],
-	events: ParticipantEvent[]
+	events: ParticipantEvent[],
+	review: AdminRunReview,
+	consentCount: number
 ): AdminParticipantRunSummary {
 	return {
 		id: run.id,
@@ -375,7 +386,16 @@ function toParticipantRunSummary(
 		completedAt: run.completedAt,
 		responseCount: responses.length,
 		eventCount: events.length,
-		metrics: createRunMetrics(responses, events)
+		metrics: createRunMetrics(responses, events),
+		review,
+		qualityFlags: createRunQualityFlags({
+			status: run.status,
+			completedAt: run.completedAt,
+			responseCount: responses.length,
+			eventCount: events.length,
+			consentCount,
+			responses
+		})
 	};
 }
 
@@ -480,9 +500,9 @@ export async function getAdminParticipantDetail(
 	]);
 	const runIds = new Set(sessionRunRows.map(({ run }) => run.id));
 	const runIdValues = [...runIds];
-	const [responseRows, eventRows] =
+	const [responseRows, eventRows, reviewRows] =
 		runIdValues.length === 0
-			? [[], []]
+			? [[], [], []]
 			: await Promise.all([
 					db
 						.select()
@@ -493,10 +513,17 @@ export async function getAdminParticipantDetail(
 						.select()
 						.from(experimentEvents)
 						.where(inArray(experimentEvents.runId, runIdValues))
-						.orderBy(asc(experimentEvents.createdAt))
+						.orderBy(asc(experimentEvents.createdAt)),
+					db
+						.select()
+						.from(experimentRunReviews)
+						.where(inArray(experimentRunReviews.runId, runIdValues))
 				]);
 	const responsesByRunId = new Map<string, ParticipantResponse[]>();
 	const eventsByRunId = new Map<string, ParticipantEvent[]>();
+	const reviewsByRunId = new Map(
+		reviewRows.map((review) => [review.runId, toAdminRunReview(review)])
+	);
 
 	for (const response of responseRows) {
 		if (!runIds.has(response.runId)) continue;
@@ -542,7 +569,9 @@ export async function getAdminParticipantDetail(
 			toParticipantRunSummary(
 				row,
 				responsesByRunId.get(row.run.id) ?? [],
-				eventsByRunId.get(row.run.id) ?? []
+				eventsByRunId.get(row.run.id) ?? [],
+				reviewsByRunId.get(row.run.id) ?? toAdminRunReview(null),
+				consentRows.length
 			)
 		)
 	};

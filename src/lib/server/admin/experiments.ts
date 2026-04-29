@@ -3,11 +3,19 @@ import { db } from '$lib/server/db';
 import {
 	experimentEvents,
 	experimentResponses,
+	experimentRunReviews,
 	experimentRuns,
 	experimentVersions,
 	experiments,
+	participantConsents,
 	participantSessions
 } from '$lib/server/db/schema';
+import {
+	createRunQualityFlags,
+	toAdminRunReview,
+	type AdminRunQualityFlag,
+	type AdminRunReview
+} from './reviews';
 
 export type AdminExperimentFilters = {
 	experimentSlug: string;
@@ -100,6 +108,8 @@ export type AdminExperimentRunSummary = {
 	completedAt: number | null;
 	responseCount: number;
 	eventCount: number;
+	review: AdminRunReview;
+	qualityFlags: AdminRunQualityFlag[];
 };
 
 export type AdminExperimentRun = AdminExperimentRunSummary & {
@@ -140,6 +150,9 @@ const genericResponseCsvHeaders = [
 	'experiment_name',
 	'experiment_version_id',
 	'run_status',
+	'review_status',
+	'review_reason',
+	'review_note',
 	'run_started_at',
 	'run_completed_at',
 	'trial_index',
@@ -654,6 +667,18 @@ function countByRunId(rows: { runId: string }[]): Map<string, number> {
 	return counts;
 }
 
+function countByParticipantSessionId(
+	rows: { participantSessionId: string }[]
+): Map<string, number> {
+	const counts = new Map<string, number>();
+
+	for (const row of rows) {
+		counts.set(row.participantSessionId, (counts.get(row.participantSessionId) ?? 0) + 1);
+	}
+
+	return counts;
+}
+
 function buildExperimentOptions(rows: AdminExperimentJoinedRow[]): AdminExperimentOption[] {
 	const experimentsBySlug = new Map<string, AdminExperimentOption>();
 
@@ -678,7 +703,9 @@ function matchesFilters(row: AdminExperimentJoinedRow, filters: AdminExperimentF
 function toSummary(
 	{ run, session, version, experiment }: AdminExperimentJoinedRow,
 	responseCount: number,
-	eventCount: number
+	eventCount: number,
+	review: AdminRunReview,
+	consentCount: number
 ): AdminExperimentRunSummary {
 	return {
 		id: run.id,
@@ -693,7 +720,15 @@ function toSummary(
 		startedAt: run.startedAt,
 		completedAt: run.completedAt,
 		responseCount,
-		eventCount
+		eventCount,
+		review,
+		qualityFlags: createRunQualityFlags({
+			status: run.status,
+			completedAt: run.completedAt,
+			responseCount,
+			eventCount,
+			consentCount
+		})
 	};
 }
 
@@ -730,8 +765,16 @@ export async function listAdminExperimentRuns(
 		.select({ runId: experimentResponses.runId })
 		.from(experimentResponses);
 	const eventRows = await db.select({ runId: experimentEvents.runId }).from(experimentEvents);
+	const reviewRows = await db.select().from(experimentRunReviews);
+	const consentRows = await db
+		.select({ participantSessionId: participantConsents.participantSessionId })
+		.from(participantConsents);
 	const responseCounts = countByRunId(responseRows);
 	const eventCounts = countByRunId(eventRows);
+	const reviewsByRunId = new Map(
+		reviewRows.map((review) => [review.runId, toAdminRunReview(review)])
+	);
+	const consentCounts = countByParticipantSessionId(consentRows);
 
 	return {
 		filters,
@@ -740,7 +783,13 @@ export async function listAdminExperimentRuns(
 		runs: rows
 			.filter((row) => matchesFilters(row, filters))
 			.map((row) =>
-				toSummary(row, responseCounts.get(row.run.id) ?? 0, eventCounts.get(row.run.id) ?? 0)
+				toSummary(
+					row,
+					responseCounts.get(row.run.id) ?? 0,
+					eventCounts.get(row.run.id) ?? 0,
+					reviewsByRunId.get(row.run.id) ?? toAdminRunReview(null),
+					consentCounts.get(row.run.participantSessionId) ?? 0
+				)
 			)
 	};
 }
@@ -771,12 +820,29 @@ export async function getAdminExperimentRun(runId: string): Promise<AdminExperim
 		.from(experimentEvents)
 		.where(eq(experimentEvents.runId, runId))
 		.orderBy(asc(experimentEvents.createdAt));
+	const [reviewRow] = await db
+		.select()
+		.from(experimentRunReviews)
+		.where(eq(experimentRunReviews.runId, runId));
+	const consentRows = await db
+		.select({ participantSessionId: participantConsents.participantSessionId })
+		.from(participantConsents)
+		.where(eq(participantConsents.participantSessionId, row.run.participantSessionId));
 
 	const responses = responseRows.map(toAdminResponse);
 	const events = eventRows.map(toAdminEvent);
+	const review = toAdminRunReview(reviewRow);
 
 	return {
-		...toSummary(row, responses.length, events.length),
+		...toSummary(row, responses.length, events.length, review, consentRows.length),
+		qualityFlags: createRunQualityFlags({
+			status: row.run.status,
+			completedAt: row.run.completedAt,
+			responseCount: responses.length,
+			eventCount: events.length,
+			consentCount: consentRows.length,
+			responses
+		}),
 		config: parseJson(row.version.configJson),
 		questionOrder: JSON.parse(row.run.questionOrderJson) as string[],
 		events,
@@ -816,6 +882,9 @@ export async function getAdminExperimentResponseCsv(): Promise<string> {
 					run.experimentName,
 					run.experimentVersionId,
 					run.status,
+					run.review.status,
+					run.review.reason,
+					run.review.note,
 					isoCell(run.startedAt),
 					isoCell(run.completedAt),
 					response.trialIndex,

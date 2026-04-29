@@ -15,6 +15,9 @@ export const load: PageServerLoad = async ({ cookies, url }) => {
 	if (filters.status) exportParams.set('status', filters.status);
 	if (filters.startedFrom) exportParams.set('from', filters.startedFrom);
 	if (filters.startedTo) exportParams.set('to', filters.startedTo);
+	if (filters.reviewStatus && filters.reviewStatus !== 'included') {
+		exportParams.set('review', filters.reviewStatus);
+	}
 
 	return {
 		...(await getAdminAnalysis(filters)),

@@ -78,6 +78,24 @@ export const experimentRuns = sqliteTable(
 	]
 );
 
+export const experimentRunReviews = sqliteTable(
+	'experiment_run_reviews',
+	{
+		runId: text('run_id')
+			.primaryKey()
+			.references(() => experimentRuns.id, { onDelete: 'cascade' }),
+		status: text('status').notNull().default('included'),
+		reason: text('reason'),
+		note: text('note').notNull().default(''),
+		createdAt: integer('created_at').notNull(),
+		updatedAt: integer('updated_at').notNull()
+	},
+	(table) => [
+		index('experiment_run_reviews_status_idx').on(table.status),
+		index('experiment_run_reviews_reason_idx').on(table.reason)
+	]
+);
+
 export const experimentEvents = sqliteTable(
 	'experiment_events',
 	{

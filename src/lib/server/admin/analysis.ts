@@ -4,18 +4,26 @@ import { db } from '$lib/server/db';
 import {
 	experimentEvents,
 	experimentResponses,
+	experimentRunReviews,
 	experimentRuns,
 	experimentVersions,
 	experiments,
 	participantConsents
 } from '$lib/server/db/schema';
 import type { AdminExperimentOption } from './experiments';
+import {
+	parseAdminRunReviewStatus,
+	toAdminRunReview,
+	type AdminRunReview,
+	type AdminRunReviewStatus
+} from './reviews';
 
 export type AdminAnalysisFilters = {
 	experimentSlug: string;
 	status: string;
 	startedFrom: string;
 	startedTo: string;
+	reviewStatus: '' | 'all' | AdminRunReviewStatus;
 };
 
 export type AdminAnalysisMetric = {
@@ -122,6 +130,7 @@ type AnalysisRun = {
 	events: AnalysisEvent[];
 	responseCount: number;
 	eventCount: number;
+	review: AdminRunReview;
 };
 
 const analysisCsvHeaders = [
@@ -132,6 +141,7 @@ const analysisCsvHeaders = [
 	'completion_rate',
 	'total_responses',
 	'total_events',
+	'review_filter',
 	'median_response_time_ms',
 	'tipi_extroversion_mean',
 	'tipi_agreeableness_mean',
@@ -252,6 +262,13 @@ function matchesFilters(run: AnalysisRun, filters: AdminAnalysisFilters): boolea
 
 	if (filters.experimentSlug && run.experimentSlug !== filters.experimentSlug) return false;
 	if (filters.status && run.status !== filters.status) return false;
+	if (
+		filters.reviewStatus &&
+		filters.reviewStatus !== 'all' &&
+		run.review.status !== filters.reviewStatus
+	) {
+		return false;
+	}
 	if (startedFrom !== null && run.startedAt < startedFrom) return false;
 	if (startedTo !== null && run.startedAt > startedTo) return false;
 	return true;
@@ -614,7 +631,8 @@ function groupRuns(runs: AnalysisRun[]): AdminAnalysisExperimentSummary[] {
 function toAnalysisRun(
 	{ run, experiment }: AnalysisRunRow,
 	responses: AnalysisResponse[],
-	events: AnalysisEvent[]
+	events: AnalysisEvent[],
+	review: AdminRunReview
 ): AnalysisRun {
 	return {
 		id: run.id,
@@ -627,18 +645,23 @@ function toAnalysisRun(
 		responses,
 		events,
 		responseCount: responses.length,
-		eventCount: events.length
+		eventCount: events.length,
+		review
 	};
 }
 
 async function loadAnalysisRuns(): Promise<AnalysisRun[]> {
-	const [runRows, responseRows, eventRows] = await Promise.all([
+	const [runRows, responseRows, eventRows, reviewRows] = await Promise.all([
 		getAnalysisRunRows(),
 		db.select().from(experimentResponses),
-		db.select().from(experimentEvents)
+		db.select().from(experimentEvents),
+		db.select().from(experimentRunReviews)
 	]);
 	const responsesByRunId = new Map<string, AnalysisResponse[]>();
 	const eventsByRunId = new Map<string, AnalysisEvent[]>();
+	const reviewsByRunId = new Map(
+		reviewRows.map((review) => [review.runId, toAdminRunReview(review)])
+	);
 
 	for (const response of responseRows) {
 		pushGrouped(responsesByRunId, response.runId, {
@@ -663,7 +686,12 @@ async function loadAnalysisRuns(): Promise<AnalysisRun[]> {
 	}
 
 	return runRows.map((row) =>
-		toAnalysisRun(row, responsesByRunId.get(row.run.id) ?? [], eventsByRunId.get(row.run.id) ?? [])
+		toAnalysisRun(
+			row,
+			responsesByRunId.get(row.run.id) ?? [],
+			eventsByRunId.get(row.run.id) ?? [],
+			reviewsByRunId.get(row.run.id) ?? toAdminRunReview(null)
+		)
 	);
 }
 
@@ -672,7 +700,11 @@ export function parseAdminAnalysisFilters(searchParams: URLSearchParams): AdminA
 		experimentSlug: searchParams.get('experiment') ?? '',
 		status: searchParams.get('status') ?? '',
 		startedFrom: sanitizeDate(searchParams.get('from')),
-		startedTo: sanitizeDate(searchParams.get('to'))
+		startedTo: sanitizeDate(searchParams.get('to')),
+		reviewStatus:
+			searchParams.get('review') === 'all'
+				? 'all'
+				: parseAdminRunReviewStatus(searchParams.get('review') ?? 'included')
 	};
 }
 
@@ -723,6 +755,7 @@ export async function getAdminAnalysisCsv(filters: AdminAnalysisFilters): Promis
 				summary.completionRate,
 				summary.totalResponses,
 				summary.totalEvents,
+				analysis.filters.reviewStatus || 'included',
 				summary.medianResponseTimeMs,
 				summary.tipi?.traitMeans.extroversion,
 				summary.tipi?.traitMeans.agreeableness,

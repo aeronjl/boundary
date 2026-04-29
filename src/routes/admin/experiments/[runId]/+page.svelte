@@ -23,6 +23,18 @@
 	};
 
 	const formatMs = (value: number | null) => (value === null ? '-' : `${value.toFixed(0)} ms`);
+	const reviewStatuses = ['included', 'review', 'excluded'] as const;
+	const reviewReasons = [
+		'too_fast',
+		'incomplete',
+		'missing_consent',
+		'repeated_responses',
+		'test_data',
+		'duplicate',
+		'technical_issue',
+		'other'
+	] as const;
+	const formatReason = (value: string | null) => value?.replaceAll('_', ' ') ?? '-';
 </script>
 
 <svelte:head>
@@ -74,6 +86,62 @@
 			<p class="text-xs text-gray-500">Events</p>
 			<p>{data.run.eventCount}</p>
 		</div>
+	</div>
+
+	<div class="border-t border-gray-200 pt-3">
+		<div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+			<div>
+				<h2 class="font-serif text-xl">Review status</h2>
+				<p class="mt-1 text-gray-500">
+					{data.run.review.status}
+					{#if data.run.review.reason}
+						<span>({formatReason(data.run.review.reason)})</span>
+					{/if}
+				</p>
+				{#if data.run.review.note}
+					<p class="mt-2 max-w-2xl text-gray-600">{data.run.review.note}</p>
+				{/if}
+			</div>
+			<form method="POST" action="?/review" class="flex max-w-3xl flex-wrap items-end gap-3">
+				<label class="flex flex-col gap-1">
+					<span class="text-xs font-medium text-gray-500">Review status</span>
+					<select name="status" class="rounded-sm border border-gray-300 px-3 py-2">
+						{#each reviewStatuses as status (status)}
+							<option value={status} selected={data.run.review.status === status}>{status}</option>
+						{/each}
+					</select>
+				</label>
+				<label class="flex flex-col gap-1">
+					<span class="text-xs font-medium text-gray-500">Review reason</span>
+					<select name="reason" class="rounded-sm border border-gray-300 px-3 py-2">
+						<option value="" selected={data.run.review.reason === null}>No reason</option>
+						{#each reviewReasons as reason (reason)}
+							<option value={reason} selected={data.run.review.reason === reason}>
+								{formatReason(reason)}
+							</option>
+						{/each}
+					</select>
+				</label>
+				<label class="flex min-w-64 flex-1 flex-col gap-1">
+					<span class="text-xs font-medium text-gray-500">Review note</span>
+					<input
+						name="note"
+						value={data.run.review.note}
+						class="rounded-sm border border-gray-300 px-3 py-2"
+					/>
+				</label>
+				<button class="rounded-sm bg-black px-3 py-2 text-white">Save review</button>
+			</form>
+		</div>
+		{#if data.run.qualityFlags.length > 0}
+			<div class="mt-3 flex flex-wrap gap-2">
+				{#each data.run.qualityFlags as flag (flag.code)}
+					<span class="rounded-sm bg-gray-100 px-2 py-1 text-xs">
+						{flag.label}
+					</span>
+				{/each}
+			</div>
+		{/if}
 	</div>
 
 	{#if data.run.banditSummary}

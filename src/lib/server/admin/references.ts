@@ -3,8 +3,10 @@ import {
 	referenceCompatibilities,
 	referenceDatasetStatuses,
 	referenceMetricContracts,
+	referenceSourceTypes,
 	type ReferenceCompatibility,
-	type ReferenceDatasetStatus
+	type ReferenceDatasetStatus,
+	type ReferenceSourceType
 } from '$lib/reference-data/catalog';
 import { db } from '$lib/server/db';
 import { referenceDatasets, referenceMetrics, referenceStudies } from '$lib/server/db/schema';
@@ -50,6 +52,7 @@ export type AdminReferenceDataset = typeof referenceDatasets.$inferSelect & {
 
 export type AdminSetReferenceDatasetInput = {
 	id: string;
+	referenceStudyId: string | null;
 	status: string;
 	compatibility: string;
 	sampleSize: string | null;
@@ -58,6 +61,21 @@ export type AdminSetReferenceDatasetInput = {
 	taskVariant: string | null;
 	notes: string | null;
 };
+
+export type AdminSetReferenceStudyInput = {
+	id: string;
+	shortCitation: string | null;
+	title: string | null;
+	url: string | null;
+	doi: string | null;
+	publicationYear: string | null;
+	sourceType: string;
+	population: string | null;
+	sampleSize: string | null;
+	notes: string | null;
+};
+
+export type AdminCreateReferenceStudyInput = Omit<AdminSetReferenceStudyInput, 'id'>;
 
 export type AdminSetReferenceMetricInput = {
 	id: string;
@@ -97,6 +115,12 @@ function parseReferenceCompatibility(value: string): ReferenceCompatibility {
 		: 'partial';
 }
 
+function parseReferenceSourceType(value: string): ReferenceSourceType {
+	return referenceSourceTypes.includes(value as ReferenceSourceType)
+		? (value as ReferenceSourceType)
+		: 'literature';
+}
+
 function trimmed(value: string | null): string {
 	return value?.trim() ?? '';
 }
@@ -115,6 +139,29 @@ function parseOptionalNumber(value: string | null): number | null {
 
 	const parsed = Number(normalized);
 	return Number.isFinite(parsed) ? parsed : Number.NaN;
+}
+
+function slugifyReferenceStudyId(value: string): string {
+	const slug = value
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, '-')
+		.replace(/^-+|-+$/g, '');
+
+	return slug.length > 0 ? slug : 'reference-source';
+}
+
+async function nextReferenceStudyId(base: string): Promise<string> {
+	for (let suffix = 0; suffix < 100; suffix++) {
+		const id = suffix === 0 ? base : `${base}-${suffix + 1}`;
+		const [existing] = await db
+			.select({ id: referenceStudies.id })
+			.from(referenceStudies)
+			.where(eq(referenceStudies.id, id));
+
+		if (!existing) return id;
+	}
+
+	return `${base}-${Date.now()}`;
 }
 
 function parseJsonRecord(value: string): Record<string, unknown> | null {
@@ -250,6 +297,7 @@ export async function listAdminReferenceRegistry(): Promise<{
 	metricCount: number;
 	datasetStatuses: typeof referenceDatasetStatuses;
 	compatibilities: typeof referenceCompatibilities;
+	sourceTypes: typeof referenceSourceTypes;
 }> {
 	const [studies, datasets, metrics] = await Promise.all([
 		db.select().from(referenceStudies).orderBy(asc(referenceStudies.shortCitation)),
@@ -279,8 +327,102 @@ export async function listAdminReferenceRegistry(): Promise<{
 		metricContractCount: referenceMetricContracts.length,
 		metricCount: metrics.length,
 		datasetStatuses: referenceDatasetStatuses,
-		compatibilities: referenceCompatibilities
+		compatibilities: referenceCompatibilities,
+		sourceTypes: referenceSourceTypes
 	};
+}
+
+function parsedReferenceStudyFields(input: AdminCreateReferenceStudyInput) {
+	const shortCitation = trimmed(input.shortCitation);
+	const title = trimmed(input.title);
+	const url = trimmed(input.url);
+	const doi = trimmed(input.doi);
+	const publicationYear = parseOptionalInteger(input.publicationYear);
+	const sampleSize = parseOptionalInteger(input.sampleSize);
+
+	if (shortCitation.length === 0 || title.length === 0 || url.length === 0) {
+		return {
+			ok: false as const,
+			status: 400,
+			message: 'Short citation, title, and URL are required.'
+		};
+	}
+
+	if (Number.isNaN(publicationYear)) {
+		return { ok: false as const, status: 400, message: 'Publication year must be a whole number.' };
+	}
+
+	if (Number.isNaN(sampleSize)) {
+		return {
+			ok: false as const,
+			status: 400,
+			message: 'Study sample size must be a whole number.'
+		};
+	}
+
+	return {
+		ok: true as const,
+		fields: {
+			shortCitation,
+			title,
+			url,
+			doi: doi.length > 0 ? doi : null,
+			publicationYear,
+			sourceType: parseReferenceSourceType(input.sourceType),
+			population: trimmed(input.population),
+			sampleSize,
+			notes: trimmed(input.notes)
+		}
+	};
+}
+
+export async function createAdminReferenceStudy(
+	input: AdminCreateReferenceStudyInput
+): Promise<AdminReferenceUpdateResult> {
+	const parsed = parsedReferenceStudyFields(input);
+	if (!parsed.ok) return parsed;
+
+	const now = Date.now();
+	const id = await nextReferenceStudyId(
+		slugifyReferenceStudyId(
+			parsed.fields.publicationYear
+				? `${parsed.fields.shortCitation}-${parsed.fields.publicationYear}`
+				: parsed.fields.shortCitation
+		)
+	);
+
+	await db.insert(referenceStudies).values({
+		id,
+		...parsed.fields,
+		createdAt: now,
+		updatedAt: now
+	});
+
+	return { ok: true };
+}
+
+export async function setAdminReferenceStudy(
+	input: AdminSetReferenceStudyInput
+): Promise<AdminReferenceUpdateResult> {
+	const [study] = await db
+		.select({ id: referenceStudies.id })
+		.from(referenceStudies)
+		.where(eq(referenceStudies.id, input.id));
+
+	if (!study) return { ok: false, status: 404, message: 'Reference source not found.' };
+
+	const parsed = parsedReferenceStudyFields(input);
+	if (!parsed.ok) return parsed;
+
+	await db
+		.update(referenceStudies)
+		.set({
+			...parsed.fields,
+			updatedAt: Date.now()
+		})
+		.where(eq(referenceStudies.id, input.id));
+
+	return { ok: true };
 }
 
 export async function setAdminReferenceDataset(
@@ -301,12 +443,24 @@ export async function setAdminReferenceDataset(
 	const status = parseReferenceDatasetStatus(input.status);
 	const compatibility = parseReferenceCompatibility(input.compatibility);
 	const notes = trimmed(input.notes);
+	const referenceStudyId = trimmed(input.referenceStudyId) || null;
+
+	if (referenceStudyId) {
+		const [study] = await db
+			.select({ id: referenceStudies.id })
+			.from(referenceStudies)
+			.where(eq(referenceStudies.id, referenceStudyId));
+
+		if (!study) return { ok: false, status: 400, message: 'Reference source not found.' };
+	}
+
 	const validation = await validateReferenceReview(input.id, status, notes);
 	if (!validation.ok) return validation;
 
 	await db
 		.update(referenceDatasets)
 		.set({
+			referenceStudyId,
 			status,
 			compatibility,
 			sampleSize,

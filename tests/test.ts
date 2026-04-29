@@ -761,6 +761,28 @@ test('admin can inspect and export ten item personality inventory data', async (
 	await expect(page.getByText('Imported reference summary')).toBeVisible();
 	await expect(page.getByText('Imported n=98 from nback2_nont, nback2_targ')).toBeVisible();
 
+	const sourceCitation = `Boundary Pilot ${Date.now()}`;
+	const createSourceForm = page.locator('form[aria-label="Add literature source"]');
+	await createSourceForm.getByLabel('Short citation').fill(sourceCitation);
+	await createSourceForm.getByLabel('Title').fill('Boundary pilot reference source');
+	await createSourceForm.getByLabel('Source type').selectOption('literature');
+	await createSourceForm.getByLabel('URL').fill('https://example.com/boundary-pilot');
+	await createSourceForm.getByLabel('DOI').fill('10.0000/boundary-pilot');
+	await createSourceForm.getByLabel('Publication year').fill('2026');
+	await createSourceForm.getByLabel('Sample size').fill('12');
+	await createSourceForm.getByLabel('Population').fill('Initial pilot participants');
+	await createSourceForm.getByLabel('Notes').fill('Added during reference curation smoke test.');
+	await createSourceForm.getByRole('button', { name: 'Add source' }).click();
+	await expect(page.getByText('Reference source added.')).toBeVisible();
+
+	const sourceForm = page.locator(`form[aria-label="Edit literature source ${sourceCitation}"]`);
+	await expect(sourceForm).toBeVisible();
+	await sourceForm.getByLabel('Population').fill('Boundary pilot participants');
+	await sourceForm.getByLabel('Notes').fill('Source reviewed for reference curation smoke test.');
+	await sourceForm.getByRole('button', { name: 'Save source' }).click();
+	await expect(page.getByText('Reference source updated.')).toBeVisible();
+	await expect(sourceForm.getByLabel('Population')).toHaveValue('Boundary pilot participants');
+
 	const initialRevertButton = page.getByRole('button', { name: 'Revert to candidate' });
 	if (await initialRevertButton.isVisible()) {
 		await initialRevertButton.click();
@@ -768,6 +790,7 @@ test('admin can inspect and export ten item personality inventory data', async (
 	}
 
 	const datasetForm = page.locator('form[aria-label^="Edit reference dataset"]').first();
+	await datasetForm.getByLabel('Literature source').selectOption({ label: sourceCitation });
 	await datasetForm.getByLabel('Dataset status').selectOption('candidate');
 	await datasetForm.locator('select[name="compatibility"]').selectOption('partial');
 	await datasetForm.getByLabel('Sample size').fill('42');
@@ -776,6 +799,7 @@ test('admin can inspect and export ten item personality inventory data', async (
 		.fill('Candidate details updated before review.');
 	await datasetForm.getByRole('button', { name: 'Save dataset' }).click();
 	await expect(page.getByText('Reference dataset updated.')).toBeVisible();
+	await expect(page.getByRole('link', { name: sourceCitation }).first()).toBeVisible();
 	await expect(datasetForm.getByLabel('Dataset status')).toHaveValue('candidate');
 	await expect(datasetForm.getByLabel('Sample size')).toHaveValue('42');
 

@@ -13,6 +13,7 @@
 		return Number.isFinite(parsed) ? formatDate(parsed) : '-';
 	};
 	const formatNumberInput = (value: number | null) => (value === null ? '' : String(value));
+	const formatTextInput = (value: string | null) => value ?? '';
 </script>
 
 <svelte:head>
@@ -213,6 +214,17 @@
 					>
 						<input type="hidden" name="datasetId" value={dataset.id} />
 						<label class="flex flex-col gap-1">
+							<span class="text-xs font-medium text-gray-500">Literature source</span>
+							<select name="referenceStudyId" class="rounded-sm border border-gray-300 px-3 py-2">
+								<option value="">Unlinked</option>
+								{#each data.studies as study (study.id)}
+									<option value={study.id} selected={dataset.referenceStudyId === study.id}>
+										{study.shortCitation}
+									</option>
+								{/each}
+							</select>
+						</label>
+						<label class="flex flex-col gap-1">
 							<span class="text-xs font-medium text-gray-500">Dataset status</span>
 							<select name="status" class="rounded-sm border border-gray-300 px-3 py-2">
 								{#each data.datasetStatuses as status (status)}
@@ -372,33 +384,169 @@
 
 	<div>
 		<h2 class="font-serif text-2xl">Literature sources</h2>
-		<div class="mt-3 overflow-x-auto border-t border-gray-200">
-			<table class="w-full min-w-[780px] text-left text-xs">
-				<thead class="text-gray-500">
-					<tr>
-						<th class="py-2 pr-3 font-medium">Source</th>
-						<th class="py-2 pr-3 font-medium">Type</th>
-						<th class="py-2 pr-3 font-medium">Population</th>
-						<th class="py-2 pr-3 font-medium">Notes</th>
-					</tr>
-				</thead>
-				<tbody>
-					{#each data.studies as study (study.id)}
-						<tr class="border-t border-gray-100">
-							<td class="py-2 pr-3">
-								<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
-								<a class="underline" href={study.url} rel="noreferrer" target="_blank">
-									{study.shortCitation}
-								</a>
-								<p class="mt-1 text-gray-500">{study.title}</p>
-							</td>
-							<td class="py-2 pr-3">{study.sourceType}</td>
-							<td class="py-2 pr-3">{study.population}</td>
-							<td class="py-2 pr-3">{study.notes}</td>
-						</tr>
+		<form
+			method="POST"
+			action="?/createStudy"
+			aria-label="Add literature source"
+			class="mt-3 grid gap-3 border-t border-gray-200 pt-3 md:grid-cols-4"
+		>
+			<label class="flex flex-col gap-1">
+				<span class="text-xs font-medium text-gray-500">Short citation</span>
+				<input
+					name="shortCitation"
+					required
+					placeholder="Author, year"
+					class="rounded-sm border border-gray-300 px-3 py-2"
+				/>
+			</label>
+			<label class="flex flex-col gap-1 md:col-span-2">
+				<span class="text-xs font-medium text-gray-500">Title</span>
+				<input name="title" required class="rounded-sm border border-gray-300 px-3 py-2" />
+			</label>
+			<label class="flex flex-col gap-1">
+				<span class="text-xs font-medium text-gray-500">Source type</span>
+				<select name="sourceType" class="rounded-sm border border-gray-300 px-3 py-2">
+					{#each data.sourceTypes as sourceType (sourceType)}
+						<option value={sourceType}>{sourceType}</option>
 					{/each}
-				</tbody>
-			</table>
+				</select>
+			</label>
+			<label class="flex flex-col gap-1 md:col-span-2">
+				<span class="text-xs font-medium text-gray-500">URL</span>
+				<input name="url" required class="rounded-sm border border-gray-300 px-3 py-2" />
+			</label>
+			<label class="flex flex-col gap-1">
+				<span class="text-xs font-medium text-gray-500">DOI</span>
+				<input name="doi" class="rounded-sm border border-gray-300 px-3 py-2" />
+			</label>
+			<label class="flex flex-col gap-1">
+				<span class="text-xs font-medium text-gray-500">Publication year</span>
+				<input
+					name="publicationYear"
+					inputmode="numeric"
+					class="rounded-sm border border-gray-300 px-3 py-2"
+				/>
+			</label>
+			<label class="flex flex-col gap-1">
+				<span class="text-xs font-medium text-gray-500">Sample size</span>
+				<input
+					name="sampleSize"
+					inputmode="numeric"
+					class="rounded-sm border border-gray-300 px-3 py-2"
+				/>
+			</label>
+			<label class="flex flex-col gap-1 md:col-span-3">
+				<span class="text-xs font-medium text-gray-500">Population</span>
+				<input name="population" class="rounded-sm border border-gray-300 px-3 py-2" />
+			</label>
+			<label class="flex flex-col gap-1 md:col-span-4">
+				<span class="text-xs font-medium text-gray-500">Notes</span>
+				<textarea name="notes" rows="2" class="rounded-sm border border-gray-300 px-3 py-2"
+				></textarea>
+			</label>
+			<div class="md:col-span-4">
+				<button class="rounded-sm bg-black px-3 py-2 text-xs text-white">Add source</button>
+			</div>
+		</form>
+
+		<div class="mt-6 space-y-4 border-t border-gray-200 pt-3">
+			{#each data.studies as study (study.id)}
+				<form
+					method="POST"
+					action="?/study"
+					aria-label={`Edit literature source ${study.shortCitation}`}
+					class="grid gap-3 border-t border-gray-100 pt-3 md:grid-cols-4"
+				>
+					<input type="hidden" name="studyId" value={study.id} />
+					<div class="md:col-span-4">
+						<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+						<a class="underline" href={study.url} rel="noreferrer" target="_blank">
+							{study.shortCitation}
+						</a>
+						<p class="mt-1 text-xs text-gray-500">{study.title}</p>
+					</div>
+					<label class="flex flex-col gap-1">
+						<span class="text-xs font-medium text-gray-500">Short citation</span>
+						<input
+							name="shortCitation"
+							required
+							value={study.shortCitation}
+							class="rounded-sm border border-gray-300 px-3 py-2"
+						/>
+					</label>
+					<label class="flex flex-col gap-1 md:col-span-2">
+						<span class="text-xs font-medium text-gray-500">Title</span>
+						<input
+							name="title"
+							required
+							value={study.title}
+							class="rounded-sm border border-gray-300 px-3 py-2"
+						/>
+					</label>
+					<label class="flex flex-col gap-1">
+						<span class="text-xs font-medium text-gray-500">Source type</span>
+						<select name="sourceType" class="rounded-sm border border-gray-300 px-3 py-2">
+							{#each data.sourceTypes as sourceType (sourceType)}
+								<option value={sourceType} selected={study.sourceType === sourceType}>
+									{sourceType}
+								</option>
+							{/each}
+						</select>
+					</label>
+					<label class="flex flex-col gap-1 md:col-span-2">
+						<span class="text-xs font-medium text-gray-500">URL</span>
+						<input
+							name="url"
+							required
+							value={study.url}
+							class="rounded-sm border border-gray-300 px-3 py-2"
+						/>
+					</label>
+					<label class="flex flex-col gap-1">
+						<span class="text-xs font-medium text-gray-500">DOI</span>
+						<input
+							name="doi"
+							value={formatTextInput(study.doi)}
+							class="rounded-sm border border-gray-300 px-3 py-2"
+						/>
+					</label>
+					<label class="flex flex-col gap-1">
+						<span class="text-xs font-medium text-gray-500">Publication year</span>
+						<input
+							name="publicationYear"
+							inputmode="numeric"
+							value={formatNumberInput(study.publicationYear)}
+							class="rounded-sm border border-gray-300 px-3 py-2"
+						/>
+					</label>
+					<label class="flex flex-col gap-1">
+						<span class="text-xs font-medium text-gray-500">Sample size</span>
+						<input
+							name="sampleSize"
+							inputmode="numeric"
+							value={formatNumberInput(study.sampleSize)}
+							class="rounded-sm border border-gray-300 px-3 py-2"
+						/>
+					</label>
+					<label class="flex flex-col gap-1 md:col-span-3">
+						<span class="text-xs font-medium text-gray-500">Population</span>
+						<input
+							name="population"
+							value={study.population}
+							class="rounded-sm border border-gray-300 px-3 py-2"
+						/>
+					</label>
+					<label class="flex flex-col gap-1 md:col-span-4">
+						<span class="text-xs font-medium text-gray-500">Notes</span>
+						<textarea name="notes" rows="2" class="rounded-sm border border-gray-300 px-3 py-2"
+							>{study.notes}</textarea
+						>
+					</label>
+					<div class="md:col-span-4">
+						<button class="rounded-sm bg-gray-100 px-3 py-2 text-xs">Save source</button>
+					</div>
+				</form>
+			{/each}
 		</div>
 	</div>
 </section>

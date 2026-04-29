@@ -5,6 +5,7 @@ import { orientationExperimentSlug } from '../experiments/orientation';
 
 export type ReferenceCompatibility = 'compatible' | 'partial' | 'incompatible';
 export type ReferenceDatasetStatus = 'candidate' | 'validated' | 'rejected';
+export type ReferenceSourceType = 'literature' | 'dataset';
 export type ReferenceMetricUnit =
 	| 'proportion'
 	| 'milliseconds'
@@ -16,6 +17,7 @@ export type ReferenceComparisonType = 'distribution' | 'threshold' | 'descriptiv
 
 export const referenceDatasetStatuses = ['candidate', 'validated', 'rejected'] as const;
 export const referenceCompatibilities = ['compatible', 'partial', 'incompatible'] as const;
+export const referenceSourceTypes = ['literature', 'dataset'] as const;
 
 export type ReferenceMetricContract = {
 	experimentSlug: string;
@@ -33,7 +35,7 @@ export type ReferenceStudySeed = {
 	url: string;
 	doi: string | null;
 	publicationYear: number | null;
-	sourceType: 'literature' | 'dataset';
+	sourceType: ReferenceSourceType;
 	population: string;
 	sampleSize: number | null;
 	notes: string;

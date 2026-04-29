@@ -779,6 +779,28 @@ test('admin can inspect and export ten item personality inventory data', async (
 	await expect(metricForm.getByLabel('Metric notes')).toHaveValue(
 		'Accuracy extractable after event validation.'
 	);
+
+	const referenceContextResponse = await page.request.post('/api/reference-context/n-back', {
+		data: {
+			metrics: {
+				accuracy: 0.83,
+				sensitivityIndex: 1.2,
+				falseAlarmRate: 0.1
+			}
+		}
+	});
+	expect(referenceContextResponse.status()).toBe(200);
+	const referenceContext = await referenceContextResponse.json();
+	const accuracyComparison = referenceContext.comparisons.find(
+		(comparison: { metricKey: string }) => comparison.metricKey === 'accuracy'
+	);
+	expect(accuracyComparison).toMatchObject({
+		state: 'comparable',
+		referenceMean: 0.72,
+		referenceStandardDeviation: 0.11
+	});
+	expect(accuracyComparison.zScore).toBeCloseTo(1);
+	expect(accuracyComparison.summary).toContain('above the reference mean');
 	await page.goto('/admin');
 
 	const csvResponse = await page.request.get('/admin/tipi/export.csv');

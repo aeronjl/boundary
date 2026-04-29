@@ -344,16 +344,7 @@ for (const dataset of referenceDatasetSeeds) {
 				referenceStudyId: dataset.referenceStudyId,
 				experimentSlug: dataset.experimentSlug,
 				name: dataset.name,
-				url: dataset.url,
-				status: dataset.status,
-				compatibility: dataset.compatibility,
-				sampleSize: dataset.sampleSize,
-				license: dataset.license,
-				population: dataset.population,
-				taskVariant: dataset.taskVariant,
-				metricSummaryJson: JSON.stringify(dataset.metricSummaryJson),
-				notes: dataset.notes,
-				updatedAt: now
+				url: dataset.url
 			}
 		});
 
@@ -385,14 +376,7 @@ for (const dataset of referenceDatasetSeeds) {
 					metricKey: metric.metricKey,
 					label: metric.label,
 					unit: metric.unit,
-					comparisonType: metric.comparisonType,
-					mean: metric.mean,
-					standardDeviation: metric.standardDeviation,
-					minimum: metric.minimum,
-					maximum: metric.maximum,
-					metricJson: JSON.stringify(metric.metricJson),
-					notes: metric.notes,
-					updatedAt: now
+					comparisonType: metric.comparisonType
 				}
 			});
 	}

@@ -10,6 +10,12 @@ import {
 	intertemporalDelayedChoiceRate
 } from '$lib/experiments/intertemporal-interpretation';
 import { referenceMetricContracts } from '$lib/reference-data/catalog';
+import {
+	calculateReferenceZScore,
+	createComparisonSummary,
+	formatPercentile,
+	percentileFromZScore
+} from '$lib/reference-data/comparison';
 import { createReferenceContext } from '$lib/reference-data/summary';
 import { calculateNBackSignalDetectionMetrics, type NBackResult } from '$lib/experiments/n-back';
 import { createNBackInterpretation } from '$lib/experiments/n-back-interpretation';
@@ -179,6 +185,27 @@ describe('reference data contracts', () => {
 		expect(
 			context.metrics.find((metric) => metric.metricKey === 'accuracy')?.hasCandidateDataset
 		).toBe(true);
+	});
+
+	it('computes z-score and percentile summaries for validated reference statistics', () => {
+		const zScore = calculateReferenceZScore(0.83, 0.72, 0.11);
+		const percentile = percentileFromZScore(zScore);
+
+		expect(zScore).toBeCloseTo(1);
+		expect(percentile).toBeCloseTo(0.84, 2);
+		expect(formatPercentile(percentile)).toBe('84th percentile');
+		expect(
+			createComparisonSummary({
+				label: 'Accuracy',
+				unit: 'proportion',
+				currentValue: 0.83,
+				state: 'comparable',
+				datasetName: 'OpenfMRI smoke test',
+				referenceMean: 0.72,
+				zScore,
+				percentile
+			})
+		).toContain('above the reference mean');
 	});
 });
 

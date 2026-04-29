@@ -203,6 +203,7 @@ describe('reference data contracts', () => {
 				currentValue: 0.83,
 				state: 'comparable',
 				datasetName: 'OpenfMRI smoke test',
+				referenceCohortLabel: null,
 				referenceMean: 0.72,
 				zScore,
 				percentile

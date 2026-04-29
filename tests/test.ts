@@ -894,6 +894,11 @@ test('admin can inspect and export ten item personality inventory data', async (
 	);
 	expect(importedAccuracyComparison).toMatchObject({
 		state: 'comparable',
+		referenceSourceCitation: sourceCitation,
+		referenceCohortLabel: cohortLabel,
+		mappingSourceMetric: 'pilot_accuracy',
+		mappingSourceColumns: ['pilot_nont', 'pilot_targ'],
+		mappingExtractionStatus: 'reviewed',
 		referenceMean: 0.8508194948622451,
 		referenceStandardDeviation: 0.1884581684338786
 	});

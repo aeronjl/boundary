@@ -97,6 +97,20 @@
 		if (comparisonPending) return 'checking validated references';
 		return 'not checked';
 	}
+
+	function provenanceLabel(comparison: ReferenceComparison | undefined): string {
+		if (!comparison) return '-';
+
+		const source = comparison.referenceSourceCitation;
+		const cohort = comparison.referenceCohortLabel
+			? `${comparison.referenceCohortLabel}${comparison.referenceCohortSampleSize ? `, n=${comparison.referenceCohortSampleSize}` : ''}`
+			: '';
+		const mapping = comparison.mappingSourceMetric
+			? `${comparison.mappingSourceMetric}${comparison.mappingExtractionStatus ? ` (${comparison.mappingExtractionStatus})` : ''}`
+			: '';
+
+		return [source, cohort, mapping].filter(Boolean).join(' | ') || '-';
+	}
 </script>
 
 <section class="mt-6">
@@ -148,6 +162,7 @@
 						<th class="py-2 pr-3 font-medium">Metric</th>
 						<th class="py-2 pr-3 font-medium">This run</th>
 						<th class="py-2 pr-3 font-medium">Reference data</th>
+						<th class="py-2 pr-3 font-medium">Provenance</th>
 						<th class="py-2 pr-3 font-medium">Comparison</th>
 						<th class="py-2 pr-3 font-medium">Constraint</th>
 					</tr>
@@ -159,6 +174,7 @@
 							<td class="py-2 pr-3">{metric.label}</td>
 							<td class="py-2 pr-3">{formatReferenceValue(metric.currentValue, metric.unit)}</td>
 							<td class="py-2 pr-3">{referenceDataLabel(comparison, metric)}</td>
+							<td class="py-2 pr-3 text-gray-600">{provenanceLabel(comparison)}</td>
 							<td class="py-2 pr-3 text-gray-600">{comparisonLabel(comparison)}</td>
 							<td class="py-2 pr-3 text-gray-600">{metric.notes}</td>
 						</tr>

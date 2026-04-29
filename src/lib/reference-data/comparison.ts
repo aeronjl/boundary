@@ -17,6 +17,13 @@ export type ReferenceComparison = {
 	datasetName: string | null;
 	datasetStatus: string | null;
 	datasetCompatibility: string | null;
+	referenceSourceCitation: string | null;
+	referenceSourceUrl: string | null;
+	referenceCohortLabel: string | null;
+	referenceCohortSampleSize: number | null;
+	mappingSourceMetric: string | null;
+	mappingSourceColumns: string[];
+	mappingExtractionStatus: string | null;
 	referenceMean: number | null;
 	referenceStandardDeviation: number | null;
 	zScore: number | null;
@@ -48,6 +55,7 @@ type ComparisonSummaryInput = {
 	currentValue: ReferenceMetricValue;
 	state: ReferenceComparisonState;
 	datasetName: string | null;
+	referenceCohortLabel: string | null;
 	referenceMean: number | null;
 	zScore: number | null;
 	percentile: number | null;
@@ -133,7 +141,11 @@ export function createComparisonSummary(input: ComparisonSummaryInput): string {
 
 	const absoluteZ = Math.abs(input.zScore);
 	const referenceValue = formatReferenceValue(input.referenceMean, input.unit);
-	const datasetText = input.datasetName ? ` in ${input.datasetName}` : '';
+	const referenceLabel =
+		input.referenceCohortLabel && input.datasetName
+			? `${input.referenceCohortLabel} from ${input.datasetName}`
+			: (input.referenceCohortLabel ?? input.datasetName);
+	const datasetText = referenceLabel ? ` in ${referenceLabel}` : '';
 
 	if (absoluteZ < 0.1) {
 		return `This run's ${input.label} is close to the reference mean${datasetText} (${referenceValue}).`;

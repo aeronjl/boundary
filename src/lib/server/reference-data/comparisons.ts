@@ -1,4 +1,4 @@
-import { asc, eq } from 'drizzle-orm';
+import { asc, eq, inArray } from 'drizzle-orm';
 import {
 	referenceMetricContracts,
 	type ReferenceMetricContract
@@ -13,15 +13,28 @@ import {
 	type ReferenceComparisonState
 } from '$lib/reference-data/comparison';
 import { db } from '$lib/server/db';
-import { referenceDatasets, referenceMetrics } from '$lib/server/db/schema';
+import {
+	referenceCohorts,
+	referenceDatasets,
+	referenceMetricMappings,
+	referenceMetrics,
+	referenceStudies
+} from '$lib/server/db/schema';
 
 type ReferenceDatasetRow = typeof referenceDatasets.$inferSelect;
+type ReferenceCohortRow = typeof referenceCohorts.$inferSelect;
+type ReferenceMetricMappingRow = typeof referenceMetricMappings.$inferSelect;
 type ReferenceMetricRow = typeof referenceMetrics.$inferSelect;
+type ReferenceStudyRow = typeof referenceStudies.$inferSelect;
 type ReferenceMetricInput = Record<string, number | null | undefined>;
 
 type MetricReference = {
 	metric: ReferenceMetricRow;
 	dataset: ReferenceDatasetRow;
+	study: ReferenceStudyRow | null;
+	cohort: ReferenceCohortRow | null;
+	mapping: ReferenceMetricMappingRow | null;
+	sourceColumns: string[];
 };
 
 const comparableDatasetCompatibilities = new Set(['compatible', 'partial']);
@@ -46,16 +59,50 @@ function hasUsableStats(metric: ReferenceMetricRow): boolean {
 	);
 }
 
+function sourceColumnsValue(value: string): string[] {
+	try {
+		const parsed = JSON.parse(value) as unknown;
+		return Array.isArray(parsed)
+			? parsed.filter((item): item is string => typeof item === 'string')
+			: [];
+	} catch {
+		return [];
+	}
+}
+
 function metricReferences(
 	contract: ReferenceMetricContract,
 	metrics: ReferenceMetricRow[],
-	datasetsById: Map<string, ReferenceDatasetRow>
+	datasetsById: Map<string, ReferenceDatasetRow>,
+	studiesById: Map<string, ReferenceStudyRow>,
+	cohortsById: Map<string, ReferenceCohortRow>,
+	mappingsByMetricId: Map<string, ReferenceMetricMappingRow>
 ): MetricReference[] {
 	return metrics
 		.filter((metric) => metric.metricKey === contract.metricKey)
 		.flatMap((metric) => {
 			const dataset = datasetsById.get(metric.referenceDatasetId);
-			return dataset ? [{ metric, dataset }] : [];
+			const mapping = mappingsByMetricId.get(metric.id) ?? null;
+			const cohort = mapping?.referenceCohortId
+				? (cohortsById.get(mapping.referenceCohortId) ?? null)
+				: null;
+			const study =
+				cohort?.referenceStudyId || dataset?.referenceStudyId
+					? (studiesById.get(cohort?.referenceStudyId ?? dataset?.referenceStudyId ?? '') ?? null)
+					: null;
+
+			return dataset
+				? [
+						{
+							metric,
+							dataset,
+							study,
+							cohort,
+							mapping,
+							sourceColumns: mapping ? sourceColumnsValue(mapping.sourceColumnsJson) : []
+						}
+					]
+				: [];
 		});
 }
 
@@ -82,6 +129,13 @@ function emptyComparison(
 		datasetName: reference?.dataset.name ?? null,
 		datasetStatus: reference?.dataset.status ?? null,
 		datasetCompatibility: reference?.dataset.compatibility ?? null,
+		referenceSourceCitation: reference?.study?.shortCitation ?? null,
+		referenceSourceUrl: reference?.study?.url ?? null,
+		referenceCohortLabel: reference?.cohort?.label ?? null,
+		referenceCohortSampleSize: reference?.cohort?.sampleSize ?? null,
+		mappingSourceMetric: reference?.mapping?.sourceMetric ?? null,
+		mappingSourceColumns: reference?.sourceColumns ?? [],
+		mappingExtractionStatus: reference?.mapping?.extractionStatus ?? null,
 		referenceMean: reference?.metric.mean ?? null,
 		referenceStandardDeviation: reference?.metric.standardDeviation ?? null,
 		zScore: null,
@@ -99,10 +153,20 @@ function createMetricComparison(
 	contract: ReferenceMetricContract,
 	currentMetrics: ReferenceMetricInput,
 	metrics: ReferenceMetricRow[],
-	datasetsById: Map<string, ReferenceDatasetRow>
+	datasetsById: Map<string, ReferenceDatasetRow>,
+	studiesById: Map<string, ReferenceStudyRow>,
+	cohortsById: Map<string, ReferenceCohortRow>,
+	mappingsByMetricId: Map<string, ReferenceMetricMappingRow>
 ): ReferenceComparison {
 	const currentValue = toMetricValue(currentMetrics[contract.metricKey]);
-	const references = metricReferences(contract, metrics, datasetsById);
+	const references = metricReferences(
+		contract,
+		metrics,
+		datasetsById,
+		studiesById,
+		cohortsById,
+		mappingsByMetricId
+	);
 	const comparableReferences = references.filter(({ dataset }) => hasComparableDataset(dataset));
 	const firstComparableReference = comparableReferences[0] ?? null;
 
@@ -138,6 +202,13 @@ function createMetricComparison(
 		datasetName: reference.dataset.name,
 		datasetStatus: reference.dataset.status,
 		datasetCompatibility: reference.dataset.compatibility,
+		referenceSourceCitation: reference.study?.shortCitation ?? null,
+		referenceSourceUrl: reference.study?.url ?? null,
+		referenceCohortLabel: reference.cohort?.label ?? null,
+		referenceCohortSampleSize: reference.cohort?.sampleSize ?? null,
+		mappingSourceMetric: reference.mapping?.sourceMetric ?? null,
+		mappingSourceColumns: reference.sourceColumns,
+		mappingExtractionStatus: reference.mapping?.extractionStatus ?? null,
 		referenceMean: reference.metric.mean,
 		referenceStandardDeviation: reference.metric.standardDeviation,
 		zScore,
@@ -212,9 +283,41 @@ export async function getReferenceComparisonContext(
 			.where(eq(referenceMetrics.experimentSlug, experimentSlug))
 			.orderBy(asc(referenceMetrics.metricKey))
 	]);
+	const datasetIds = datasets.map((dataset) => dataset.id);
+	const metricIds = metrics.map((metric) => metric.id);
+	const [studies, cohorts, mappings] = await Promise.all([
+		db.select().from(referenceStudies).orderBy(asc(referenceStudies.shortCitation)),
+		datasetIds.length > 0
+			? db
+					.select()
+					.from(referenceCohorts)
+					.where(inArray(referenceCohorts.referenceDatasetId, datasetIds))
+					.orderBy(asc(referenceCohorts.label))
+			: [],
+		metricIds.length > 0
+			? db
+					.select()
+					.from(referenceMetricMappings)
+					.where(inArray(referenceMetricMappings.referenceMetricId, metricIds))
+					.orderBy(asc(referenceMetricMappings.sourceMetric))
+			: []
+	]);
 	const datasetsById = new Map(datasets.map((dataset) => [dataset.id, dataset]));
+	const studiesById = new Map(studies.map((study) => [study.id, study]));
+	const cohortsById = new Map(cohorts.map((cohort) => [cohort.id, cohort]));
+	const mappingsByMetricId = new Map(
+		mappings.map((mapping) => [mapping.referenceMetricId, mapping])
+	);
 	const comparisons = contracts.map((contract) =>
-		createMetricComparison(contract, currentMetrics, metrics, datasetsById)
+		createMetricComparison(
+			contract,
+			currentMetrics,
+			metrics,
+			datasetsById,
+			studiesById,
+			cohortsById,
+			mappingsByMetricId
+		)
 	);
 
 	return {

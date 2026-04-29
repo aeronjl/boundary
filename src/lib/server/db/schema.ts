@@ -1,4 +1,4 @@
-import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { index, integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 export const experiments = sqliteTable('experiments', {
 	id: text('id').primaryKey(),
@@ -25,6 +25,80 @@ export const experimentVersions = sqliteTable(
 		uniqueIndex('experiment_versions_experiment_version_unique').on(
 			table.experimentId,
 			table.version
+		)
+	]
+);
+
+export const referenceStudies = sqliteTable('reference_studies', {
+	id: text('id').primaryKey(),
+	shortCitation: text('short_citation').notNull(),
+	title: text('title').notNull(),
+	url: text('url').notNull(),
+	doi: text('doi'),
+	publicationYear: integer('publication_year'),
+	sourceType: text('source_type').notNull().default('literature'),
+	population: text('population').notNull().default(''),
+	sampleSize: integer('sample_size'),
+	notes: text('notes').notNull().default(''),
+	createdAt: integer('created_at').notNull(),
+	updatedAt: integer('updated_at').notNull()
+});
+
+export const referenceDatasets = sqliteTable(
+	'reference_datasets',
+	{
+		id: text('id').primaryKey(),
+		referenceStudyId: text('reference_study_id').references(() => referenceStudies.id, {
+			onDelete: 'set null'
+		}),
+		experimentSlug: text('experiment_slug').notNull(),
+		name: text('name').notNull(),
+		url: text('url').notNull(),
+		status: text('status').notNull().default('candidate'),
+		compatibility: text('compatibility').notNull().default('partial'),
+		sampleSize: integer('sample_size'),
+		license: text('license').notNull().default(''),
+		population: text('population').notNull().default(''),
+		taskVariant: text('task_variant').notNull().default(''),
+		metricSummaryJson: text('metric_summary_json').notNull().default('{}'),
+		notes: text('notes').notNull().default(''),
+		createdAt: integer('created_at').notNull(),
+		updatedAt: integer('updated_at').notNull()
+	},
+	(table) => [
+		index('reference_datasets_study_idx').on(table.referenceStudyId),
+		index('reference_datasets_experiment_slug_idx').on(table.experimentSlug),
+		index('reference_datasets_status_idx').on(table.status)
+	]
+);
+
+export const referenceMetrics = sqliteTable(
+	'reference_metrics',
+	{
+		id: text('id').primaryKey(),
+		referenceDatasetId: text('reference_dataset_id')
+			.notNull()
+			.references(() => referenceDatasets.id, { onDelete: 'cascade' }),
+		experimentSlug: text('experiment_slug').notNull(),
+		metricKey: text('metric_key').notNull(),
+		label: text('label').notNull(),
+		unit: text('unit').notNull().default(''),
+		comparisonType: text('comparison_type').notNull().default('distribution'),
+		mean: real('mean'),
+		standardDeviation: real('standard_deviation'),
+		minimum: real('minimum'),
+		maximum: real('maximum'),
+		metricJson: text('metric_json').notNull().default('{}'),
+		notes: text('notes').notNull().default(''),
+		createdAt: integer('created_at').notNull(),
+		updatedAt: integer('updated_at').notNull()
+	},
+	(table) => [
+		index('reference_metrics_dataset_idx').on(table.referenceDatasetId),
+		index('reference_metrics_experiment_metric_idx').on(table.experimentSlug, table.metricKey),
+		uniqueIndex('reference_metrics_dataset_metric_unique').on(
+			table.referenceDatasetId,
+			table.metricKey
 		)
 	]
 );

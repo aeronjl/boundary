@@ -4,6 +4,7 @@
 	import { onMount } from 'svelte';
 	import ExperimentStartGate from '$lib/components/ExperimentStartGate.svelte';
 	import InterpretationPanel from '$lib/components/InterpretationPanel.svelte';
+	import ReferenceContext from '$lib/components/ReferenceContext.svelte';
 	import {
 		banditRewardRate,
 		bestBanditArm,
@@ -46,6 +47,13 @@
 	$: resultBestArm = result ? bestBanditArm(result) : null;
 	$: resultBestArmRate = result ? bestBanditArmSelectionRate(result) : null;
 	$: resultRewardRate = result ? banditRewardRate(result) : null;
+	$: referenceMetrics = result
+		? {
+				rewardRate: resultRewardRate,
+				bestArmSelectionRate: resultBestArmRate,
+				sampledArmCount: result.arms.filter((arm) => arm.pulls > 0).length
+			}
+		: {};
 
 	const formatPercent = (value: number | null) =>
 		value === null ? '-' : `${(value * 100).toFixed(0)}%`;
@@ -293,6 +301,7 @@
 				{#if interpretation}
 					<InterpretationPanel {interpretation} />
 				{/if}
+				<ReferenceContext experimentSlug={experiment.slug} metrics={referenceMetrics} />
 
 				{#if studySessionId}
 					<a

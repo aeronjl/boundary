@@ -4,6 +4,7 @@
 	import { onMount } from 'svelte';
 	import ExperimentStartGate from '$lib/components/ExperimentStartGate.svelte';
 	import InterpretationPanel from '$lib/components/InterpretationPanel.svelte';
+	import ReferenceContext from '$lib/components/ReferenceContext.svelte';
 	import { getExperimentCatalogEntry } from '$lib/experiments/catalog';
 	import {
 		clearStoredExperimentRunId,
@@ -38,6 +39,14 @@
 			? ((state.trialNumber - 1) / state.totalTrials) * 100
 			: 0;
 	$: interpretation = result ? createNBackInterpretation(result) : null;
+	$: referenceMetrics = result
+		? {
+				accuracy: result.accuracy,
+				sensitivityIndex: result.sensitivityIndex,
+				falseAlarmRate: result.falseAlarmRate,
+				meanResponseTimeMs: result.meanResponseTimeMs
+			}
+		: {};
 
 	const formatPercent = (value: number) => `${(value * 100).toFixed(0)}%`;
 	const formatOptionalPercent = (value: number | null) =>
@@ -311,6 +320,7 @@
 			{#if interpretation}
 				<InterpretationPanel {interpretation} />
 			{/if}
+			<ReferenceContext experimentSlug={experiment.slug} metrics={referenceMetrics} />
 			{#if studySessionId}
 				<a
 					class="mt-4 inline-block rounded-sm bg-black px-3 py-2 text-xs text-white"

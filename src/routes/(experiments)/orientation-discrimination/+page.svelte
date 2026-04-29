@@ -4,6 +4,7 @@
 	import { onMount } from 'svelte';
 	import ExperimentStartGate from '$lib/components/ExperimentStartGate.svelte';
 	import InterpretationPanel from '$lib/components/InterpretationPanel.svelte';
+	import ReferenceContext from '$lib/components/ReferenceContext.svelte';
 	import { getExperimentCatalogEntry } from '$lib/experiments/catalog';
 	import { createOrientationInterpretation } from '$lib/experiments/orientation-interpretation';
 	import {
@@ -38,6 +39,13 @@
 			: 0;
 	$: interpretation = result ? createOrientationInterpretation(result) : null;
 	$: smallestMagnitudeSummary = result?.magnitudeSummaries[0] ?? null;
+	$: referenceMetrics = result
+		? {
+				accuracy: result.accuracy,
+				estimatedThresholdDegrees: result.estimatedThresholdDegrees,
+				meanResponseTimeMs: result.meanResponseTimeMs
+			}
+		: {};
 
 	const formatPercent = (value: number) => `${(value * 100).toFixed(0)}%`;
 	const formatOptionalPercent = (value: number | null) =>
@@ -284,6 +292,7 @@
 			{#if interpretation}
 				<InterpretationPanel {interpretation} />
 			{/if}
+			<ReferenceContext experimentSlug={experiment.slug} metrics={referenceMetrics} />
 			{#if studySessionId}
 				<a
 					class="mt-4 inline-block rounded-sm bg-black px-3 py-2 text-xs text-white"

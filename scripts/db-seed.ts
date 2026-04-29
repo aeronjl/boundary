@@ -31,8 +31,16 @@ import {
 	tipiExperimentSlug,
 	tipiVersionId
 } from '../src/lib/experiments/tipi';
+import { referenceDatasetSeeds, referenceStudySeeds } from '../src/lib/reference-data/catalog';
 import { closeDatabase, db } from '../src/lib/server/db';
-import { experimentVersions, experiments, tipiQuestions } from '../src/lib/server/db/schema';
+import {
+	experimentVersions,
+	experiments,
+	referenceDatasets,
+	referenceMetrics,
+	referenceStudies,
+	tipiQuestions
+} from '../src/lib/server/db/schema';
 
 type SeedQuestion = {
 	question: string;
@@ -275,4 +283,122 @@ console.log(
 	`Seeded ${defaultOrientationConfig.angleMagnitudes.length * defaultOrientationConfig.repetitionsPerDirection * 2} orientation discrimination trials.`
 );
 console.log(`Seeded ${defaultNBackConfig.totalTrials} n-back trials.`);
+
+for (const study of referenceStudySeeds) {
+	await db
+		.insert(referenceStudies)
+		.values({
+			id: study.id,
+			shortCitation: study.shortCitation,
+			title: study.title,
+			url: study.url,
+			doi: study.doi,
+			publicationYear: study.publicationYear,
+			sourceType: study.sourceType,
+			population: study.population,
+			sampleSize: study.sampleSize,
+			notes: study.notes,
+			createdAt: now,
+			updatedAt: now
+		})
+		.onConflictDoUpdate({
+			target: referenceStudies.id,
+			set: {
+				shortCitation: study.shortCitation,
+				title: study.title,
+				url: study.url,
+				doi: study.doi,
+				publicationYear: study.publicationYear,
+				sourceType: study.sourceType,
+				population: study.population,
+				sampleSize: study.sampleSize,
+				notes: study.notes,
+				updatedAt: now
+			}
+		});
+}
+
+for (const dataset of referenceDatasetSeeds) {
+	await db
+		.insert(referenceDatasets)
+		.values({
+			id: dataset.id,
+			referenceStudyId: dataset.referenceStudyId,
+			experimentSlug: dataset.experimentSlug,
+			name: dataset.name,
+			url: dataset.url,
+			status: dataset.status,
+			compatibility: dataset.compatibility,
+			sampleSize: dataset.sampleSize,
+			license: dataset.license,
+			population: dataset.population,
+			taskVariant: dataset.taskVariant,
+			metricSummaryJson: JSON.stringify(dataset.metricSummaryJson),
+			notes: dataset.notes,
+			createdAt: now,
+			updatedAt: now
+		})
+		.onConflictDoUpdate({
+			target: referenceDatasets.id,
+			set: {
+				referenceStudyId: dataset.referenceStudyId,
+				experimentSlug: dataset.experimentSlug,
+				name: dataset.name,
+				url: dataset.url,
+				status: dataset.status,
+				compatibility: dataset.compatibility,
+				sampleSize: dataset.sampleSize,
+				license: dataset.license,
+				population: dataset.population,
+				taskVariant: dataset.taskVariant,
+				metricSummaryJson: JSON.stringify(dataset.metricSummaryJson),
+				notes: dataset.notes,
+				updatedAt: now
+			}
+		});
+
+	for (const metric of dataset.metrics) {
+		await db
+			.insert(referenceMetrics)
+			.values({
+				id: metric.id,
+				referenceDatasetId: dataset.id,
+				experimentSlug: dataset.experimentSlug,
+				metricKey: metric.metricKey,
+				label: metric.label,
+				unit: metric.unit,
+				comparisonType: metric.comparisonType,
+				mean: metric.mean,
+				standardDeviation: metric.standardDeviation,
+				minimum: metric.minimum,
+				maximum: metric.maximum,
+				metricJson: JSON.stringify(metric.metricJson),
+				notes: metric.notes,
+				createdAt: now,
+				updatedAt: now
+			})
+			.onConflictDoUpdate({
+				target: referenceMetrics.id,
+				set: {
+					referenceDatasetId: dataset.id,
+					experimentSlug: dataset.experimentSlug,
+					metricKey: metric.metricKey,
+					label: metric.label,
+					unit: metric.unit,
+					comparisonType: metric.comparisonType,
+					mean: metric.mean,
+					standardDeviation: metric.standardDeviation,
+					minimum: metric.minimum,
+					maximum: metric.maximum,
+					metricJson: JSON.stringify(metric.metricJson),
+					notes: metric.notes,
+					updatedAt: now
+				}
+			});
+	}
+}
+
+console.log(
+	`Seeded ${referenceStudySeeds.length} reference studies and ${referenceDatasetSeeds.length} reference dataset candidates.`
+);
 await closeDatabase();

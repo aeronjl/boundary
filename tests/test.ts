@@ -88,6 +88,7 @@ async function completeBanditRun(page: Page) {
 	await expect(page.getByRole('heading', { name: 'Bandit run complete' })).toBeVisible();
 	await expect(page.getByRole('heading', { name: 'How this compares' })).toBeVisible();
 	await expect(page.getByText('Reward yield', { exact: true })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Reference context' })).toBeVisible();
 }
 
 async function completeIntertemporalRun(page: Page) {
@@ -102,6 +103,7 @@ async function completeIntertemporalRun(page: Page) {
 	await expect(page.getByRole('heading', { name: 'Intertemporal choice complete' })).toBeVisible();
 	await expect(page.getByRole('heading', { name: 'How this compares' })).toBeVisible();
 	await expect(page.getByText('Delay preference', { exact: true })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Reference context' })).toBeVisible();
 }
 
 async function completeOrientationRun(page: Page) {
@@ -118,6 +120,7 @@ async function completeOrientationRun(page: Page) {
 	).toBeVisible();
 	await expect(page.getByRole('heading', { name: 'How this compares' })).toBeVisible();
 	await expect(page.getByText('Perceptual accuracy')).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Reference context' })).toBeVisible();
 }
 
 async function completeNBackRun(page: Page) {
@@ -132,6 +135,7 @@ async function completeNBackRun(page: Page) {
 	await expect(page.getByRole('heading', { name: 'n-back complete' })).toBeVisible();
 	await expect(page.getByRole('heading', { name: 'How this compares' })).toBeVisible();
 	await expect(page.getByText('Signal sensitivity')).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Reference context' })).toBeVisible();
 }
 
 test('index page has expected h1', async ({ page }) => {
@@ -748,6 +752,13 @@ test('admin can inspect and export ten item personality inventory data', async (
 	await expect(page.getByRole('link', { name: 'Study analysis' })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Analysis', exact: true })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Participants' })).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Reference registry' })).toBeVisible();
+
+	await page.getByRole('link', { name: 'Reference registry' }).click();
+	await expect(page.getByRole('heading', { name: 'Reference registry' })).toBeVisible();
+	await expect(page.getByText('OpenfMRI ds000115').first()).toBeVisible();
+	await expect(page.getByText('Metric contracts', { exact: true })).toBeVisible();
+	await page.goto('/admin');
 
 	const csvResponse = await page.request.get('/admin/tipi/export.csv');
 	expect(csvResponse.status()).toBe(200);

@@ -9,6 +9,8 @@ import {
 	createIntertemporalInterpretation,
 	intertemporalDelayedChoiceRate
 } from '$lib/experiments/intertemporal-interpretation';
+import { referenceMetricContracts } from '$lib/reference-data/catalog';
+import { createReferenceContext } from '$lib/reference-data/summary';
 import { calculateNBackSignalDetectionMetrics, type NBackResult } from '$lib/experiments/n-back';
 import { createNBackInterpretation } from '$lib/experiments/n-back-interpretation';
 import {
@@ -144,6 +146,39 @@ describe('intertemporal interpretation helpers', () => {
 		expect(interpretation.cards.map((card) => card.title)).toContain('Delay preference');
 		expect(interpretation.relatedPrompts.map((prompt) => prompt.href)).toContain('/n-armed-bandit');
 		expect(interpretation.references).toHaveLength(3);
+	});
+});
+
+describe('reference data contracts', () => {
+	it('exposes comparable metrics without requiring validated datasets', () => {
+		const context = createReferenceContext('n-armed-bandit', {
+			rewardRate: 0.55,
+			bestArmSelectionRate: 0.4,
+			sampledArmCount: 4
+		});
+
+		expect(referenceMetricContracts.length).toBeGreaterThanOrEqual(10);
+		expect(context.metrics.map((metric) => metric.metricKey)).toEqual([
+			'rewardRate',
+			'bestArmSelectionRate',
+			'sampledArmCount'
+		]);
+		expect(context.summary).toContain('no external reference dataset');
+		expect(context.metrics[0].currentValue).toBe(0.55);
+	});
+
+	it('marks candidate datasets separately from validated comparisons', () => {
+		const context = createReferenceContext('n-back', {
+			accuracy: 0.75,
+			sensitivityIndex: 1.2,
+			falseAlarmRate: 0.1
+		});
+
+		expect(context.candidateDatasetCount).toBe(1);
+		expect(context.validatedDatasetCount).toBe(0);
+		expect(
+			context.metrics.find((metric) => metric.metricKey === 'accuracy')?.hasCandidateDataset
+		).toBe(true);
 	});
 });
 

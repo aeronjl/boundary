@@ -5,6 +5,7 @@
 	import ExperimentStartGate from '$lib/components/ExperimentStartGate.svelte';
 	import { getExperimentCatalogEntry } from '$lib/experiments/catalog';
 	import InterpretationPanel from '$lib/components/InterpretationPanel.svelte';
+	import ReferenceContext from '$lib/components/ReferenceContext.svelte';
 	import {
 		createIntertemporalInterpretation,
 		intertemporalDelayedChoiceRate
@@ -36,6 +37,13 @@
 	$: options = trial ? [trial.sooner, trial.later] : [];
 	$: interpretation = result ? createIntertemporalInterpretation(result) : null;
 	$: delayedChoiceRate = result ? intertemporalDelayedChoiceRate(result) : null;
+	$: referenceMetrics = result
+		? {
+				delayedChoiceRate,
+				netGain: result.netGain,
+				totalDelaySeconds: result.totalDelaySeconds
+			}
+		: {};
 
 	const formatPoints = (value: number) => `${value.toFixed(0)} points`;
 	const formatSeconds = (value: number) => `${value.toFixed(0)} sec`;
@@ -279,6 +287,7 @@
 			{#if interpretation}
 				<InterpretationPanel {interpretation} />
 			{/if}
+			<ReferenceContext experimentSlug={experiment.slug} metrics={referenceMetrics} />
 			{#if studySessionId}
 				<a
 					class="mt-4 inline-block rounded-sm bg-black px-3 py-2 text-xs text-white"

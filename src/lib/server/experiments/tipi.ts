@@ -20,7 +20,15 @@ import {
 	markExperimentRunCompleted,
 	parseExperimentRunItemOrder
 } from './lifecycle';
-import { recordExperimentEvent, recordExperimentResponse } from './records';
+import {
+	assertSubmittedTrialIndex,
+	createTimingMetadata,
+	getTrialStartedAt,
+	recordExperimentEvent,
+	recordExperimentResponse,
+	recordTrialStarted,
+	type TrialSubmissionTiming
+} from './records';
 
 type TipiQuestionRow = typeof tipiQuestions.$inferSelect;
 
@@ -97,19 +105,26 @@ export async function startTipiRun(
 	});
 
 	const firstQuestion = questions.find((question) => question.id === questionOrder[0]) ?? null;
+	const trialStarted = await recordTrialStarted({
+		runId: run.id,
+		trialIndex: 0,
+		itemId: firstQuestion?.id ?? null
+	});
 
 	return {
 		runId: run.id,
 		trialNumber: 1,
 		totalTrials: questionOrder.length,
-		question: firstQuestion
+		question: firstQuestion,
+		trialStartedAt: trialStarted.createdAt
 	};
 }
 
 export async function submitTipiResponse(
 	runId: string,
 	questionId: string,
-	response: string
+	response: string,
+	timing: TrialSubmissionTiming = {}
 ): Promise<TipiSubmitResult> {
 	if (!isTipiLikertResponse(response)) {
 		throw new Error('Invalid TIPI response.');
@@ -139,6 +154,7 @@ export async function submitTipiResponse(
 		.orderBy(asc(tipiResponses.trialIndex));
 	const trialIndex = existingResponses.length;
 	const expectedQuestionId = questionOrder[trialIndex];
+	assertSubmittedTrialIndex(timing.trialIndex, trialIndex);
 
 	if (!expectedQuestionId || expectedQuestionId !== questionId) {
 		throw new Error('Response does not match the next expected question.');
@@ -156,6 +172,8 @@ export async function submitTipiResponse(
 	const question = toTipiQuestion(questionRow);
 	const score = scoreTipiResponse(response, question.scoring);
 	const createdAt = Date.now();
+	const serverTrialStartedAt = await getTrialStartedAt(runId, trialIndex);
+	const timingMetadata = createTimingMetadata(timing, serverTrialStartedAt, createdAt);
 
 	await db.insert(tipiResponses).values({
 		id: crypto.randomUUID(),
@@ -178,6 +196,9 @@ export async function submitTipiResponse(
 			scale: question.scale,
 			scoring: question.scoring
 		},
+		metadata: {
+			timing: timingMetadata
+		},
 		createdAt
 	});
 
@@ -188,7 +209,8 @@ export async function submitTipiResponse(
 		payload: {
 			questionId,
 			response,
-			score
+			score,
+			timing: timingMetadata
 		},
 		createdAt
 	});
@@ -200,13 +222,19 @@ export async function submitTipiResponse(
 			.select()
 			.from(tipiQuestions)
 			.where(eq(tipiQuestions.id, nextQuestionId));
+		const trialStarted = await recordTrialStarted({
+			runId,
+			trialIndex: trialIndex + 1,
+			itemId: nextQuestionId
+		});
 
 		return {
 			completed: false,
 			runId,
 			trialNumber: trialIndex + 2,
 			totalTrials: questionOrder.length,
-			question: nextQuestionRow ? toTipiQuestion(nextQuestionRow) : null
+			question: nextQuestionRow ? toTipiQuestion(nextQuestionRow) : null,
+			trialStartedAt: trialStarted.createdAt
 		};
 	}
 

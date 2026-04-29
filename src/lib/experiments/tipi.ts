@@ -48,6 +48,7 @@ export type TipiRunState = {
 	trialNumber: number;
 	totalTrials: number;
 	question: TipiQuestion | null;
+	trialStartedAt: number | null;
 };
 
 const linearScores: Record<TipiLikertResponse, number> = {

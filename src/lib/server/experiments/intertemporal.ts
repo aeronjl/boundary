@@ -18,7 +18,15 @@ import {
 	getPublishedExperimentVersion,
 	markExperimentRunCompleted
 } from './lifecycle';
-import { recordExperimentEvent, recordExperimentResponse } from './records';
+import {
+	assertSubmittedTrialIndex,
+	createTimingMetadata,
+	getTrialStartedAt,
+	recordExperimentEvent,
+	recordExperimentResponse,
+	recordTrialStarted,
+	type TrialSubmissionTiming
+} from './records';
 
 type ResponseRow = typeof experimentResponses.$inferSelect;
 
@@ -126,7 +134,8 @@ function createState(
 	runId: string,
 	context: IntertemporalStartedPayload,
 	responses: ResponseRow[],
-	lastOutcome: IntertemporalOutcome | null
+	lastOutcome: IntertemporalOutcome | null,
+	trialStartedAt: number | null
 ): IntertemporalRunState {
 	const nextTrialId = context.trialOrder[responses.length];
 
@@ -134,6 +143,7 @@ function createState(
 		runId,
 		trialNumber: responses.length + 1,
 		totalTrials: context.totalTrials,
+		trialStartedAt,
 		wealth: wealthFromResponses(context.config, responses),
 		trial: nextTrialId ? getTrial(context.config, nextTrialId) : null,
 		lastOutcome,
@@ -219,13 +229,26 @@ export async function startIntertemporalRun(
 		}
 	});
 
-	return createState(run.id, { config, trialOrder, totalTrials: trialOrder.length }, [], null);
+	const trialStarted = await recordTrialStarted({
+		runId: run.id,
+		trialIndex: 0,
+		itemId: trialOrder[0] ?? null
+	});
+
+	return createState(
+		run.id,
+		{ config, trialOrder, totalTrials: trialOrder.length },
+		[],
+		null,
+		trialStarted.createdAt
+	);
 }
 
 export async function submitIntertemporalChoice(
 	runId: string,
 	trialId: string,
-	optionId: string
+	optionId: string,
+	timing: TrialSubmissionTiming = {}
 ): Promise<IntertemporalSubmitResult> {
 	const run = await getExperimentRun(runId, intertemporalVersionId);
 
@@ -250,6 +273,7 @@ export async function submitIntertemporalChoice(
 
 	const trialIndex = responses.length;
 	const expectedTrialId = context.trialOrder[trialIndex];
+	assertSubmittedTrialIndex(timing.trialIndex, trialIndex);
 
 	if (!expectedTrialId || expectedTrialId !== trialId) {
 		throw new Error('Choice does not match the next expected trial.');
@@ -270,6 +294,8 @@ export async function submitIntertemporalChoice(
 	const previousWealth = wealthFromResponses(context.config, responses);
 	const scored = scoreOption(context.config, option, previousWealth);
 	const createdAt = Date.now();
+	const serverTrialStartedAt = await getTrialStartedAt(runId, trialIndex);
+	const timingMetadata = createTimingMetadata(timing, serverTrialStartedAt, createdAt);
 	const outcome: IntertemporalOutcome = {
 		trialIndex,
 		trialId,
@@ -299,7 +325,8 @@ export async function submitIntertemporalChoice(
 			prompt: trial.prompt,
 			timeCostPerSecond: context.config.timeCostPerSecond,
 			sooner: trial.sooner,
-			later: trial.later
+			later: trial.later,
+			timing: timingMetadata
 		},
 		createdAt
 	});
@@ -316,7 +343,8 @@ export async function submitIntertemporalChoice(
 			delaySeconds: scored.delaySeconds,
 			timeCost: scored.timeCost,
 			netValue: scored.netValue,
-			wealthAfter: scored.wealth
+			wealthAfter: scored.wealth,
+			timing: timingMetadata
 		},
 		createdAt
 	});
@@ -328,9 +356,15 @@ export async function submitIntertemporalChoice(
 		return { completed: true, runId, result, lastOutcome: outcome };
 	}
 
+	const nextTrialStarted = await recordTrialStarted({
+		runId,
+		trialIndex: trialIndex + 1,
+		itemId: context.trialOrder[trialIndex + 1] ?? null
+	});
+
 	return {
 		completed: false,
-		...createState(runId, context, updatedResponses, outcome)
+		...createState(runId, context, updatedResponses, outcome, nextTrialStarted.createdAt)
 	};
 }
 

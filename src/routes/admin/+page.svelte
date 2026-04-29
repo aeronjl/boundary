@@ -84,7 +84,7 @@
 			</div>
 		</div>
 
-		<div class="flex gap-2">
+		<div class="flex flex-wrap gap-2">
 			<a
 				class="rounded-sm bg-black px-3 py-2 text-xs text-white"
 				href={resolve('/admin/experiments')}
@@ -102,6 +102,12 @@
 				href={resolve('/admin/experiments/export.json')}
 			>
 				All experiment JSON
+			</a>
+			<a
+				class="rounded-sm bg-gray-100 px-3 py-2 text-xs"
+				href={resolve('/admin/experiments/export.csv')}
+			>
+				All experiment CSV
 			</a>
 		</div>
 

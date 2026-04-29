@@ -9,6 +9,7 @@
 	let runId = '';
 	let trialNumber = 0;
 	let totalTrials = 0;
+	let trialStartedAt: number | null = null;
 	let score = 0;
 	let arms: BanditArm[] = [];
 	let selectedArmId = '';
@@ -35,6 +36,7 @@
 		runId = state.runId;
 		trialNumber = state.trialNumber;
 		totalTrials = state.totalTrials;
+		trialStartedAt = state.trialStartedAt;
 		score = state.score;
 		arms = state.arms;
 		lastReward = state.lastOutcome?.reward ?? null;
@@ -46,6 +48,7 @@
 		result = null;
 		selectedArmId = '';
 		lastReward = null;
+		trialStartedAt = null;
 
 		try {
 			const response = await fetch('/api/experiments/n-armed-bandit/runs', { method: 'POST' });
@@ -58,7 +61,7 @@
 	}
 
 	async function chooseArm(armId: string) {
-		if (!runId || result) return;
+		if (isBusy || !runId || result) return;
 
 		isBusy = true;
 		errorMessage = '';
@@ -70,7 +73,12 @@
 				headers: {
 					'content-type': 'application/json'
 				},
-				body: JSON.stringify({ armId })
+				body: JSON.stringify({
+					armId,
+					trialIndex: trialNumber - 1,
+					trialStartedAt,
+					submittedAt: Date.now()
+				})
 			});
 			const update = await parseJsonResponse<BanditPullResult>(response);
 
@@ -80,6 +88,7 @@
 				result = update.result;
 				score = update.result.totalReward;
 				trialNumber = totalTrials;
+				trialStartedAt = null;
 			} else {
 				applyRunState(update);
 			}

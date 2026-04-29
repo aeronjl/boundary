@@ -51,6 +51,7 @@ export type IntertemporalRunState = {
 	runId: string;
 	trialNumber: number;
 	totalTrials: number;
+	trialStartedAt: number | null;
 	wealth: number;
 	trial: IntertemporalTrial | null;
 	lastOutcome: IntertemporalOutcome | null;

@@ -54,6 +54,9 @@
 		<a class="rounded-sm bg-gray-100 px-3 py-2" href={resolve('/admin/experiments/export.json')}>
 			Export JSON
 		</a>
+		<a class="rounded-sm bg-gray-100 px-3 py-2" href={resolve('/admin/experiments/export.csv')}>
+			Export CSV
+		</a>
 	</form>
 
 	<div class="grid grid-cols-2 gap-3 md:grid-cols-4">

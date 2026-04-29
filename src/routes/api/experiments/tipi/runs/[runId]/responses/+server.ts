@@ -1,11 +1,19 @@
 import { json } from '@sveltejs/kit';
+import { experimentSubmissionErrorMessage } from '$lib/server/experiments/records';
 import { submitTipiResponse } from '$lib/server/experiments/tipi';
 import type { RequestHandler } from './$types';
 
 type Payload = {
 	questionId?: unknown;
 	response?: unknown;
+	trialIndex?: unknown;
+	trialStartedAt?: unknown;
+	submittedAt?: unknown;
 };
+
+function optionalNumber(value: unknown): number | null {
+	return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
 
 export const POST: RequestHandler = async ({ params, request }) => {
 	const payload = (await request.json()) as Payload;
@@ -15,10 +23,17 @@ export const POST: RequestHandler = async ({ params, request }) => {
 	}
 
 	try {
-		const result = await submitTipiResponse(params.runId, payload.questionId, payload.response);
+		const result = await submitTipiResponse(params.runId, payload.questionId, payload.response, {
+			trialIndex: optionalNumber(payload.trialIndex),
+			clientTrialStartedAt: optionalNumber(payload.trialStartedAt),
+			clientSubmittedAt: optionalNumber(payload.submittedAt)
+		});
 		return json(result);
 	} catch (error) {
 		console.error(error);
-		return json({ message: 'Could not record TIPI response.' }, { status: 400 });
+		return json(
+			{ message: experimentSubmissionErrorMessage(error, 'Could not record TIPI response.') },
+			{ status: 400 }
+		);
 	}
 };

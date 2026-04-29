@@ -7,6 +7,7 @@
 	let currentQuestion: TipiQuestion | null = null;
 	let trialNumber = 0;
 	let totalTrials = 0;
+	let trialStartedAt: number | null = null;
 	let finishExperiment = false;
 	let showScoringThemes = false;
 	let isBusy = false;
@@ -34,6 +35,7 @@
 		isBusy = true;
 		errorMessage = '';
 		finishExperiment = false;
+		trialStartedAt = null;
 		tipiResult.set(null);
 
 		try {
@@ -44,6 +46,7 @@
 			currentQuestion = run.question;
 			trialNumber = run.trialNumber;
 			totalTrials = run.totalTrials;
+			trialStartedAt = run.trialStartedAt;
 		} catch (error) {
 			errorMessage = error instanceof Error ? error.message : 'Could not start the inventory.';
 		} finally {
@@ -52,6 +55,8 @@
 	}
 
 	async function handleRequestNewQuestion(event: CustomEvent<string>) {
+		if (isBusy) return;
+
 		if (!runId || !currentQuestion) {
 			errorMessage = 'The inventory is not ready yet.';
 			return;
@@ -68,7 +73,10 @@
 				},
 				body: JSON.stringify({
 					questionId: currentQuestion.id,
-					response: event.detail
+					response: event.detail,
+					trialIndex: trialNumber - 1,
+					trialStartedAt,
+					submittedAt: Date.now()
 				})
 			});
 			const update = await parseJsonResponse<SubmitResponse>(response);
@@ -76,11 +84,13 @@
 			if (update.completed) {
 				currentQuestion = null;
 				finishExperiment = true;
+				trialStartedAt = null;
 				tipiResult.set(update.result);
 			} else {
 				currentQuestion = update.question;
 				trialNumber = update.trialNumber;
 				totalTrials = update.totalTrials;
+				trialStartedAt = update.trialStartedAt;
 			}
 		} catch (error) {
 			errorMessage = error instanceof Error ? error.message : 'Could not save your response.';
@@ -94,6 +104,7 @@
 		currentQuestion = null;
 		trialNumber = 0;
 		totalTrials = 0;
+		trialStartedAt = null;
 		finishExperiment = false;
 		errorMessage = '';
 		tipiResult.set(null);

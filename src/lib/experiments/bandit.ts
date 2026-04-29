@@ -41,6 +41,7 @@ export type BanditRunState = {
 	runId: string;
 	trialNumber: number;
 	totalTrials: number;
+	trialStartedAt: number | null;
 	score: number;
 	arms: BanditArm[];
 	lastOutcome: BanditOutcome | null;

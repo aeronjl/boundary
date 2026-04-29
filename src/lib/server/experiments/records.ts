@@ -1,3 +1,4 @@
+import { and, desc, eq } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { experimentEvents, experimentResponses } from '$lib/server/db/schema';
 
@@ -23,6 +24,19 @@ type RecordExperimentResponseInput = {
 	createdAt?: number;
 };
 
+type RecordTrialStartedInput = {
+	runId: string;
+	trialIndex: number;
+	itemId?: string | null;
+	createdAt?: number;
+};
+
+export type TrialSubmissionTiming = {
+	trialIndex?: number | null;
+	clientTrialStartedAt?: number | null;
+	clientSubmittedAt?: number | null;
+};
+
 function assertValidTrialIndex(trialIndex: number | null | undefined): void {
 	if (trialIndex == null) return;
 	if (!Number.isInteger(trialIndex) || trialIndex < 0) {
@@ -30,8 +44,69 @@ function assertValidTrialIndex(trialIndex: number | null | undefined): void {
 	}
 }
 
+function validTimestamp(value: number | null | undefined): number | null {
+	if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+		return null;
+	}
+
+	return value;
+}
+
 function stringifyJson(value: JsonValue | null | undefined, fallback: JsonValue): string {
 	return JSON.stringify(value ?? fallback);
+}
+
+export function assertSubmittedTrialIndex(
+	submittedTrialIndex: number | null | undefined,
+	expectedTrialIndex: number
+): void {
+	assertValidTrialIndex(submittedTrialIndex);
+
+	if (submittedTrialIndex == null) return;
+
+	if (submittedTrialIndex !== expectedTrialIndex) {
+		throw new Error('Submission does not match the next expected trial.');
+	}
+}
+
+export function experimentSubmissionErrorMessage(error: unknown, fallback: string): string {
+	if (!(error instanceof Error)) return fallback;
+
+	if (
+		error.message.includes('UNIQUE constraint failed') ||
+		error.message.includes('SQLITE_CONSTRAINT')
+	) {
+		return 'This trial was already submitted. Refresh the run before continuing.';
+	}
+
+	return error.message || fallback;
+}
+
+export function createTimingMetadata(
+	timing: TrialSubmissionTiming | undefined,
+	serverTrialStartedAt: number | null,
+	serverReceivedAt = Date.now()
+): JsonValue {
+	const clientTrialStartedAt = validTimestamp(timing?.clientTrialStartedAt);
+	const clientSubmittedAt = validTimestamp(timing?.clientSubmittedAt);
+	const normalizedServerTrialStartedAt = validTimestamp(serverTrialStartedAt);
+	const responseTimeMs =
+		clientTrialStartedAt && clientSubmittedAt && clientSubmittedAt >= clientTrialStartedAt
+			? clientSubmittedAt - clientTrialStartedAt
+			: null;
+	const serverResponseTimeMs =
+		normalizedServerTrialStartedAt && serverReceivedAt >= normalizedServerTrialStartedAt
+			? serverReceivedAt - normalizedServerTrialStartedAt
+			: null;
+
+	return {
+		clientTrialStartedAt,
+		clientSubmittedAt,
+		serverTrialStartedAt: normalizedServerTrialStartedAt,
+		serverReceivedAt,
+		responseTimeMs,
+		serverResponseTimeMs
+	};
 }
 
 export async function recordExperimentEvent({
@@ -55,6 +130,41 @@ export async function recordExperimentEvent({
 	await db.insert(experimentEvents).values(event);
 
 	return event;
+}
+
+export async function recordTrialStarted({
+	runId,
+	trialIndex,
+	itemId = null,
+	createdAt = Date.now()
+}: RecordTrialStartedInput) {
+	return recordExperimentEvent({
+		runId,
+		eventType: 'trial_started',
+		trialIndex,
+		payload: {
+			itemId
+		},
+		createdAt
+	});
+}
+
+export async function getTrialStartedAt(runId: string, trialIndex: number): Promise<number | null> {
+	assertValidTrialIndex(trialIndex);
+
+	const [event] = await db
+		.select({ createdAt: experimentEvents.createdAt })
+		.from(experimentEvents)
+		.where(
+			and(
+				eq(experimentEvents.runId, runId),
+				eq(experimentEvents.eventType, 'trial_started'),
+				eq(experimentEvents.trialIndex, trialIndex)
+			)
+		)
+		.orderBy(desc(experimentEvents.createdAt));
+
+	return event?.createdAt ?? null;
 }
 
 export async function recordExperimentResponse({

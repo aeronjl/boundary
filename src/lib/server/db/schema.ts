@@ -94,7 +94,8 @@ export const experimentResponses = sqliteTable(
 	(table) => [
 		index('experiment_responses_run_idx').on(table.runId),
 		index('experiment_responses_run_trial_idx').on(table.runId, table.trialIndex),
-		index('experiment_responses_run_item_idx').on(table.runId, table.itemId)
+		index('experiment_responses_run_item_idx').on(table.runId, table.itemId),
+		uniqueIndex('experiment_responses_run_trial_unique').on(table.runId, table.trialIndex)
 	]
 );
 

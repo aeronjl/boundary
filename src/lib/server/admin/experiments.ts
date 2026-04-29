@@ -111,6 +111,29 @@ export type AdminExperimentExport = {
 	runs: AdminExperimentRun[];
 };
 
+const genericResponseCsvHeaders = [
+	'run_id',
+	'participant_session_id',
+	'experiment_slug',
+	'experiment_name',
+	'experiment_version_id',
+	'run_status',
+	'run_started_at',
+	'run_completed_at',
+	'trial_index',
+	'trial_number',
+	'item_id',
+	'response_type',
+	'response_json',
+	'score_json',
+	'metadata_json',
+	'response_time_ms',
+	'server_response_time_ms',
+	'server_trial_started_at',
+	'server_received_at',
+	'response_created_at'
+] as const;
+
 export const adminExperimentDictionary: AdminExperimentDictionaryEntry[] = [
 	{
 		kind: 'event',
@@ -118,6 +141,13 @@ export const adminExperimentDictionary: AdminExperimentDictionaryEntry[] = [
 		source: 'all experiments',
 		description: 'Recorded once a participant run is created.',
 		fields: ['payload.totalTrials', 'payload.itemOrder or payload.arms']
+	},
+	{
+		kind: 'event',
+		name: 'trial_started',
+		source: 'all experiments',
+		description: 'Recorded when the server presents the next trial.',
+		fields: ['trialIndex', 'payload.itemId']
 	},
 	{
 		kind: 'event',
@@ -158,14 +188,28 @@ export const adminExperimentDictionary: AdminExperimentDictionaryEntry[] = [
 		name: 'tipi_likert',
 		source: 'ten-item-personality-inventory',
 		description: 'Generic copy of a TIPI answer.',
-		fields: ['itemId', 'response.value', 'score.value', 'score.scale', 'score.scoring']
+		fields: [
+			'itemId',
+			'response.value',
+			'score.value',
+			'score.scale',
+			'score.scoring',
+			'metadata.timing.responseTimeMs'
+		]
 	},
 	{
 		kind: 'response',
 		name: 'bandit_arm_pull',
 		source: 'n-armed-bandit',
 		description: 'Generic trial record for one bandit choice.',
-		fields: ['itemId', 'response.armId', 'score.reward', 'score.probability', 'metadata.armLabel']
+		fields: [
+			'itemId',
+			'response.armId',
+			'score.reward',
+			'score.probability',
+			'metadata.armLabel',
+			'metadata.timing.responseTimeMs'
+		]
 	},
 	{
 		kind: 'response',
@@ -178,7 +222,8 @@ export const adminExperimentDictionary: AdminExperimentDictionaryEntry[] = [
 			'score.amount',
 			'score.delaySeconds',
 			'score.netValue',
-			'score.wealthAfter'
+			'score.wealthAfter',
+			'metadata.timing.responseTimeMs'
 		]
 	}
 ];
@@ -198,6 +243,24 @@ function stringValue(value: unknown): string | null {
 
 function numberValue(value: unknown): number | null {
 	return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function csvCell(value: unknown): string {
+	const text = value == null ? '' : String(value);
+	return `"${text.replaceAll('"', '""')}"`;
+}
+
+function jsonCell(value: unknown): string {
+	return value == null ? '' : JSON.stringify(value);
+}
+
+function isoCell(value: number | null): string {
+	return value == null ? '' : new Date(value).toISOString();
+}
+
+function timingRecord(response: AdminExperimentResponse): Record<string, unknown> | null {
+	const metadata = isRecord(response.metadata) ? response.metadata : null;
+	return isRecord(metadata?.timing) ? metadata.timing : null;
 }
 
 function getPayloadRecord(event: AdminExperimentEvent | undefined): Record<string, unknown> | null {
@@ -536,4 +599,44 @@ export async function getAdminExperimentExport(): Promise<AdminExperimentExport>
 		generatedAt: new Date().toISOString(),
 		runs
 	};
+}
+
+export async function getAdminExperimentResponseCsv(): Promise<string> {
+	const { runs } = await getAdminExperimentExport();
+	const rows = [genericResponseCsvHeaders.map(csvCell).join(',')];
+
+	for (const run of runs) {
+		for (const response of run.responses) {
+			const timing = timingRecord(response);
+
+			rows.push(
+				[
+					run.id,
+					run.participantSessionId,
+					run.experimentSlug,
+					run.experimentName,
+					run.experimentVersionId,
+					run.status,
+					isoCell(run.startedAt),
+					isoCell(run.completedAt),
+					response.trialIndex,
+					response.trialIndex + 1,
+					response.itemId,
+					response.responseType,
+					jsonCell(response.response),
+					jsonCell(response.score),
+					jsonCell(response.metadata),
+					numberValue(timing?.responseTimeMs),
+					numberValue(timing?.serverResponseTimeMs),
+					isoCell(numberValue(timing?.serverTrialStartedAt)),
+					isoCell(numberValue(timing?.serverReceivedAt)),
+					isoCell(response.createdAt)
+				]
+					.map(csvCell)
+					.join(',')
+			);
+		}
+	}
+
+	return `${rows.join('\n')}\n`;
 }

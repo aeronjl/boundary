@@ -46,10 +46,11 @@
 	}
 
 	async function choose(optionId: string) {
-		if (!state || !trial) return;
+		if (pending || !state || !trial) return;
 
 		pending = true;
 		errorMessage = '';
+		const submittedAt = Date.now();
 
 		try {
 			const response = await fetch(
@@ -57,7 +58,13 @@
 				{
 					method: 'POST',
 					headers: { 'content-type': 'application/json' },
-					body: JSON.stringify({ trialId: trial.id, optionId })
+					body: JSON.stringify({
+						trialId: trial.id,
+						optionId,
+						trialIndex: state.trialNumber - 1,
+						trialStartedAt: state.trialStartedAt,
+						submittedAt
+					})
 				}
 			);
 

@@ -11,6 +11,17 @@
 	const formatPoints = (value: number) => value.toFixed(0);
 	const formatSeconds = (value: number) => value.toFixed(0);
 	const formatJson = (value: unknown) => JSON.stringify(value, null, 2) ?? 'undefined';
+	const timingValue = (metadata: unknown, key: string) => {
+		if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return null;
+
+		const timing = (metadata as Record<string, unknown>).timing;
+		if (!timing || typeof timing !== 'object' || Array.isArray(timing)) return null;
+
+		const value = (timing as Record<string, unknown>)[key];
+		return typeof value === 'number' && Number.isFinite(value) ? value : null;
+	};
+
+	const formatMs = (value: number | null) => (value === null ? '-' : `${value.toFixed(0)} ms`);
 </script>
 
 <svelte:head>
@@ -151,6 +162,8 @@
 						<th class="py-2 pr-3 font-medium">Trial</th>
 						<th class="py-2 pr-3 font-medium">Item</th>
 						<th class="py-2 pr-3 font-medium">Type</th>
+						<th class="py-2 pr-3 font-medium">Response time</th>
+						<th class="py-2 pr-3 font-medium">Server time</th>
 						<th class="py-2 pr-3 font-medium">Response</th>
 						<th class="py-2 pr-3 font-medium">Score</th>
 					</tr>
@@ -161,6 +174,11 @@
 							<td class="py-2 pr-3">{response.trialIndex + 1}</td>
 							<td class="py-2 pr-3 font-mono">{response.itemId ?? '-'}</td>
 							<td class="py-2 pr-3 font-mono">{response.responseType}</td>
+							<td class="py-2 pr-3">{formatMs(timingValue(response.metadata, 'responseTimeMs'))}</td
+							>
+							<td class="py-2 pr-3">
+								{formatMs(timingValue(response.metadata, 'serverResponseTimeMs'))}
+							</td>
 							<td class="py-2 pr-3">
 								<pre
 									class="max-w-sm overflow-auto font-mono text-xs whitespace-pre-wrap">{formatJson(
@@ -176,7 +194,7 @@
 						</tr>
 					{:else}
 						<tr>
-							<td class="py-4 text-gray-500" colspan="5">No generic responses recorded.</td>
+							<td class="py-4 text-gray-500" colspan="7">No generic responses recorded.</td>
 						</tr>
 					{/each}
 				</tbody>

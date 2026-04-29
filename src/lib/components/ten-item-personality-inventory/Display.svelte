@@ -84,6 +84,7 @@
 							name="answer"
 							value={option.value}
 							class="my-2 font-mono text-xs text-gray-400 hover:cursor-pointer focus:outline-none"
+							{disabled}
 							bind:group={selectedValue}
 						/>
 						<label

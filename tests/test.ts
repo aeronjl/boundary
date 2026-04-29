@@ -1,6 +1,21 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
+type GenericExportResponse = {
+	metadata: {
+		timing: {
+			responseTimeMs: number;
+		};
+	};
+};
+
+type GenericExportRun = {
+	experimentVersionId: string;
+	responses: GenericExportResponse[];
+	events: { eventType: string }[];
+	intertemporalSummary?: { delayedChoiceCount: number } | null;
+};
+
 async function completeTipiRun(page: Page) {
 	await page.goto('/ten-item-personality-inventory');
 	await page.getByRole('button', { name: 'Start' }).click();
@@ -77,14 +92,15 @@ test('n-armed bandit records generic trial data', async ({ page }) => {
 
 	const exportBody = await exportResponse.json();
 	const banditRun = exportBody.runs.find(
-		(run: { experimentVersionId: string; responses: unknown[] }) =>
+		(run: GenericExportRun) =>
 			run.experimentVersionId === 'n-armed-bandit-v1' && run.responses.length === 20
 	);
 
 	expect(banditRun).toBeTruthy();
 	expect(banditRun?.events.map((event: { eventType: string }) => event.eventType)).toEqual(
-		expect.arrayContaining(['run_started', 'arm_pulled', 'run_completed'])
+		expect.arrayContaining(['run_started', 'trial_started', 'arm_pulled', 'run_completed'])
 	);
+	expect(banditRun?.responses[0].metadata.timing.responseTimeMs).toEqual(expect.any(Number));
 
 	await page.getByRole('link', { name: 'Experiment runs' }).click();
 	await expect(page.getByRole('heading', { name: 'Experiment runs' })).toBeVisible();
@@ -111,11 +127,7 @@ test('intertemporal choice records generic trial data', async ({ page }) => {
 
 	const exportBody = await exportResponse.json();
 	const choiceRun = exportBody.runs.find(
-		(run: {
-			experimentVersionId: string;
-			responses: unknown[];
-			intertemporalSummary: { delayedChoiceCount: number } | null;
-		}) =>
+		(run: GenericExportRun) =>
 			run.experimentVersionId === 'intertemporal-choice-v1' &&
 			run.responses.length === 8 &&
 			run.intertemporalSummary?.delayedChoiceCount === 8
@@ -123,8 +135,9 @@ test('intertemporal choice records generic trial data', async ({ page }) => {
 
 	expect(choiceRun).toBeTruthy();
 	expect(choiceRun?.events.map((event: { eventType: string }) => event.eventType)).toEqual(
-		expect.arrayContaining(['run_started', 'choice_made', 'run_completed'])
+		expect.arrayContaining(['run_started', 'trial_started', 'choice_made', 'run_completed'])
 	);
+	expect(choiceRun?.responses[0].metadata.timing.responseTimeMs).toEqual(expect.any(Number));
 
 	await page.goto('/admin/experiments?experiment=intertemporal-choice');
 	await expect(page.getByRole('heading', { name: 'Experiment runs' })).toBeVisible();
@@ -151,6 +164,7 @@ test('admin can inspect and export ten item personality inventory data', async (
 	await expect(page.getByRole('link', { name: 'CSV export' })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'JSON export' })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'All experiment JSON' })).toBeVisible();
+	await expect(page.getByRole('link', { name: 'All experiment CSV' })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Experiment runs' })).toBeVisible();
 
 	const csvResponse = await page.request.get('/admin/tipi/export.csv');
@@ -163,8 +177,12 @@ test('admin can inspect and export ten item personality inventory data', async (
 	expect(jsonExport).toMatchObject({ runs: expect.any(Array) });
 	expect(jsonExport.runs[0].genericResponses).toHaveLength(10);
 	expect(jsonExport.runs[0].events.map((event: { eventType: string }) => event.eventType)).toEqual(
-		expect.arrayContaining(['run_started', 'response_submitted', 'run_completed'])
+		expect.arrayContaining(['run_started', 'trial_started', 'response_submitted', 'run_completed'])
 	);
+
+	const genericCsvResponse = await page.request.get('/admin/experiments/export.csv');
+	expect(genericCsvResponse.status()).toBe(200);
+	expect(await genericCsvResponse.text()).toContain('response_time_ms');
 
 	await page
 		.getByRole('link', { name: /View run/ })

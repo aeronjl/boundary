@@ -18,7 +18,15 @@ import {
 	getPublishedExperimentVersion,
 	markExperimentRunCompleted
 } from './lifecycle';
-import { recordExperimentEvent, recordExperimentResponse } from './records';
+import {
+	assertSubmittedTrialIndex,
+	createTimingMetadata,
+	getTrialStartedAt,
+	recordExperimentEvent,
+	recordExperimentResponse,
+	recordTrialStarted,
+	type TrialSubmissionTiming
+} from './records';
 
 type ResponseRow = typeof experimentResponses.$inferSelect;
 
@@ -116,12 +124,14 @@ function createState(
 	runId: string,
 	context: BanditStartedPayload,
 	responses: ResponseRow[],
-	lastOutcome: BanditOutcome | null
+	lastOutcome: BanditOutcome | null,
+	trialStartedAt: number | null
 ): BanditRunState {
 	return {
 		runId,
 		trialNumber: responses.length + 1,
 		totalTrials: context.totalTrials,
+		trialStartedAt,
 		score: totalRewardFromResponses(responses),
 		arms: context.arms,
 		lastOutcome
@@ -177,10 +187,25 @@ export async function startBanditRun(
 		}
 	});
 
-	return createState(run.id, { config, arms, totalTrials: config.totalTrials }, [], null);
+	const trialStarted = await recordTrialStarted({
+		runId: run.id,
+		trialIndex: 0
+	});
+
+	return createState(
+		run.id,
+		{ config, arms, totalTrials: config.totalTrials },
+		[],
+		null,
+		trialStarted.createdAt
+	);
 }
 
-export async function submitBanditPull(runId: string, armId: string): Promise<BanditPullResult> {
+export async function submitBanditPull(
+	runId: string,
+	armId: string,
+	timing: TrialSubmissionTiming = {}
+): Promise<BanditPullResult> {
 	const run = await getExperimentRun(runId, banditVersionId);
 
 	if (!run) {
@@ -204,6 +229,7 @@ export async function submitBanditPull(runId: string, armId: string): Promise<Ba
 	}
 
 	const trialIndex = responses.length;
+	assertSubmittedTrialIndex(timing.trialIndex, trialIndex);
 
 	if (trialIndex >= context.totalTrials) {
 		const result = await completeBanditRun(runId, context, responses);
@@ -224,6 +250,8 @@ export async function submitBanditPull(runId: string, armId: string): Promise<Ba
 
 	const reward = Math.random() < arm.rewardProbability ? context.config.rewardValue : 0;
 	const createdAt = Date.now();
+	const serverTrialStartedAt = await getTrialStartedAt(runId, trialIndex);
+	const timingMetadata = createTimingMetadata(timing, serverTrialStartedAt, createdAt);
 	const outcome: BanditOutcome = {
 		trialIndex,
 		armId,
@@ -242,7 +270,8 @@ export async function submitBanditPull(runId: string, armId: string): Promise<Ba
 			probability: arm.rewardProbability
 		},
 		metadata: {
-			armLabel: arm.label
+			armLabel: arm.label,
+			timing: timingMetadata
 		},
 		createdAt
 	});
@@ -255,7 +284,8 @@ export async function submitBanditPull(runId: string, armId: string): Promise<Ba
 			armId,
 			armLabel: arm.label,
 			reward,
-			totalReward: outcome.totalReward
+			totalReward: outcome.totalReward,
+			timing: timingMetadata
 		},
 		createdAt
 	});
@@ -267,9 +297,14 @@ export async function submitBanditPull(runId: string, armId: string): Promise<Ba
 		return { completed: true, runId, result, lastOutcome: outcome };
 	}
 
+	const nextTrialStarted = await recordTrialStarted({
+		runId,
+		trialIndex: trialIndex + 1
+	});
+
 	return {
 		completed: false,
-		...createState(runId, context, updatedResponses, outcome)
+		...createState(runId, context, updatedResponses, outcome, nextTrialStarted.createdAt)
 	};
 }
 

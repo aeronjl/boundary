@@ -7,8 +7,9 @@
 	export let triggerFunction = false;
 	export let disabled = false;
 	export let errorMessage = '';
+	export let showIntroduction = true;
 
-	let introduction = true;
+	let introduction = showIntroduction;
 	let askingQuestions = false;
 	let finished = false;
 	let selectedValue: string = '';
@@ -40,6 +41,11 @@
 		introduction = false;
 		finished = true;
 		askingQuestions = false;
+	}
+
+	$: if (selectedQuestion && !finished) {
+		introduction = false;
+		askingQuestions = true;
 	}
 </script>
 
@@ -110,6 +116,7 @@
 		<button
 			on:click={() => {
 				introduction = true;
+				if (!showIntroduction) introduction = false;
 				finished = false;
 				askingQuestions = false;
 				handleReset();

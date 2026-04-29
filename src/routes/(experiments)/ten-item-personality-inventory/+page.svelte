@@ -1,7 +1,11 @@
 <script lang="ts">
+	import ExperimentStartGate from '$lib/components/ExperimentStartGate.svelte';
 	import Display from '$lib/components/ten-item-personality-inventory/Display.svelte';
+	import { getExperimentCatalogEntry } from '$lib/experiments/catalog';
 	import type { TipiQuestion, TipiResult, TipiRunState } from '$lib/experiments/tipi';
 	import { tipiResult } from '../../../stores/ten-item-personality-inventory/experimentData';
+
+	const experiment = getExperimentCatalogEntry('ten-item-personality-inventory');
 
 	let runId = '';
 	let currentQuestion: TipiQuestion | null = null;
@@ -122,14 +126,21 @@
 	</p>
 {/if}
 
-<Display
-	selectedQuestion={currentQuestion?.question ?? ''}
-	{trialNumber}
-	{totalTrials}
-	disabled={isBusy}
-	{errorMessage}
-	bind:triggerFunction={finishExperiment}
-	on:start={handleStart}
-	on:submit={handleRequestNewQuestion}
-	on:reset={resetExperiment}
-/>
+{#if !runId && !finishExperiment}
+	<ExperimentStartGate {experiment} busy={isBusy} on:start={handleStart} />
+{:else}
+	<Display
+		selectedQuestion={currentQuestion?.question ?? ''}
+		{trialNumber}
+		{totalTrials}
+		disabled={isBusy}
+		{errorMessage}
+		showIntroduction={false}
+		bind:triggerFunction={finishExperiment}
+		on:submit={handleRequestNewQuestion}
+		on:reset={resetExperiment}
+	/>
+	{#if finishExperiment}
+		<p class="mt-3 max-w-2xl text-sm text-gray-600">{experiment.debrief}</p>
+	{/if}
+{/if}

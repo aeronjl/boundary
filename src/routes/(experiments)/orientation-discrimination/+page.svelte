@@ -1,4 +1,6 @@
 <script lang="ts">
+	import ExperimentStartGate from '$lib/components/ExperimentStartGate.svelte';
+	import { getExperimentCatalogEntry } from '$lib/experiments/catalog';
 	import type {
 		OrientationDirection,
 		OrientationOutcome,
@@ -7,6 +9,8 @@
 		OrientationSubmitResult
 	} from '$lib/experiments/orientation';
 	import Display from '$lib/components/orientation-discrimination/Display.svelte';
+
+	const experiment = getExperimentCatalogEntry('orientation-discrimination');
 
 	let state: OrientationRunState | null = null;
 	let result: OrientationResult | null = null;
@@ -122,15 +126,7 @@
 	{/if}
 
 	{#if !state && !result}
-		<div class="border-t border-gray-200 pt-4">
-			<button
-				class="rounded-sm bg-black px-4 py-2 text-white disabled:bg-gray-300"
-				disabled={pending}
-				on:click={startRun}
-			>
-				Start
-			</button>
-		</div>
+		<ExperimentStartGate {experiment} busy={pending} on:start={startRun} />
 	{/if}
 
 	{#if state && trial}
@@ -178,6 +174,7 @@
 	{#if result}
 		<div>
 			<h2 class="font-serif text-2xl">Orientation discrimination complete</h2>
+			<p class="mt-2 max-w-2xl text-gray-600">{experiment.debrief}</p>
 			<div class="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
 				<div class="border-t border-gray-200 py-3">
 					<p class="text-xs text-gray-500">Accuracy</p>

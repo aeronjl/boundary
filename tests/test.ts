@@ -18,9 +18,21 @@ type GenericExportRun = {
 	nBackSummary?: { totalTrials: number; correctCount: number } | null;
 };
 
+async function acceptConsentAndStart(page: Page) {
+	await expect(page.getByRole('heading', { name: 'Before you start' })).toBeVisible();
+	const consent = page.getByLabel(/I consent to take part/);
+
+	if (await consent.isVisible()) {
+		await consent.check();
+		await page.getByRole('button', { name: 'Accept and start' }).click();
+	} else {
+		await page.getByRole('button', { name: 'Start' }).click();
+	}
+}
+
 async function completeTipiRun(page: Page) {
 	await page.goto('/ten-item-personality-inventory');
-	await page.getByRole('button', { name: 'Start' }).click();
+	await acceptConsentAndStart(page);
 
 	for (let trial = 1; trial <= 10; trial++) {
 		await expect(page.getByText(`Question ${trial} of 10`)).toBeVisible();
@@ -33,7 +45,7 @@ async function completeTipiRun(page: Page) {
 
 async function completeBanditRun(page: Page) {
 	await page.goto('/n-armed-bandit');
-	await page.getByRole('button', { name: 'Start' }).click();
+	await acceptConsentAndStart(page);
 
 	for (let trial = 1; trial <= 20; trial++) {
 		await expect(page.getByText(`Trial ${trial} of 20`)).toBeVisible();
@@ -45,7 +57,7 @@ async function completeBanditRun(page: Page) {
 
 async function completeIntertemporalRun(page: Page) {
 	await page.goto('/intertemporal-choice');
-	await page.getByRole('button', { name: 'Start' }).click();
+	await acceptConsentAndStart(page);
 
 	for (let trial = 1; trial <= 8; trial++) {
 		await expect(page.getByText(`${trial} of 8`)).toBeVisible();
@@ -57,7 +69,7 @@ async function completeIntertemporalRun(page: Page) {
 
 async function completeOrientationRun(page: Page) {
 	await page.goto('/orientation-discrimination');
-	await page.getByRole('button', { name: 'Start' }).click();
+	await acceptConsentAndStart(page);
 
 	for (let trial = 1; trial <= 16; trial++) {
 		await expect(page.getByText(`${trial} of 16`)).toBeVisible();
@@ -71,7 +83,7 @@ async function completeOrientationRun(page: Page) {
 
 async function completeNBackRun(page: Page) {
 	await page.goto('/n-back');
-	await page.getByRole('button', { name: 'Start' }).click();
+	await acceptConsentAndStart(page);
 
 	for (let trial = 1; trial <= 16; trial++) {
 		await expect(page.getByText(`${trial} of 16`)).toBeVisible();
@@ -99,6 +111,21 @@ test('health endpoint reports readiness', async ({ request }) => {
 			remote: false
 		}
 	});
+});
+
+test('experiment starts require participant consent', async ({ page, request }) => {
+	const blocked = await request.post('/api/experiments/n-back/runs');
+	expect(blocked.status()).toBe(403);
+	expect(await blocked.json()).toMatchObject({
+		message: expect.stringContaining('consent')
+	});
+
+	await page.goto('/n-back');
+	await expect(page.getByRole('heading', { name: 'Before you start' })).toBeVisible();
+	await expect(page.getByText('Estimated duration')).toBeVisible();
+	await page.getByLabel(/I consent to take part/).check();
+	await page.getByRole('button', { name: 'Accept and start' }).click();
+	await expect(page.getByText('1 of 16')).toBeVisible();
 });
 
 test('ten item personality inventory records and displays results', async ({ page }) => {

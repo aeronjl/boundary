@@ -1,10 +1,14 @@
 <script lang="ts">
+	import ExperimentStartGate from '$lib/components/ExperimentStartGate.svelte';
+	import { getExperimentCatalogEntry } from '$lib/experiments/catalog';
 	import type {
 		BanditArm,
 		BanditPullResult,
 		BanditResult,
 		BanditRunState
 	} from '$lib/experiments/bandit';
+
+	const experiment = getExperimentCatalogEntry('n-armed-bandit');
 
 	let runId = '';
 	let trialNumber = 0;
@@ -114,13 +118,7 @@
 	</div>
 
 	{#if !runId}
-		<button
-			on:click={startRun}
-			disabled={isBusy}
-			class="w-fit rounded-sm bg-black px-4 py-2 text-xs text-white disabled:bg-gray-300"
-		>
-			Start
-		</button>
+		<ExperimentStartGate {experiment} busy={isBusy} on:start={startRun} />
 	{:else}
 		<div class="grid gap-3 border-t border-gray-200 pt-4 md:grid-cols-3">
 			<div>
@@ -170,6 +168,7 @@
 				<p class="mt-1 text-gray-600">
 					You collected {result.totalReward} rewards across {result.totalTrials} trials.
 				</p>
+				<p class="mt-2 max-w-2xl text-gray-600">{experiment.debrief}</p>
 
 				<table class="mt-4 w-full text-left text-xs">
 					<thead class="text-gray-500">

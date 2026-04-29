@@ -36,6 +36,27 @@ export const participantSessions = sqliteTable('participant_sessions', {
 	lastSeenAt: integer('last_seen_at').notNull()
 });
 
+export const participantConsents = sqliteTable(
+	'participant_consents',
+	{
+		id: text('id').primaryKey(),
+		participantSessionId: text('participant_session_id')
+			.notNull()
+			.references(() => participantSessions.id, { onDelete: 'cascade' }),
+		consentVersion: text('consent_version').notNull(),
+		userAgent: text('user_agent'),
+		detailsJson: text('details_json').notNull().default('{}'),
+		acceptedAt: integer('accepted_at').notNull()
+	},
+	(table) => [
+		index('participant_consents_session_idx').on(table.participantSessionId),
+		uniqueIndex('participant_consents_session_version_unique').on(
+			table.participantSessionId,
+			table.consentVersion
+		)
+	]
+);
+
 export const experimentRuns = sqliteTable(
 	'experiment_runs',
 	{

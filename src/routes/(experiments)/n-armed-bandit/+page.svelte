@@ -3,6 +3,13 @@
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
 	import ExperimentStartGate from '$lib/components/ExperimentStartGate.svelte';
+	import InterpretationPanel from '$lib/components/InterpretationPanel.svelte';
+	import {
+		banditRewardRate,
+		bestBanditArm,
+		bestBanditArmSelectionRate,
+		createBanditInterpretation
+	} from '$lib/experiments/bandit-interpretation';
 	import { getExperimentCatalogEntry } from '$lib/experiments/catalog';
 	import {
 		clearStoredExperimentRunId,
@@ -35,6 +42,13 @@
 	$: progressLabel =
 		totalTrials > 0 ? `Trial ${Math.min(trialNumber, totalTrials)} of ${totalTrials}` : '';
 	$: progressPercent = result ? 100 : totalTrials > 0 ? ((trialNumber - 1) / totalTrials) * 100 : 0;
+	$: interpretation = result ? createBanditInterpretation(result) : null;
+	$: resultBestArm = result ? bestBanditArm(result) : null;
+	$: resultBestArmRate = result ? bestBanditArmSelectionRate(result) : null;
+	$: resultRewardRate = result ? banditRewardRate(result) : null;
+
+	const formatPercent = (value: number | null) =>
+		value === null ? '-' : `${(value * 100).toFixed(0)}%`;
 
 	async function parseJsonResponse<T>(response: Response): Promise<T> {
 		const body = (await response.json()) as T & { message?: string };
@@ -240,6 +254,21 @@
 				</p>
 				<p class="mt-2 max-w-2xl text-gray-600">{experiment.debrief}</p>
 
+				<div class="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3">
+					<div class="border-t border-gray-200 py-3">
+						<p class="text-xs text-gray-500">Reward rate</p>
+						<p class="font-serif text-2xl">{formatPercent(resultRewardRate)}</p>
+					</div>
+					<div class="border-t border-gray-200 py-3">
+						<p class="text-xs text-gray-500">Best arm</p>
+						<p class="font-serif text-2xl">{resultBestArm?.label ?? '-'}</p>
+					</div>
+					<div class="border-t border-gray-200 py-3">
+						<p class="text-xs text-gray-500">Best-arm pulls</p>
+						<p class="font-serif text-2xl">{formatPercent(resultBestArmRate)}</p>
+					</div>
+				</div>
+
 				<table class="mt-4 w-full text-left text-xs">
 					<thead class="text-gray-500">
 						<tr>
@@ -260,6 +289,10 @@
 						{/each}
 					</tbody>
 				</table>
+
+				{#if interpretation}
+					<InterpretationPanel {interpretation} />
+				{/if}
 
 				{#if studySessionId}
 					<a

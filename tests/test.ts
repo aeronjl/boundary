@@ -86,6 +86,8 @@ async function completeBanditRun(page: Page) {
 	}
 
 	await expect(page.getByRole('heading', { name: 'Bandit run complete' })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'How this compares' })).toBeVisible();
+	await expect(page.getByText('Reward yield', { exact: true })).toBeVisible();
 }
 
 async function completeIntertemporalRun(page: Page) {
@@ -98,6 +100,8 @@ async function completeIntertemporalRun(page: Page) {
 	}
 
 	await expect(page.getByRole('heading', { name: 'Intertemporal choice complete' })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'How this compares' })).toBeVisible();
+	await expect(page.getByText('Delay preference', { exact: true })).toBeVisible();
 }
 
 async function completeOrientationRun(page: Page) {

@@ -1,4 +1,14 @@
 import { describe, it, expect } from 'vitest';
+import type { BanditResult } from '$lib/experiments/bandit';
+import {
+	bestBanditArmSelectionRate,
+	createBanditInterpretation
+} from '$lib/experiments/bandit-interpretation';
+import type { IntertemporalResult } from '$lib/experiments/intertemporal';
+import {
+	createIntertemporalInterpretation,
+	intertemporalDelayedChoiceRate
+} from '$lib/experiments/intertemporal-interpretation';
 import { calculateNBackSignalDetectionMetrics, type NBackResult } from '$lib/experiments/n-back';
 import { createNBackInterpretation } from '$lib/experiments/n-back-interpretation';
 import {
@@ -84,6 +94,56 @@ describe('orientation interpretation helpers', () => {
 		expect(interpretation.cards.map((card) => card.title)).toContain('Approximate threshold');
 		expect(interpretation.relatedPrompts.map((prompt) => prompt.href)).toContain('/n-back');
 		expect(interpretation.disclaimer).toContain('not medical');
+	});
+});
+
+describe('bandit interpretation helpers', () => {
+	it('summarizes reward learning and best-arm use', () => {
+		const result: BanditResult = {
+			runId: 'run-1',
+			completedAt: new Date(0).toISOString(),
+			totalReward: 13,
+			totalTrials: 20,
+			bestArmId: 'arm-a',
+			arms: [
+				{ id: 'arm-a', label: 'A', rewardProbability: 0.8, pulls: 12, reward: 10 },
+				{ id: 'arm-b', label: 'B', rewardProbability: 0.4, pulls: 4, reward: 2 },
+				{ id: 'arm-c', label: 'C', rewardProbability: 0.3, pulls: 2, reward: 1 },
+				{ id: 'arm-d', label: 'D', rewardProbability: 0.2, pulls: 2, reward: 0 }
+			]
+		};
+		const interpretation = createBanditInterpretation(result);
+
+		expect(bestBanditArmSelectionRate(result)).toBe(0.6);
+		expect(interpretation.cards.map((card) => card.title)).toContain('Best-arm use');
+		expect(interpretation.relatedPrompts.map((prompt) => prompt.href)).toContain(
+			'/intertemporal-choice'
+		);
+		expect(interpretation.references).toHaveLength(3);
+	});
+});
+
+describe('intertemporal interpretation helpers', () => {
+	it('summarizes delay choice and net value', () => {
+		const result: IntertemporalResult = {
+			runId: 'run-1',
+			completedAt: new Date(0).toISOString(),
+			totalTrials: 8,
+			totalIncome: 2000,
+			totalDelaySeconds: 30,
+			totalTimeCost: 600,
+			netGain: 1400,
+			finalWealth: 2400,
+			immediateChoiceCount: 3,
+			delayedChoiceCount: 5,
+			averageDelaySeconds: 3.75
+		};
+		const interpretation = createIntertemporalInterpretation(result);
+
+		expect(intertemporalDelayedChoiceRate(result)).toBe(5 / 8);
+		expect(interpretation.cards.map((card) => card.title)).toContain('Delay preference');
+		expect(interpretation.relatedPrompts.map((prompt) => prompt.href)).toContain('/n-armed-bandit');
+		expect(interpretation.references).toHaveLength(3);
 	});
 });
 

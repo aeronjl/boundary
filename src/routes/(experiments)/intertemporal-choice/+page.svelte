@@ -4,6 +4,11 @@
 	import { onMount } from 'svelte';
 	import ExperimentStartGate from '$lib/components/ExperimentStartGate.svelte';
 	import { getExperimentCatalogEntry } from '$lib/experiments/catalog';
+	import InterpretationPanel from '$lib/components/InterpretationPanel.svelte';
+	import {
+		createIntertemporalInterpretation,
+		intertemporalDelayedChoiceRate
+	} from '$lib/experiments/intertemporal-interpretation';
 	import {
 		clearStoredExperimentRunId,
 		getStoredExperimentRunId,
@@ -29,9 +34,13 @@
 	$: studySessionId = $page.url.searchParams.get('study') ?? '';
 	$: trial = state?.trial ?? null;
 	$: options = trial ? [trial.sooner, trial.later] : [];
+	$: interpretation = result ? createIntertemporalInterpretation(result) : null;
+	$: delayedChoiceRate = result ? intertemporalDelayedChoiceRate(result) : null;
 
 	const formatPoints = (value: number) => `${value.toFixed(0)} points`;
 	const formatSeconds = (value: number) => `${value.toFixed(0)} sec`;
+	const formatPercent = (value: number | null) =>
+		value === null ? '-' : `${(value * 100).toFixed(0)}%`;
 
 	function netValue(option: IntertemporalOption): number {
 		return option.amount - option.delaySeconds * (state?.timeCostPerSecond ?? 0);
@@ -250,7 +259,26 @@
 					<p class="text-xs text-gray-500">Delay taken</p>
 					<p>{formatSeconds(result.totalDelaySeconds)}</p>
 				</div>
+				<div class="border-t border-gray-200 py-3">
+					<p class="text-xs text-gray-500">Immediate choices</p>
+					<p>{result.immediateChoiceCount} of {result.totalTrials}</p>
+				</div>
+				<div class="border-t border-gray-200 py-3">
+					<p class="text-xs text-gray-500">Average delay</p>
+					<p>{formatSeconds(result.averageDelaySeconds)}</p>
+				</div>
+				<div class="border-t border-gray-200 py-3">
+					<p class="text-xs text-gray-500">Time cost</p>
+					<p>{formatPoints(result.totalTimeCost)}</p>
+				</div>
+				<div class="border-t border-gray-200 py-3">
+					<p class="text-xs text-gray-500">Delayed rate</p>
+					<p>{formatPercent(delayedChoiceRate)}</p>
+				</div>
 			</div>
+			{#if interpretation}
+				<InterpretationPanel {interpretation} />
+			{/if}
 			{#if studySessionId}
 				<a
 					class="mt-4 inline-block rounded-sm bg-black px-3 py-2 text-xs text-white"

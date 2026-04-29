@@ -8,6 +8,8 @@ import {
 	type InterpretationCard,
 	type RelatedTaskPrompt
 } from '$lib/experiments/interpretation';
+import { banditEvidenceReferences } from '$lib/experiments/bandit-interpretation';
+import { intertemporalEvidenceReferences } from '$lib/experiments/intertemporal-interpretation';
 import { nBackEvidenceReferences } from '$lib/experiments/n-back-interpretation';
 import { orientationEvidenceReferences } from '$lib/experiments/orientation-interpretation';
 
@@ -122,7 +124,12 @@ function decisionCard(
 			intertemporal && bandit
 				? 'The study now has both delay-choice and reward-learning signals, which are useful comparison axes for later reference datasets.'
 				: 'The completed decision task adds context, but the paired decision task would make this part of the profile more interpretable.',
-		evidenceIds: []
+		evidenceIds:
+			intertemporal && bandit
+				? ['frederick-2002', 'green-myerson-2004', 'sutton-barto-2018', 'steyvers-2009']
+				: intertemporal
+					? ['frederick-2002', 'green-myerson-2004']
+					: ['sutton-barto-2018', 'steyvers-2009', 'wilson-2014']
 	};
 }
 
@@ -183,7 +190,7 @@ function createPrompts(
 			title: 'Try the bandit task',
 			body: 'Adds reward-learning and exploration context to the profile.',
 			href: '/n-armed-bandit',
-			evidenceIds: []
+			evidenceIds: ['steyvers-2009']
 		});
 	}
 
@@ -227,7 +234,12 @@ export function createStudyProfileInterpretation(
 	const cards = [completionCard(tasks), ...optionalCards];
 	const relatedPrompts = createPrompts(tasks, orientation, nBack);
 	const references = referencesFor(
-		[...orientationEvidenceReferences, ...nBackEvidenceReferences],
+		[
+			...orientationEvidenceReferences,
+			...nBackEvidenceReferences,
+			...banditEvidenceReferences,
+			...intertemporalEvidenceReferences
+		],
 		cards,
 		relatedPrompts
 	);

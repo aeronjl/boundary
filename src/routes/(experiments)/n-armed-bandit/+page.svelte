@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
+	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
 	import ExperimentStartGate from '$lib/components/ExperimentStartGate.svelte';
 	import { getExperimentCatalogEntry } from '$lib/experiments/catalog';
@@ -29,6 +31,7 @@
 	let errorMessage = '';
 	let resumeChecked = false;
 
+	$: studySessionId = $page.url.searchParams.get('study') ?? '';
 	$: progressLabel =
 		totalTrials > 0 ? `Trial ${Math.min(trialNumber, totalTrials)} of ${totalTrials}` : '';
 	$: progressPercent = result ? 100 : totalTrials > 0 ? ((trialNumber - 1) / totalTrials) * 100 : 0;
@@ -77,7 +80,8 @@
 	}
 
 	async function resumeStoredRun() {
-		const storedRunId = getStoredExperimentRunId(experiment.slug);
+		const storedRunId =
+			$page.url.searchParams.get('run') ?? getStoredExperimentRunId(experiment.slug);
 
 		if (!storedRunId) {
 			resumeChecked = true;
@@ -117,7 +121,11 @@
 		trialStartedAt = null;
 
 		try {
-			const response = await fetch('/api/experiments/n-armed-bandit/runs', { method: 'POST' });
+			const response = await fetch('/api/experiments/n-armed-bandit/runs', {
+				method: 'POST',
+				headers: studySessionId ? { 'content-type': 'application/json' } : undefined,
+				body: studySessionId ? JSON.stringify({ studySessionId }) : undefined
+			});
 			applyRunState(await parseJsonResponse<BanditRunState>(response));
 		} catch (error) {
 			errorMessage = error instanceof Error ? error.message : 'Could not start the task.';
@@ -253,13 +261,22 @@
 					</tbody>
 				</table>
 
-				<button
-					on:click={startRun}
-					disabled={isBusy}
-					class="mt-4 rounded-sm bg-black px-4 py-2 text-xs text-white disabled:bg-gray-300"
-				>
-					Start another run
-				</button>
+				{#if studySessionId}
+					<a
+						class="mt-4 inline-block rounded-sm bg-black px-4 py-2 text-xs text-white"
+						href={resolve('/study')}
+					>
+						Continue study
+					</a>
+				{:else}
+					<button
+						on:click={startRun}
+						disabled={isBusy}
+						class="mt-4 rounded-sm bg-black px-4 py-2 text-xs text-white disabled:bg-gray-300"
+					>
+						Start another run
+					</button>
+				{/if}
 			</div>
 		{/if}
 	{/if}

@@ -291,6 +291,52 @@ test('ten item personality inventory resumes saved runs after reload', async ({ 
 	).toBeNull();
 });
 
+test('study runner tracks task progress across experiments', async ({ page }) => {
+	await page.goto('/study');
+	await expect(page.getByRole('heading', { name: 'Boundary study' })).toBeVisible();
+	await page.getByLabel(/I consent to take part in this study/).check();
+	await page.getByRole('button', { name: 'Accept and start study' }).click();
+
+	await expect(page.getByText('0 of 5')).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Orientation discrimination' })).toBeVisible();
+	await page.getByRole('link', { name: 'Start task' }).click();
+
+	await expect(page).toHaveURL(/\/orientation-discrimination\?study=/);
+	await page.getByRole('button', { name: 'Start' }).click();
+
+	for (let trial = 1; trial <= 16; trial++) {
+		await expect(page.getByText(`${trial} of 16`)).toBeVisible();
+		await page.getByRole('button', { name: 'Choose clockwise' }).click();
+	}
+
+	await expect(
+		page.getByRole('heading', { name: 'Orientation discrimination complete' })
+	).toBeVisible();
+	await page.getByRole('link', { name: 'Continue study' }).click();
+
+	await expect(page).toHaveURL(/\/study$/);
+	await expect(page.getByText('1 of 5')).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Intertemporal choice' })).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Start task' })).toHaveAttribute(
+		'href',
+		/intertemporal-choice/
+	);
+	const orientationRow = page.getByRole('row').filter({ hasText: 'Orientation discrimination' });
+	await expect(orientationRow).toContainText('completed');
+
+	await page.reload();
+	await expect(page.getByText('1 of 5')).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Intertemporal choice' })).toBeVisible();
+
+	await page.goto('/admin');
+	await page.getByLabel('Admin token').fill('test-admin-token');
+	await page.getByRole('button', { name: 'Sign in' }).click();
+	await page.getByRole('link', { name: 'Study sessions' }).click();
+	await expect(page.getByRole('heading', { name: 'Study sessions' })).toBeVisible();
+	await expect(page.getByText('1 of 5').first()).toBeVisible();
+	await expect(page.getByText('Intertemporal choice').first()).toBeVisible();
+});
+
 test('n-armed bandit records generic trial data', async ({ page }) => {
 	await completeBanditRun(page);
 

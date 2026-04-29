@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
+	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
 	import ExperimentStartGate from '$lib/components/ExperimentStartGate.svelte';
 	import { getExperimentCatalogEntry } from '$lib/experiments/catalog';
@@ -25,6 +27,7 @@
 	let errorMessage = '';
 	let resumeChecked = false;
 
+	$: studySessionId = $page.url.searchParams.get('study') ?? '';
 	$: trial = state?.trial ?? null;
 	$: progressPercent = result
 		? 100
@@ -69,7 +72,8 @@
 	}
 
 	async function resumeStoredRun() {
-		const storedRunId = getStoredExperimentRunId(experiment.slug);
+		const storedRunId =
+			$page.url.searchParams.get('run') ?? getStoredExperimentRunId(experiment.slug);
 
 		if (!storedRunId) {
 			resumeChecked = true;
@@ -110,7 +114,9 @@
 
 		try {
 			const response = await fetch('/api/experiments/orientation-discrimination/runs', {
-				method: 'POST'
+				method: 'POST',
+				headers: studySessionId ? { 'content-type': 'application/json' } : undefined,
+				body: studySessionId ? JSON.stringify({ studySessionId }) : undefined
 			});
 			applyRunState(await parseJsonResponse<OrientationRunState>(response));
 		} catch (error) {
@@ -252,13 +258,22 @@
 					<p>{formatMs(result.meanResponseTimeMs)}</p>
 				</div>
 			</div>
-			<button
-				class="mt-4 rounded-sm bg-gray-100 px-3 py-2 text-xs"
-				disabled={pending}
-				on:click={startRun}
-			>
-				Start another run
-			</button>
+			{#if studySessionId}
+				<a
+					class="mt-4 inline-block rounded-sm bg-black px-3 py-2 text-xs text-white"
+					href={resolve('/study')}
+				>
+					Continue study
+				</a>
+			{:else}
+				<button
+					class="mt-4 rounded-sm bg-gray-100 px-3 py-2 text-xs"
+					disabled={pending}
+					on:click={startRun}
+				>
+					Start another run
+				</button>
+			{/if}
 		</div>
 	{/if}
 </section>

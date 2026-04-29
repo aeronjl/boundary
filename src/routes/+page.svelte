@@ -12,6 +12,13 @@
 </p>
 <p class="my-2 text-justify text-sm">You are invited to try these experiments for yourself.</p>
 
+<a
+	class="my-4 inline-block rounded-sm bg-black px-4 py-2 text-sm text-white"
+	href={resolve('/study')}
+>
+	Start the Boundary study
+</a>
+
 <div class="my-4 flex flex-col gap-y-1">
 	<h3 class="font-serif text-lg">Recent Experiments</h3>
 	<ul class="list-inside list-disc text-sm">

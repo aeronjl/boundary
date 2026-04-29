@@ -20,6 +20,7 @@ import {
 	markExperimentRunCompleted,
 	parseExperimentRunItemOrder
 } from './lifecycle';
+import { markStudyTaskCompletedForRun } from '../studies';
 import {
 	assertSubmittedTrialIndex,
 	createTimingMetadata,
@@ -398,6 +399,7 @@ async function completeTipiRun(runId: string): Promise<TipiResult> {
 		});
 
 	await markExperimentRunCompleted(runId, completedAt);
+	await markStudyTaskCompletedForRun(runId, completedAt);
 
 	await recordExperimentEvent({
 		runId,

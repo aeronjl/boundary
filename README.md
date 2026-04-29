@@ -42,7 +42,8 @@ Set `ADMIN_TOKEN` to protect `/admin` and the export endpoints:
 ADMIN_TOKEN=...
 ```
 
-Apply production migrations and seed experiment definitions with:
+Vercel runs `bun run db:deploy` before each production build via `vercel.json`. To apply
+production migrations manually, use:
 
 ```sh
 TURSO_DATABASE_URL=... TURSO_AUTH_TOKEN=... bun run db:deploy

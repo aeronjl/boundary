@@ -8,6 +8,7 @@
 	export let disabled = false;
 	export let errorMessage = '';
 	export let showIntroduction = true;
+	export let showReset = true;
 
 	let introduction = showIntroduction;
 	let askingQuestions = false;
@@ -113,17 +114,19 @@
 	{/if}
 	{#if finished}
 		<p class="my-4 font-mono text-xs">You have completed the inventory.</p>
-		<button
-			on:click={() => {
-				introduction = true;
-				if (!showIntroduction) introduction = false;
-				finished = false;
-				askingQuestions = false;
-				handleReset();
-			}}
-			class="w-1/4 border border-r-8 border-b-8 border-black p-1 font-mono text-xs active:bg-gray-50"
-		>
-			Reset
-		</button>
+		{#if showReset}
+			<button
+				on:click={() => {
+					introduction = true;
+					if (!showIntroduction) introduction = false;
+					finished = false;
+					askingQuestions = false;
+					handleReset();
+				}}
+				class="w-1/4 border border-r-8 border-b-8 border-black p-1 font-mono text-xs active:bg-gray-50"
+			>
+				Reset
+			</button>
+		{/if}
 	{/if}
 </div>

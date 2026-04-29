@@ -78,6 +78,55 @@ export const experimentRuns = sqliteTable(
 	]
 );
 
+export const studySessions = sqliteTable(
+	'study_sessions',
+	{
+		id: text('id').primaryKey(),
+		participantSessionId: text('participant_session_id')
+			.notNull()
+			.references(() => participantSessions.id, { onDelete: 'cascade' }),
+		protocolId: text('protocol_id').notNull(),
+		status: text('status').notNull().default('started'),
+		taskOrderJson: text('task_order_json').notNull().default('[]'),
+		startedAt: integer('started_at').notNull(),
+		completedAt: integer('completed_at'),
+		updatedAt: integer('updated_at').notNull()
+	},
+	(table) => [
+		index('study_sessions_participant_session_idx').on(table.participantSessionId),
+		index('study_sessions_protocol_idx').on(table.protocolId),
+		uniqueIndex('study_sessions_participant_protocol_unique').on(
+			table.participantSessionId,
+			table.protocolId
+		)
+	]
+);
+
+export const studyTasks = sqliteTable(
+	'study_tasks',
+	{
+		id: text('id').primaryKey(),
+		studySessionId: text('study_session_id')
+			.notNull()
+			.references(() => studySessions.id, { onDelete: 'cascade' }),
+		experimentSlug: text('experiment_slug').notNull(),
+		position: integer('position').notNull(),
+		status: text('status').notNull().default('pending'),
+		runId: text('run_id').references(() => experimentRuns.id, { onDelete: 'set null' }),
+		startedAt: integer('started_at'),
+		completedAt: integer('completed_at')
+	},
+	(table) => [
+		index('study_tasks_study_session_idx').on(table.studySessionId),
+		index('study_tasks_run_idx').on(table.runId),
+		uniqueIndex('study_tasks_session_position_unique').on(table.studySessionId, table.position),
+		uniqueIndex('study_tasks_session_experiment_unique').on(
+			table.studySessionId,
+			table.experimentSlug
+		)
+	]
+);
+
 export const experimentRunReviews = sqliteTable(
 	'experiment_run_reviews',
 	{

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
+	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
 	import ExperimentStartGate from '$lib/components/ExperimentStartGate.svelte';
 	import Display from '$lib/components/ten-item-personality-inventory/Display.svelte';
@@ -23,6 +25,8 @@
 	let isBusy = false;
 	let errorMessage = '';
 	let resumeChecked = false;
+
+	$: studySessionId = $page.url.searchParams.get('study') ?? '';
 
 	type SubmitResponse =
 		| ({ completed: false } & TipiRunState)
@@ -69,7 +73,8 @@
 	}
 
 	async function resumeStoredRun() {
-		const storedRunId = getStoredExperimentRunId(experiment.slug);
+		const storedRunId =
+			$page.url.searchParams.get('run') ?? getStoredExperimentRunId(experiment.slug);
 
 		if (!storedRunId) {
 			resumeChecked = true;
@@ -108,7 +113,11 @@
 		tipiResult.set(null);
 
 		try {
-			const response = await fetch('/api/experiments/tipi/runs', { method: 'POST' });
+			const response = await fetch('/api/experiments/tipi/runs', {
+				method: 'POST',
+				headers: studySessionId ? { 'content-type': 'application/json' } : undefined,
+				body: studySessionId ? JSON.stringify({ studySessionId }) : undefined
+			});
 			const run = await parseJsonResponse<TipiRunState>(response);
 
 			applyRunState(run);
@@ -196,11 +205,20 @@
 		disabled={isBusy}
 		{errorMessage}
 		showIntroduction={false}
+		showReset={!studySessionId}
 		bind:triggerFunction={finishExperiment}
 		on:submit={handleRequestNewQuestion}
 		on:reset={resetExperiment}
 	/>
 	{#if finishExperiment}
 		<p class="mt-3 max-w-2xl text-sm text-gray-600">{experiment.debrief}</p>
+		{#if studySessionId}
+			<a
+				class="mt-3 inline-block rounded-sm bg-black px-3 py-2 text-xs text-white"
+				href={resolve('/study')}
+			>
+				Continue study
+			</a>
+		{/if}
 	{/if}
 {/if}

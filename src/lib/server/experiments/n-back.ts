@@ -19,6 +19,7 @@ import {
 	getPublishedExperimentVersion,
 	markExperimentRunCompleted
 } from './lifecycle';
+import { markStudyTaskCompletedForRun } from '../studies';
 import {
 	assertSubmittedTrialIndex,
 	createTimingMetadata,
@@ -490,6 +491,7 @@ async function completeNBackRun(
 	const result = createResult(runId, context, responses, completedAt);
 
 	await markExperimentRunCompleted(runId, completedAt);
+	await markStudyTaskCompletedForRun(runId, completedAt);
 	await recordExperimentEvent({
 		runId,
 		eventType: 'run_completed',

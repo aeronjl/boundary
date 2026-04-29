@@ -180,6 +180,42 @@
 		</div>
 	{/if}
 
+	{#if data.run.nBackSummary}
+		<div>
+			<h2 class="font-serif text-xl">n-back summary</h2>
+			<div class="mt-2 grid grid-cols-2 gap-3 md:grid-cols-4">
+				<div class="border-t border-gray-200 py-3">
+					<p class="text-xs text-gray-500">Accuracy</p>
+					<p class="font-serif text-2xl">{formatPercent(data.run.nBackSummary.accuracy)}</p>
+				</div>
+				<div class="border-t border-gray-200 py-3">
+					<p class="text-xs text-gray-500">Correct</p>
+					<p>{data.run.nBackSummary.correctCount} of {data.run.nBackSummary.totalTrials}</p>
+				</div>
+				<div class="border-t border-gray-200 py-3">
+					<p class="text-xs text-gray-500">Hits</p>
+					<p>{data.run.nBackSummary.hits}</p>
+				</div>
+				<div class="border-t border-gray-200 py-3">
+					<p class="text-xs text-gray-500">Misses</p>
+					<p>{data.run.nBackSummary.misses}</p>
+				</div>
+				<div class="border-t border-gray-200 py-3">
+					<p class="text-xs text-gray-500">False alarms</p>
+					<p>{data.run.nBackSummary.falseAlarms}</p>
+				</div>
+				<div class="border-t border-gray-200 py-3">
+					<p class="text-xs text-gray-500">Correct rejections</p>
+					<p>{data.run.nBackSummary.correctRejections}</p>
+				</div>
+				<div class="border-t border-gray-200 py-3">
+					<p class="text-xs text-gray-500">Mean response time</p>
+					<p>{formatMs(data.run.nBackSummary.meanResponseTimeMs)}</p>
+				</div>
+			</div>
+		</div>
+	{/if}
+
 	<div>
 		<h2 class="font-serif text-xl">Responses</h2>
 		<div class="mt-2 overflow-x-auto border-t border-gray-200">

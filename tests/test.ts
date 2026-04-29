@@ -15,6 +15,7 @@ type GenericExportRun = {
 	events: { eventType: string }[];
 	intertemporalSummary?: { delayedChoiceCount: number } | null;
 	orientationSummary?: { totalTrials: number; correctCount: number } | null;
+	nBackSummary?: { totalTrials: number; correctCount: number } | null;
 };
 
 async function completeTipiRun(page: Page) {
@@ -66,6 +67,18 @@ async function completeOrientationRun(page: Page) {
 	await expect(
 		page.getByRole('heading', { name: 'Orientation discrimination complete' })
 	).toBeVisible();
+}
+
+async function completeNBackRun(page: Page) {
+	await page.goto('/n-back');
+	await page.getByRole('button', { name: 'Start' }).click();
+
+	for (let trial = 1; trial <= 16; trial++) {
+		await expect(page.getByText(`${trial} of 16`)).toBeVisible();
+		await page.getByRole('button', { name: 'Choose no match' }).click();
+	}
+
+	await expect(page.getByRole('heading', { name: 'n-back complete' })).toBeVisible();
 }
 
 test('index page has expected h1', async ({ page }) => {
@@ -204,6 +217,43 @@ test('orientation discrimination records generic trial data', async ({ page }) =
 		.click();
 	await expect(page.getByRole('heading', { name: 'Orientation summary' })).toBeVisible();
 	await expect(page.getByText('orientation_judged').first()).toBeVisible();
+});
+
+test('n-back records generic trial data', async ({ page }) => {
+	await completeNBackRun(page);
+
+	await page.goto('/admin');
+	await page.getByLabel('Admin token').fill('test-admin-token');
+	await page.getByRole('button', { name: 'Sign in' }).click();
+
+	const exportResponse = await page.request.get('/admin/experiments/export.json');
+	expect(exportResponse.status()).toBe(200);
+
+	const exportBody = await exportResponse.json();
+	const nBackRun = exportBody.runs.find(
+		(run: GenericExportRun) =>
+			run.experimentVersionId === 'n-back-v1' &&
+			run.responses.length === 16 &&
+			run.nBackSummary?.totalTrials === 16
+	);
+
+	expect(nBackRun).toBeTruthy();
+	expect(nBackRun?.events.map((event: { eventType: string }) => event.eventType)).toEqual(
+		expect.arrayContaining(['run_started', 'trial_started', 'n_back_answered', 'run_completed'])
+	);
+	expect(nBackRun?.responses[0].metadata.timing.responseTimeMs).toEqual(expect.any(Number));
+
+	await page.goto('/admin/experiments?experiment=n-back');
+	await expect(page.getByRole('heading', { name: 'Experiment runs' })).toBeVisible();
+	await expect(page.getByRole('cell', { name: 'n-back' }).first()).toBeVisible();
+	await expect(page.getByText('n_back_response').first()).toBeVisible();
+
+	await page
+		.getByRole('link', { name: /View run/ })
+		.first()
+		.click();
+	await expect(page.getByRole('heading', { name: 'n-back summary' })).toBeVisible();
+	await expect(page.getByText('n_back_answered').first()).toBeVisible();
 });
 
 test('admin can inspect and export ten item personality inventory data', async ({ page }) => {

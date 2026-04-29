@@ -13,6 +13,12 @@ import {
 	intertemporalVersionId
 } from '../src/lib/experiments/intertemporal';
 import {
+	defaultNBackConfig,
+	nBackExperimentId,
+	nBackExperimentSlug,
+	nBackVersionId
+} from '../src/lib/experiments/n-back';
+import {
 	defaultOrientationConfig,
 	orientationExperimentId,
 	orientationExperimentSlug,
@@ -156,6 +162,44 @@ await db
 await db
 	.insert(experiments)
 	.values({
+		id: nBackExperimentId,
+		slug: nBackExperimentSlug,
+		name: 'n-back',
+		description: 'A working memory task for judging whether the current position repeats.',
+		createdAt: now
+	})
+	.onConflictDoUpdate({
+		target: experiments.id,
+		set: {
+			slug: nBackExperimentSlug,
+			name: 'n-back',
+			description: 'A working memory task for judging whether the current position repeats.'
+		}
+	});
+
+await db
+	.insert(experimentVersions)
+	.values({
+		id: nBackVersionId,
+		experimentId: nBackExperimentId,
+		version: 1,
+		status: 'published',
+		configJson: JSON.stringify(defaultNBackConfig),
+		createdAt: now,
+		publishedAt: now
+	})
+	.onConflictDoUpdate({
+		target: experimentVersions.id,
+		set: {
+			status: 'published',
+			configJson: JSON.stringify(defaultNBackConfig),
+			publishedAt: now
+		}
+	});
+
+await db
+	.insert(experiments)
+	.values({
 		id: tipiExperimentId,
 		slug: tipiExperimentSlug,
 		name: 'Ten Item Personality Inventory',
@@ -230,4 +274,5 @@ console.log(`Seeded ${defaultIntertemporalConfig.trials.length} intertemporal ch
 console.log(
 	`Seeded ${defaultOrientationConfig.angleMagnitudes.length * defaultOrientationConfig.repetitionsPerDirection * 2} orientation discrimination trials.`
 );
+console.log(`Seeded ${defaultNBackConfig.totalTrials} n-back trials.`);
 await closeDatabase();

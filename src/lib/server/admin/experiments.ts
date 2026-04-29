@@ -74,6 +74,18 @@ export type AdminOrientationSummary = {
 	meanResponseTimeMs: number | null;
 };
 
+export type AdminNBackSummary = {
+	totalTrials: number;
+	correctCount: number;
+	incorrectCount: number;
+	accuracy: number;
+	hits: number;
+	misses: number;
+	falseAlarms: number;
+	correctRejections: number;
+	meanResponseTimeMs: number | null;
+};
+
 export type AdminExperimentRunSummary = {
 	id: string;
 	participantSessionId: string;
@@ -98,6 +110,7 @@ export type AdminExperimentRun = AdminExperimentRunSummary & {
 	banditSummary: AdminBanditSummary | null;
 	intertemporalSummary: AdminIntertemporalSummary | null;
 	orientationSummary: AdminOrientationSummary | null;
+	nBackSummary: AdminNBackSummary | null;
 };
 
 export type AdminExperimentRunList = {
@@ -200,6 +213,19 @@ export const adminExperimentDictionary: AdminExperimentDictionaryEntry[] = [
 	},
 	{
 		kind: 'event',
+		name: 'n_back_answered',
+		source: 'n-back',
+		description: 'A match or no-match working-memory response was selected and scored.',
+		fields: [
+			'trialIndex',
+			'payload.trialId',
+			'payload.response',
+			'payload.expectedMatch',
+			'payload.correct'
+		]
+	},
+	{
+		kind: 'event',
 		name: 'run_completed',
 		source: 'all experiments',
 		description: 'Recorded once the final result has been calculated.',
@@ -260,6 +286,21 @@ export const adminExperimentDictionary: AdminExperimentDictionaryEntry[] = [
 			'score.correctDirection',
 			'score.angleDegrees',
 			'score.magnitudeDegrees',
+			'metadata.timing.responseTimeMs'
+		]
+	},
+	{
+		kind: 'response',
+		name: 'n_back_response',
+		source: 'n-back',
+		description: 'Generic trial record for one n-back judgment.',
+		fields: [
+			'itemId',
+			'response.response',
+			'score.correct',
+			'score.expectedMatch',
+			'score.positionIndex',
+			'score.matchPositionIndex',
 			'metadata.timing.responseTimeMs'
 		]
 	}
@@ -517,6 +558,75 @@ function createOrientationSummary(
 	};
 }
 
+function createNBackSummary(
+	events: AdminExperimentEvent[],
+	responses: AdminExperimentResponse[]
+): AdminNBackSummary | null {
+	const nBackResponses = responses.filter(
+		(response) => response.responseType === 'n_back_response'
+	);
+	const startedPayload = getPayloadRecord(
+		events.find((event) => event.eventType === 'run_started')
+	);
+	const completedPayload = getPayloadRecord(
+		events.find((event) => event.eventType === 'run_completed')
+	);
+	const completedResult = isRecord(completedPayload?.result) ? completedPayload.result : null;
+
+	if (nBackResponses.length === 0 && !completedResult) return null;
+
+	let computedCorrectCount = 0;
+	let hits = 0;
+	let misses = 0;
+	let falseAlarms = 0;
+	let correctRejections = 0;
+
+	for (const response of nBackResponses) {
+		const responsePayload = isRecord(response.response) ? response.response : null;
+		const score = isRecord(response.score) ? response.score : null;
+		const expectedMatch = score?.expectedMatch === true;
+		const correct = score?.correct === true;
+		const respondedMatch = stringValue(responsePayload?.response) === 'match';
+
+		if (correct) computedCorrectCount += 1;
+		if (expectedMatch && respondedMatch) hits += 1;
+		if (expectedMatch && !respondedMatch) misses += 1;
+		if (!expectedMatch && respondedMatch) falseAlarms += 1;
+		if (!expectedMatch && !respondedMatch) correctRejections += 1;
+	}
+
+	const correctCount = numberValue(completedResult?.correctCount) ?? computedCorrectCount;
+	const totalTrials =
+		numberValue(completedResult?.totalTrials) ??
+		numberValue(startedPayload?.totalTrials) ??
+		nBackResponses.length;
+	const incorrectCount =
+		numberValue(completedResult?.incorrectCount) ?? nBackResponses.length - correctCount;
+	const responseTimes = nBackResponses.flatMap((response) => {
+		const timing = timingRecord(response);
+		const responseTimeMs = numberValue(timing?.responseTimeMs);
+		return responseTimeMs === null ? [] : [responseTimeMs];
+	});
+	const meanResponseTimeMs =
+		numberValue(completedResult?.meanResponseTimeMs) ??
+		(responseTimes.length > 0
+			? responseTimes.reduce((total, time) => total + time, 0) / responseTimes.length
+			: null);
+
+	return {
+		totalTrials,
+		correctCount,
+		incorrectCount,
+		accuracy:
+			numberValue(completedResult?.accuracy) ?? (totalTrials > 0 ? correctCount / totalTrials : 0),
+		hits: numberValue(completedResult?.hits) ?? hits,
+		misses: numberValue(completedResult?.misses) ?? misses,
+		falseAlarms: numberValue(completedResult?.falseAlarms) ?? falseAlarms,
+		correctRejections: numberValue(completedResult?.correctRejections) ?? correctRejections,
+		meanResponseTimeMs
+	};
+}
+
 async function getRunRows() {
 	return db
 		.select({
@@ -673,7 +783,8 @@ export async function getAdminExperimentRun(runId: string): Promise<AdminExperim
 		responses,
 		banditSummary: createBanditSummary(events, responses),
 		intertemporalSummary: createIntertemporalSummary(events, responses),
-		orientationSummary: createOrientationSummary(events, responses)
+		orientationSummary: createOrientationSummary(events, responses),
+		nBackSummary: createNBackSummary(events, responses)
 	};
 }
 

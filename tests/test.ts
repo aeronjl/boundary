@@ -917,6 +917,21 @@ test('admin can inspect and export ten item personality inventory data', async (
 	);
 	expect(accuracyPrompt.body).toContain(cohortLabel);
 	expect(accuracyPrompt.caveat).toContain('not a diagnosis');
+	expect(importedReferenceContext.recommendations).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				metricKey: 'accuracy',
+				href: '/orientation-discrimination',
+				sourceCitation,
+				sourceUrl: 'https://example.com/boundary-pilot'
+			})
+		])
+	);
+	const accuracyRecommendation = importedReferenceContext.recommendations.find(
+		(recommendation: { metricKey: string }) => recommendation.metricKey === 'accuracy'
+	);
+	expect(accuracyRecommendation.body).toContain(cohortLabel);
+	expect(accuracyRecommendation.caveat).toContain('not a diagnosis');
 
 	const metricForm = page.locator('form[aria-label^="Edit reference metric Accuracy"]').first();
 	await metricForm.getByLabel('Mean').fill('0.72');

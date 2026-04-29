@@ -7,6 +7,7 @@ import {
 	calculateReferenceZScore,
 	createComparisonSummary,
 	createReferenceInterpretationPrompt,
+	createReferenceTaskRecommendation,
 	percentileFromZScore,
 	type ReferenceComparison,
 	type ReferenceComparisonDataset,
@@ -265,6 +266,15 @@ function datasetSummary(dataset: ReferenceDatasetRow): ReferenceComparisonDatase
 	};
 }
 
+function uniqueRecommendations(
+	recommendations: NonNullable<ReturnType<typeof createReferenceTaskRecommendation>>[]
+): NonNullable<ReturnType<typeof createReferenceTaskRecommendation>>[] {
+	const byHref = new Map(
+		recommendations.map((recommendation) => [recommendation.href, recommendation])
+	);
+	return [...byHref.values()];
+}
+
 export async function getReferenceComparisonContext(
 	experimentSlug: string,
 	currentMetrics: ReferenceMetricInput = {}
@@ -324,11 +334,18 @@ export async function getReferenceComparisonContext(
 		const prompt = createReferenceInterpretationPrompt(comparison);
 		return prompt ? [prompt] : [];
 	});
+	const recommendations = uniqueRecommendations(
+		comparisons.flatMap((comparison) => {
+			const recommendation = createReferenceTaskRecommendation(experimentSlug, comparison);
+			return recommendation ? [recommendation] : [];
+		})
+	);
 
 	return {
 		experimentSlug,
 		comparisons,
 		prompts,
+		recommendations,
 		datasets: datasets.map(datasetSummary),
 		candidateDatasetCount: datasets.filter((dataset) => dataset.status === 'candidate').length,
 		validatedDatasetCount: datasets.filter((dataset) => dataset.status === 'validated').length,

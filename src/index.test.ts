@@ -14,8 +14,10 @@ import {
 	calculateReferenceZScore,
 	createComparisonSummary,
 	createReferenceInterpretationPrompt,
+	createReferenceTaskRecommendation,
 	formatPercentile,
-	percentileFromZScore
+	percentileFromZScore,
+	type ReferenceComparison
 } from '$lib/reference-data/comparison';
 import { parseReferenceImportSummary } from '$lib/reference-data/import-summary';
 import { createReferenceContext } from '$lib/reference-data/summary';
@@ -211,7 +213,7 @@ describe('reference data contracts', () => {
 			})
 		).toContain('above the reference mean');
 
-		const prompt = createReferenceInterpretationPrompt({
+		const comparison: ReferenceComparison = {
 			metricKey: 'accuracy',
 			label: 'Accuracy',
 			unit: 'proportion',
@@ -232,10 +234,15 @@ describe('reference data contracts', () => {
 			zScore,
 			percentile,
 			summary: ''
-		});
+		};
+		const prompt = createReferenceInterpretationPrompt(comparison);
+		const recommendation = createReferenceTaskRecommendation('n-back', comparison);
 
 		expect(prompt?.body).toContain('around the 84th percentile');
 		expect(prompt?.caveat).toContain('not a diagnosis');
+		expect(recommendation?.href).toBe('/orientation-discrimination');
+		expect(recommendation?.body).toContain('Boundary pilot cohort in Boundary Pilot, 2026');
+		expect(recommendation?.caveat).toContain('not a diagnosis');
 	});
 
 	it('validates the OpenfMRI n-back reference import summary', () => {

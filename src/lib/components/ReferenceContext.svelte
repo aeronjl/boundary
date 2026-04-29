@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { base } from '$app/paths';
+	import { base, resolve } from '$app/paths';
 	import { onMount } from 'svelte';
 	import type {
 		ReferenceComparison,
@@ -35,6 +35,7 @@
 	$: validatedDatasetCount = serverContext?.validatedDatasetCount ?? context.validatedDatasetCount;
 	$: displayDatasets = serverContext?.datasets ?? context.datasets;
 	$: interpretationPrompts = serverContext?.prompts ?? [];
+	$: taskRecommendations = serverContext?.recommendations ?? [];
 	$: if (mounted) {
 		void loadComparison(metricsRequestKey);
 	}
@@ -203,6 +204,35 @@
 								target="_blank"
 							>
 								{prompt.sourceCitation}
+							</a>
+							<!-- eslint-enable svelte/no-navigation-without-resolve -->
+						{/if}
+					</li>
+				{/each}
+			</ul>
+		</div>
+	{/if}
+
+	{#if taskRecommendations.length > 0}
+		<div class="mt-4 border-t border-gray-200 pt-3">
+			<h4 class="font-medium">Suggested next task</h4>
+			<ul class="mt-2 space-y-2">
+				{#each taskRecommendations as recommendation (`${recommendation.metricKey}:${recommendation.href}`)}
+					<li class="border-l-2 border-gray-200 py-1 pl-3">
+						<a class="font-medium underline" href={resolve(recommendation.href)}>
+							{recommendation.title}
+						</a>
+						<p class="mt-1 text-gray-600">{recommendation.body}</p>
+						<p class="mt-1 text-xs text-gray-500">{recommendation.caveat}</p>
+						{#if recommendation.sourceCitation && recommendation.sourceUrl}
+							<!-- eslint-disable svelte/no-navigation-without-resolve -->
+							<a
+								class="mt-1 inline-block text-xs underline"
+								href={recommendation.sourceUrl}
+								rel="noreferrer"
+								target="_blank"
+							>
+								{recommendation.sourceCitation}
 							</a>
 							<!-- eslint-enable svelte/no-navigation-without-resolve -->
 						{/if}

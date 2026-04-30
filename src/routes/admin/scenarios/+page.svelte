@@ -50,6 +50,10 @@
 		status === 'ready'
 			? 'border-green-200 bg-green-50 text-green-800'
 			: 'border-amber-200 bg-amber-50 text-amber-800';
+	const expectationTone = (passed: boolean) =>
+		passed
+			? 'border-green-200 bg-green-50 text-green-800'
+			: 'border-red-200 bg-red-50 text-red-800';
 	const batchApiPath = (batchId: string) =>
 		`${resolve('/admin/scenarios/batches')}/${encodeURIComponent(batchId)}`;
 	const scenarioKey = (
@@ -278,7 +282,7 @@
 		</div>
 	{/if}
 
-	<div class="grid grid-cols-2 gap-3 md:grid-cols-6">
+	<div class="grid grid-cols-2 gap-3 md:grid-cols-7">
 		<div class="border-t border-gray-200 py-3">
 			<p class="text-xs text-gray-500">Batches</p>
 			<p class="font-serif text-2xl">{data.batches.length}</p>
@@ -308,6 +312,18 @@
 					data.comparison.outcomeSnapshotSummary.targetCount
 				)}
 				targets ready
+			</p>
+		</div>
+		<div class="border-t border-gray-200 py-3">
+			<p class="text-xs text-gray-500">Expectations</p>
+			<p class="font-serif text-2xl">
+				{formatReadyCount(
+					data.comparison.outcomeSnapshotSummary.passedExpectationCount,
+					data.comparison.outcomeSnapshotSummary.expectationCount
+				)}
+			</p>
+			<p class="text-xs text-gray-500">
+				{data.comparison.outcomeSnapshotSummary.failedExpectationCount} failing
 			</p>
 		</div>
 	</div>
@@ -403,6 +419,7 @@
 							<th class="py-2 pr-3 font-medium">Experiment</th>
 							<th class="py-2 pr-3 font-medium">Targets</th>
 							<th class="py-2 pr-3 font-medium">Target gates</th>
+							<th class="py-2 pr-3 font-medium">Expectations</th>
 							<th class="py-2 pr-3 font-medium">Blockers</th>
 						</tr>
 					</thead>
@@ -434,6 +451,25 @@
 											{/each}
 										{/each}
 									</div>
+								</td>
+								<td class="py-2 pr-3">
+									{#if snapshot.expectations.length > 0}
+										<div class="flex max-w-md flex-wrap gap-1">
+											{#each snapshot.expectations as expectation (expectation.id)}
+												<span
+													class={`rounded-sm border px-2 py-1 ${expectationTone(expectation.passed)}`}
+													title={expectation.rationale}
+												>
+													{expectation.metricKey}: {formatOutcomeKind(expectation.kind)}
+													{expectation.passed
+														? 'ok'
+														: `expected ${expectation.expectedStatus}, got ${expectation.actualStatus}`}
+												</span>
+											{/each}
+										</div>
+									{:else}
+										<span class="text-gray-500">None</span>
+									{/if}
 								</td>
 								<td class="py-2 pr-3">
 									{#if snapshot.blockers.length > 0}

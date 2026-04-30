@@ -25,6 +25,11 @@ import {
 	createPolicyScenarioOutcomeSnapshotInputs
 } from '$lib/experiments/policy-scenario-comparison';
 import {
+	evaluatePolicyScenarioOutcomeExpectations,
+	policyScenarioOutcomeExpectationContracts,
+	summarizePolicyScenarioOutcomeExpectations
+} from '$lib/experiments/policy-scenario-expectations';
+import {
 	policyScenarioLaunchCount,
 	policyScenarioLaunchTargets,
 	policyScenarioRunPath
@@ -878,6 +883,78 @@ describe('policy scenario comparison helpers', () => {
 				})
 			])
 		);
+
+		expect(policyScenarioOutcomeExpectationContracts.length).toBeGreaterThan(10);
+		const nBackExpectationEvaluations = evaluatePolicyScenarioOutcomeExpectations({
+			experimentSlug: 'n-back',
+			scenarioId: 'perfect-responder',
+			scope: 'overall',
+			scopeKey: 'overall',
+			targets: [
+				{
+					id: 'n-back:accuracy:reference_percentile',
+					metricKey: 'accuracy',
+					kind: 'reference_percentile',
+					status: 'ready',
+					blockers: []
+				},
+				{
+					id: 'n-back:accuracy:cohort_similarity',
+					metricKey: 'accuracy',
+					kind: 'cohort_similarity',
+					status: 'ready',
+					blockers: []
+				},
+				{
+					id: 'n-back:accuracy:related_task_prompt',
+					metricKey: 'accuracy',
+					kind: 'related_task_prompt',
+					status: 'ready',
+					blockers: []
+				},
+				{
+					id: 'n-back:sensitivityIndex:cohort_similarity',
+					metricKey: 'sensitivityIndex',
+					kind: 'cohort_similarity',
+					status: 'blocked',
+					blockers: ['Reviewed public literature claim is missing.']
+				},
+				{
+					id: 'n-back:falseAlarmRate:reference_percentile',
+					metricKey: 'falseAlarmRate',
+					kind: 'reference_percentile',
+					status: 'blocked',
+					blockers: ['Mapping is candidate.']
+				}
+			]
+		});
+
+		expect(summarizePolicyScenarioOutcomeExpectations(nBackExpectationEvaluations)).toEqual({
+			expectationCount: 5,
+			passedExpectationCount: 5,
+			failedExpectationCount: 0
+		});
+
+		const missingTargetEvaluation = evaluatePolicyScenarioOutcomeExpectations({
+			experimentSlug: 'n-back',
+			scenarioId: 'perfect-responder',
+			scope: 'overall',
+			scopeKey: 'overall',
+			targets: nBackExpectationEvaluations
+				.filter((evaluation) => evaluation.metricKey !== 'accuracy')
+				.map((evaluation) => ({
+					id: evaluation.targetId ?? evaluation.id,
+					metricKey: evaluation.metricKey,
+					kind: evaluation.kind,
+					status: evaluation.actualStatus === 'missing' ? 'blocked' : evaluation.actualStatus,
+					blockers: evaluation.actualBlockers
+				}))
+		}).find((evaluation) => evaluation.metricKey === 'accuracy');
+
+		expect(missingTargetEvaluation).toMatchObject({
+			actualStatus: 'missing',
+			passed: false
+		});
 	});
 });
 

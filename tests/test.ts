@@ -797,11 +797,26 @@ test('admin can inspect and export ten item personality inventory data', async (
 	await expect(page.getByRole('link', { name: 'Experiment runs' })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Review queue' })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Study analysis' })).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Policy scenarios' })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Analysis', exact: true })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Participants' })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Reference registry' })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Literature extractions' })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Relationship registry' })).toBeVisible();
+
+	await page.getByRole('link', { name: 'Policy scenarios' }).click();
+	await expect(page.getByRole('heading', { name: 'Policy scenarios' })).toBeVisible();
+	await expect(page.getByText('Generated runs')).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Export JSON' })).toBeVisible();
+
+	const scenarioJsonResponse = await page.request.get('/admin/scenarios/export.json');
+	expect(scenarioJsonResponse.status()).toBe(200);
+	expect(await scenarioJsonResponse.json()).toMatchObject({
+		scenarioCount: expect.any(Number),
+		runCount: expect.any(Number)
+	});
+
+	await page.goto('/admin');
 
 	await page.getByRole('link', { name: 'Relationship registry' }).click();
 	await expect(page.getByRole('heading', { name: 'Relationship registry' })).toBeVisible();

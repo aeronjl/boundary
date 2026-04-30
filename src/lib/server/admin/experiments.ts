@@ -230,6 +230,20 @@ export const adminExperimentDictionary: AdminExperimentDictionaryEntry[] = [
 	},
 	{
 		kind: 'event',
+		name: 'policy_scenario_started',
+		source: 'intertemporal-choice',
+		description: 'A generated policy scenario started submitting a real run.',
+		fields: ['payload.scenarioId', 'payload.scenarioLabel', 'payload.description']
+	},
+	{
+		kind: 'event',
+		name: 'policy_scenario_completed',
+		source: 'intertemporal-choice',
+		description: 'A generated policy scenario completed all choices for a run.',
+		fields: ['payload.scenarioId', 'payload.scenarioLabel']
+	},
+	{
+		kind: 'event',
 		name: 'orientation_judged',
 		source: 'orientation-discrimination',
 		description: 'A clockwise or counterclockwise orientation judgment was selected and scored.',
@@ -301,6 +315,8 @@ export const adminExperimentDictionary: AdminExperimentDictionaryEntry[] = [
 			'score.delaySeconds',
 			'score.netValue',
 			'score.wealthAfter',
+			'metadata.policyScenario.scenarioId',
+			'metadata.policyScenario.epoch',
 			'metadata.timing.responseTimeMs'
 		]
 	},

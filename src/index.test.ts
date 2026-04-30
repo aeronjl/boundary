@@ -15,6 +15,7 @@ import {
 	createIntertemporalInterpretation,
 	intertemporalDelayedChoiceRate
 } from '$lib/experiments/intertemporal-interpretation';
+import { createPolicyScenarioComparison } from '$lib/experiments/policy-scenario-comparison';
 import { referenceMetricContracts } from '$lib/reference-data/catalog';
 import {
 	calculateReferenceZScore,
@@ -249,6 +250,128 @@ describe('intertemporal interpretation helpers', () => {
 				timeCostPerSecond: defaultIntertemporalConfig.timeCostPerSecond
 			}).optionId
 		).toBe('later');
+	});
+});
+
+describe('policy scenario comparison helpers', () => {
+	it('groups generated intertemporal runs by scenario and epoch', () => {
+		const comparison = createPolicyScenarioComparison(
+			[
+				{
+					runId: 'run-epoch',
+					experimentSlug: 'intertemporal-choice',
+					status: 'completed',
+					startedAt: 2,
+					completedAt: 3,
+					responses: [
+						{
+							trialIndex: 0,
+							score: {
+								amount: 240,
+								delaySeconds: 3,
+								timeCost: 60,
+								netValue: 180,
+								wealthAfter: 1180
+							},
+							metadata: {
+								policyScenario: {
+									scenarioId: 'epoch-sensitive',
+									scenarioLabel: 'Epoch-sensitive',
+									epoch: 'short',
+									laterNetAdvantage: 0,
+									minimumLaterAdvantage: 0,
+									responseTimeMs: 650
+								}
+							}
+						},
+						{
+							trialIndex: 1,
+							score: {
+								amount: 150,
+								delaySeconds: 0,
+								timeCost: 0,
+								netValue: 150,
+								wealthAfter: 1330
+							},
+							metadata: {
+								policyScenario: {
+									scenarioId: 'epoch-sensitive',
+									scenarioLabel: 'Epoch-sensitive',
+									epoch: 'long',
+									laterNetAdvantage: 20,
+									minimumLaterAdvantage: 50,
+									responseTimeMs: 1125
+								}
+							}
+						}
+					]
+				},
+				{
+					runId: 'run-later',
+					experimentSlug: 'intertemporal-choice',
+					status: 'completed',
+					startedAt: 1,
+					completedAt: 2,
+					responses: [
+						{
+							trialIndex: 0,
+							score: {
+								amount: 260,
+								delaySeconds: 6,
+								timeCost: 120,
+								netValue: 140,
+								wealthAfter: 1140
+							},
+							metadata: {
+								policyScenario: {
+									scenarioId: 'always-later',
+									scenarioLabel: 'Always later',
+									epoch: 'medium',
+									laterNetAdvantage: -20,
+									minimumLaterAdvantage: null,
+									responseTimeMs: 850
+								}
+							}
+						}
+					]
+				}
+			],
+			new Date(0).toISOString()
+		);
+
+		expect(comparison).toMatchObject({
+			scenarioCount: 2,
+			runCount: 2,
+			completedRunCount: 2,
+			choiceCount: 3
+		});
+
+		const epochSensitive = comparison.summaries.find(
+			(summary) => summary.scenarioId === 'epoch-sensitive'
+		);
+		expect(epochSensitive).toMatchObject({
+			runCount: 1,
+			totalChoiceCount: 2,
+			meanDelayedChoiceRate: 0.5,
+			meanNetGain: 330,
+			meanFinalWealth: 1330
+		});
+		expect(epochSensitive?.epochSummaries).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					epoch: 'short',
+					choiceCount: 1,
+					delayedChoiceRate: 1,
+					meanMinimumLaterAdvantage: 0
+				}),
+				expect.objectContaining({
+					epoch: 'long',
+					choiceCount: 1,
+					delayedChoiceRate: 0,
+					meanMinimumLaterAdvantage: 50
+				})
+			])
+		);
 	});
 });
 

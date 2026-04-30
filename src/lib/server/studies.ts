@@ -5,7 +5,7 @@ import {
 	isBoundaryStudyTaskSlug,
 	type StudyProtocolTask
 } from '$lib/studies/protocol';
-import { createStudyProfileInterpretation } from '$lib/studies/synthesis';
+import { createStudyProfileInterpretationWithReferenceData } from '$lib/server/study-profile';
 import { db } from '$lib/server/db';
 import { studySessions, studyTasks } from '$lib/server/db/schema';
 import { getAdminExperimentRun, type AdminExperimentRun } from './admin/experiments';
@@ -113,6 +113,8 @@ async function toProgress(
 		resultSummary: createResultSummary(task.runId ? (runDetailsById.get(task.runId) ?? null) : null)
 	}));
 	const completedTasks = progressTasks.filter((task) => task.status === 'completed').length;
+	const profileInterpretation =
+		await createStudyProfileInterpretationWithReferenceData(progressTasks);
 
 	return {
 		id: session.id,
@@ -126,7 +128,7 @@ async function toProgress(
 		completedTasks,
 		currentTask: progressTasks.find((task) => task.status !== 'completed') ?? null,
 		tasks: progressTasks,
-		profileInterpretation: createStudyProfileInterpretation(progressTasks)
+		profileInterpretation
 	};
 }
 

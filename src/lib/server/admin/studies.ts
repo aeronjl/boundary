@@ -2,8 +2,8 @@ import { asc, desc, eq, inArray } from 'drizzle-orm';
 import type { ExperimentInterpretation } from '$lib/experiments/interpretation';
 import { tipiScales } from '$lib/experiments/tipi';
 import { boundaryStudyProtocol, type StudyProtocolTask } from '$lib/studies/protocol';
-import { createStudyProfileInterpretation } from '$lib/studies/synthesis';
 import { db } from '$lib/server/db';
+import { createStudyProfileInterpretationWithReferenceData } from '$lib/server/study-profile';
 import {
 	experimentEvents,
 	experimentResponses,
@@ -1156,7 +1156,7 @@ function buildTimeline(
 	return entries.sort((left, right) => left.at - right.at || left.label.localeCompare(right.label));
 }
 
-function toAdminStudySession(
+async function toAdminStudySession(
 	session: StudySessionRow,
 	userAgent: string | null,
 	review: AdminStudyReview,
@@ -1165,7 +1165,7 @@ function toAdminStudySession(
 	taskRows: StudyTaskRow[],
 	runLinksById: Map<string, AdminStudyRunLink>,
 	runDetailsById: Map<string, AdminExperimentRun> = new Map()
-): AdminStudySessionDetail {
+): Promise<AdminStudySessionDetail> {
 	const tasks = [...taskRows]
 		.sort((left, right) => left.position - right.position)
 		.map((task) => {
@@ -1189,6 +1189,7 @@ function toAdminStudySession(
 			};
 		});
 	const completedTasks = tasks.filter((task) => task.status === 'completed').length;
+	const profileInterpretation = await createStudyProfileInterpretationWithReferenceData(tasks);
 	const summary: AdminStudySessionDetail = {
 		id: session.id,
 		participantSessionId: session.participantSessionId,
@@ -1208,7 +1209,7 @@ function toAdminStudySession(
 		needsReview: false,
 		timeline: [] as AdminStudyTimelineEntry[],
 		review,
-		profileInterpretation: createStudyProfileInterpretation(tasks)
+		profileInterpretation
 	};
 
 	summary.integrityFlags = createSessionFlags(session, tasks);
@@ -1379,8 +1380,8 @@ export async function listAdminStudySessions(
 	];
 	const runDetailsById = await getRunDetailsById(runIds);
 
-	return sessions
-		.map((session) =>
+	const studies = await Promise.all(
+		sessions.map((session) =>
 			toAdminStudySession(
 				session,
 				userAgentsBySessionId.get(session.participantSessionId) ?? null,
@@ -1392,7 +1393,9 @@ export async function listAdminStudySessions(
 				runDetailsById
 			)
 		)
-		.filter((study) => matchesStudySessionFilters(study, filters));
+	);
+
+	return studies.filter((study) => matchesStudySessionFilters(study, filters));
 }
 
 export async function getAdminStudySessionDetail(
@@ -1474,9 +1477,8 @@ export async function getAdminStudyExport(studySessionId?: string): Promise<Admi
 	];
 	const runDetailsById = await getRunDetailsById(runIds);
 
-	return {
-		generatedAt: new Date().toISOString(),
-		studies: sessions.map((session) =>
+	const studies = await Promise.all(
+		sessions.map((session) =>
 			toAdminStudySession(
 				session,
 				userAgentsBySessionId.get(session.participantSessionId) ?? null,
@@ -1488,6 +1490,11 @@ export async function getAdminStudyExport(studySessionId?: string): Promise<Admi
 				runDetailsById
 			)
 		)
+	);
+
+	return {
+		generatedAt: new Date().toISOString(),
+		studies
 	};
 }
 

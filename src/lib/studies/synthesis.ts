@@ -17,6 +17,7 @@ import {
 	relationshipEvidenceReferencesForExperiment,
 	relatedTaskPromptFromRelationship
 } from '$lib/reference-data/relationships';
+import { formatPercentile, type ReferenceComparison } from '$lib/reference-data/comparison';
 import {
 	participantLiteratureClaimsForExperiment,
 	type ParticipantLiteratureClaim
@@ -34,6 +35,15 @@ type StudySynthesisLiteratureClaim = ParticipantLiteratureClaim & {
 	taskSlug: string;
 };
 
+export type StudySynthesisReferenceComparison = ReferenceComparison & {
+	taskName: string;
+	taskSlug: string;
+};
+
+export type StudyProfileSynthesisOptions = {
+	referenceComparisons?: StudySynthesisReferenceComparison[];
+};
+
 type StudyProfileTag = {
 	id: string;
 	label: string;
@@ -42,6 +52,11 @@ type StudyProfileTag = {
 	summary: string;
 	prompt: RelatedTaskPrompt | null;
 	evidenceIds: string[];
+};
+
+type StudyReferenceMatch = StudySynthesisReferenceComparison & {
+	absoluteZScore: number;
+	evidenceId: string;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -107,6 +122,93 @@ function evidenceContextCard(
 				? `Participant-safe literature context is available for ${taskNames.join(' and ')}. These are guarded anchors for interpreting the completed profile, not diagnostic labels.`
 				: 'No participant-safe literature context is ready for the completed tasks yet, so the profile should stay descriptive.',
 		evidenceIds: claims.map((claim) => claim.id)
+	};
+}
+
+function fallbackReferenceEvidenceId(comparison: StudySynthesisReferenceComparison): string {
+	const source = (
+		comparison.referenceCohortLabel ??
+		comparison.datasetName ??
+		comparison.referenceSourceCitation ??
+		'reference'
+	)
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, '-')
+		.replace(/^-|-$/g, '');
+
+	return `reference-${comparison.taskSlug}-${comparison.metricKey}-${source}`;
+}
+
+function referenceEvidenceIdForComparison(
+	comparison: StudySynthesisReferenceComparison,
+	claims: StudySynthesisLiteratureClaim[]
+): string {
+	return (
+		claims.find(
+			(claim) => claim.taskSlug === comparison.taskSlug && claim.metricKey === comparison.metricKey
+		)?.id ?? fallbackReferenceEvidenceId(comparison)
+	);
+}
+
+function studyReferenceMatches(
+	comparisons: StudySynthesisReferenceComparison[],
+	claims: StudySynthesisLiteratureClaim[]
+): StudyReferenceMatch[] {
+	return comparisons
+		.flatMap((comparison) => {
+			if (
+				comparison.state !== 'comparable' ||
+				comparison.readinessStatus !== 'ready' ||
+				comparison.zScore === null ||
+				comparison.percentile === null ||
+				comparison.referenceMean === null
+			) {
+				return [];
+			}
+
+			return [
+				{
+					...comparison,
+					absoluteZScore: Math.abs(comparison.zScore),
+					evidenceId: referenceEvidenceIdForComparison(comparison, claims)
+				}
+			];
+		})
+		.sort(
+			(left, right) =>
+				left.absoluteZScore - right.absoluteZScore ||
+				left.taskName.localeCompare(right.taskName) ||
+				left.label.localeCompare(right.label)
+		);
+}
+
+function referenceMatchPosition(match: StudyReferenceMatch): string {
+	const cohort = match.referenceCohortLabel ?? match.datasetName ?? 'the reviewed reference cohort';
+
+	if (match.absoluteZScore < 0.25) return `close to ${cohort}`;
+	if (match.absoluteZScore < 0.75) return `broadly similar to ${cohort}`;
+
+	const direction = (match.zScore ?? 0) > 0 ? 'above' : 'below';
+	return `${match.absoluteZScore.toFixed(1)} SD ${direction} ${cohort}`;
+}
+
+function referenceMatchCard(
+	comparisons: StudySynthesisReferenceComparison[],
+	claims: StudySynthesisLiteratureClaim[]
+): InterpretationCard | null {
+	const matches = studyReferenceMatches(comparisons, claims);
+	if (matches.length === 0) return null;
+
+	const closest = matches[0];
+	const metricLabel = `${closest.taskName} ${closest.label.toLowerCase()}`;
+	const percentile = formatPercentile(closest.percentile);
+
+	return {
+		title: 'Reference matches',
+		value: `${matches.length} ready`,
+		tone: closest.absoluteZScore < 0.75 ? 'strong' : 'neutral',
+		body: `Closest reviewed reference: ${metricLabel} is ${referenceMatchPosition(closest)}, around the ${percentile}. This is task-specific reference context, not a diagnosis or group label.`,
+		evidenceIds: [closest.evidenceId]
 	};
 }
 
@@ -246,6 +348,28 @@ function literatureReferencesForClaims(
 		url: claim.sourceUrl,
 		takeaway: `${claim.body} ${claim.caveat}`
 	}));
+}
+
+function referenceComparisonReferences(
+	comparisons: StudySynthesisReferenceComparison[],
+	claims: StudySynthesisLiteratureClaim[]
+): EvidenceReference[] {
+	const claimIds = new Set(claims.map((claim) => claim.id));
+
+	return studyReferenceMatches(comparisons, claims)
+		.filter(
+			(match) =>
+				!claimIds.has(match.evidenceId) &&
+				Boolean(match.referenceSourceCitation ?? match.datasetName) &&
+				Boolean(match.referenceSourceUrl ?? match.datasetUrl)
+		)
+		.map((match) => ({
+			id: match.evidenceId,
+			shortCitation: match.referenceSourceCitation ?? match.datasetName ?? 'Reference dataset',
+			title: match.datasetName ?? `${match.taskName} reference comparison`,
+			url: match.referenceSourceUrl ?? match.datasetUrl ?? '',
+			takeaway: match.summary
+		}));
 }
 
 function repeatOrientationPrompt(
@@ -420,7 +544,8 @@ function referencesFor(
 }
 
 export function createStudyProfileInterpretation(
-	tasks: StudySynthesisTask[]
+	tasks: StudySynthesisTask[],
+	options: StudyProfileSynthesisOptions = {}
 ): ExperimentInterpretation | null {
 	if (tasks.length === 0) return null;
 
@@ -430,6 +555,7 @@ export function createStudyProfileInterpretation(
 	const bandit = resultFor(tasks, 'n-armed-bandit');
 	const tipi = resultFor(tasks, 'ten-item-personality-inventory');
 	const literatureClaims = completedLiteratureClaims(tasks);
+	const referenceComparisons = options.referenceComparisons ?? [];
 	const profileTags = profileTagsFor({
 		orientation,
 		intertemporal,
@@ -441,6 +567,7 @@ export function createStudyProfileInterpretation(
 	const optionalCards = [
 		evidenceContextCard(tasks, literatureClaims),
 		profileTagCard(profileTags),
+		referenceMatchCard(referenceComparisons, literatureClaims),
 		perceptualCard(orientation),
 		updatingCard(orientation, nBack),
 		decisionCard(intertemporal, bandit),
@@ -455,6 +582,7 @@ export function createStudyProfileInterpretation(
 			...banditEvidenceReferences,
 			...intertemporalEvidenceReferences,
 			...literatureReferencesForClaims(literatureClaims),
+			...referenceComparisonReferences(referenceComparisons, literatureClaims),
 			...tasks
 				.filter((task) => task.status === 'completed')
 				.flatMap((task) => relationshipEvidenceReferencesForExperiment(task.slug))

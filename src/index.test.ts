@@ -682,7 +682,7 @@ describe('reference data contracts', () => {
 
 describe('study profile synthesis', () => {
 	it('contrasts n-back performance with the orientation baseline', () => {
-		const interpretation = createStudyProfileInterpretation([
+		const tasks = [
 			{
 				slug: 'orientation-discrimination',
 				name: 'Orientation discrimination',
@@ -707,17 +707,63 @@ describe('study profile synthesis', () => {
 				status: 'pending',
 				resultSummary: null
 			}
-		]);
+		];
+		const referenceComparison: ReferenceComparison & { taskName: string; taskSlug: string } = {
+			metricKey: 'accuracy',
+			label: 'Accuracy',
+			unit: 'proportion',
+			currentValue: 0.56,
+			state: 'comparable',
+			readinessStatus: 'ready',
+			readinessBlockers: [],
+			datasetName: 'OpenfMRI ds000115 n-back healthy controls',
+			datasetUrl: 'https://openfmri.org/dataset/ds000115/',
+			datasetStatus: 'validated',
+			datasetCompatibility: 'partial',
+			datasetSampleSize: 20,
+			datasetPopulation: 'Healthy control participants from ds000115.',
+			datasetTaskVariant: 'Letter 2-back behavioural summary columns.',
+			referenceSourceCitation: 'OpenfMRI ds000115',
+			referenceSourceUrl: 'https://openfmri.org/dataset/ds000115/',
+			referenceCohortLabel: 'OpenfMRI ds000115 healthy controls',
+			referenceCohortSampleSize: 20,
+			referenceCohortPopulation: 'Healthy control participants from ds000115.',
+			referenceCohortGroupLabel: 'healthy controls',
+			mappingSourceMetric: '2-back accuracy',
+			mappingSourceColumns: ['condit', 'nback2_nont', 'nback2_targ'],
+			mappingTransformation: 'Filtered healthy-control target and non-target accuracy.',
+			mappingDirection: 'same',
+			mappingExtractionStatus: 'reviewed',
+			mappingReviewNotes: 'Reviewed public comparison fixture.',
+			referenceMean: 0.6,
+			referenceStandardDeviation: 0.1,
+			referenceMinimum: 0.2,
+			referenceMaximum: 1,
+			referenceDistributionSampleSize: null,
+			referenceDistributionBins: [],
+			zScore: -0.4,
+			percentile: 0.34,
+			summary: 'This run is near the reviewed reference fixture.',
+			taskName: 'n-back',
+			taskSlug: 'n-back'
+		};
+		const interpretation = createStudyProfileInterpretation(tasks, {
+			referenceComparisons: [referenceComparison]
+		});
 
 		expect(interpretation?.cards.map((card) => card.title)).toContain('Working-memory contrast');
 		expect(interpretation?.cards.map((card) => card.title)).toContain('Evidence-backed contexts');
 		expect(interpretation?.cards.map((card) => card.title)).toContain('Profile tags');
+		expect(interpretation?.cards.map((card) => card.title)).toContain('Reference matches');
 		expect(
 			interpretation?.cards.find((card) => card.title === 'Evidence-backed contexts')?.body
 		).toContain('Orientation discrimination');
 		expect(interpretation?.cards.find((card) => card.title === 'Profile tags')?.body).toContain(
 			'working-memory repeat target'
 		);
+		expect(
+			interpretation?.cards.find((card) => card.title === 'Reference matches')?.body
+		).toContain('OpenfMRI ds000115 healthy controls');
 		expect(interpretation?.cards.find((card) => card.title === 'Profile coverage')?.tone).toBe(
 			'watch'
 		);

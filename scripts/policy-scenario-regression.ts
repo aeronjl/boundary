@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import {
 	evaluatePolicyScenarioRegressionGate,
+	formatPolicyScenarioRegressionReport,
 	type PolicyScenarioRegressionGate,
 	type PolicyScenarioRegressionSnapshotInput
 } from '../src/lib/experiments/policy-scenario-regression';
@@ -48,11 +49,34 @@ function stringField(record: JsonRecord, key: string): string {
 	return value;
 }
 
+function optionalStringField(record: JsonRecord, key: string): string | undefined {
+	const value = record[key];
+
+	if (value === undefined) return undefined;
+
+	if (typeof value !== 'string') {
+		throw new Error(`Expected string export field: ${key}`);
+	}
+
+	return value;
+}
+
 function booleanField(record: JsonRecord, key: string): boolean {
 	const value = record[key];
 
 	if (typeof value !== 'boolean') {
 		throw new Error(`Expected boolean export field: ${key}`);
+	}
+
+	return value;
+}
+
+function optionalStringArrayField(record: JsonRecord, key: string): string[] | undefined {
+	const value = record[key];
+
+	if (value === undefined) return undefined;
+	if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) {
+		throw new Error(`Expected string array export field: ${key}`);
 	}
 
 	return value;
@@ -67,6 +91,8 @@ function parseExpectation(value: unknown) {
 		kind: stringField(value, 'kind'),
 		expectedStatus: stringField(value, 'expectedStatus'),
 		actualStatus: stringField(value, 'actualStatus'),
+		actualBlockers: optionalStringArrayField(value, 'actualBlockers'),
+		rationale: optionalStringField(value, 'rationale'),
 		passed: booleanField(value, 'passed')
 	};
 }
@@ -81,6 +107,7 @@ function parseMetricExpectation(value: unknown) {
 		expectedMaximum: optionalNumberField(value, 'expectedMaximum'),
 		actualValue: optionalNumberField(value, 'actualValue'),
 		actualStatus: stringField(value, 'actualStatus'),
+		rationale: optionalStringField(value, 'rationale'),
 		passed: booleanField(value, 'passed')
 	};
 }
@@ -102,8 +129,10 @@ function parseSnapshots(value: unknown): PolicyScenarioRegressionSnapshotInput[]
 			id: stringField(snapshot, 'id'),
 			experimentSlug: stringField(snapshot, 'experimentSlug'),
 			scenarioId: stringField(snapshot, 'scenarioId'),
+			scenarioLabel: optionalStringField(snapshot, 'scenarioLabel'),
 			scope: stringField(snapshot, 'scope') as PolicyScenarioRegressionSnapshotInput['scope'],
 			scopeKey: stringField(snapshot, 'scopeKey'),
+			scopeLabel: optionalStringField(snapshot, 'scopeLabel'),
 			expectations: expectations.map(parseExpectation),
 			metricExpectations: metricExpectations.map(parseMetricExpectation)
 		};
@@ -197,19 +226,11 @@ const gate: PolicyScenarioRegressionGate = evaluatePolicyScenarioRegressionGate(
 });
 
 if (!gate.passed) {
-	console.error(`Policy scenario regression ${gate.status}: ${gate.issueCount} issue(s).`);
-
-	for (const issue of gate.issues) {
-		console.error(`- ${issue.code}: ${issue.message}`);
-	}
-
-	for (const failure of gate.failures.slice(0, 20)) {
-		console.error(`- ${failure.scenarioId} ${failure.scopeKey}: ${failure.message}`);
+	for (const line of formatPolicyScenarioRegressionReport(gate.report)) {
+		console.error(line);
 	}
 
 	process.exit(1);
 }
 
-console.log(
-	`Policy scenario regression passed: ${gate.completedRunCount}/${gate.expectedScenarioCount ?? gate.runCount} run(s), ${gate.expectationCount} outcome expectation(s), and ${gate.metricExpectationCount} metric expectation(s).`
-);
+console.log(gate.report.summary);

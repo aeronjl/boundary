@@ -16,6 +16,7 @@ import {
 import { closeDatabase, db } from '../src/lib/server/db';
 import { participantSessions, policyScenarioBatches } from '../src/lib/server/db/schema';
 import { runPolicyScenario } from '../src/lib/server/experiments/policy-scenarios';
+import { formatPolicyScenarioRegressionReport } from '../src/lib/experiments/policy-scenario-regression';
 
 const usage = `Usage: bun run scenario:matrix [--seed N] [--label LABEL] [--output export.json] [--keep-batch]
 
@@ -142,23 +143,13 @@ try {
 	}
 
 	if (!comparison.regressionGate.passed) {
-		console.error(
-			`Policy scenario regression ${comparison.regressionGate.status}: ${comparison.regressionGate.issueCount} issue(s).`
-		);
-
-		for (const issue of comparison.regressionGate.issues) {
-			console.error(`- ${issue.code}: ${issue.message}`);
-		}
-
-		for (const failure of comparison.regressionGate.failures.slice(0, 20)) {
-			console.error(`- ${failure.scenarioId} ${failure.scopeKey}: ${failure.message}`);
+		for (const line of formatPolicyScenarioRegressionReport(comparison.regressionGate.report)) {
+			console.error(line);
 		}
 
 		process.exitCode = 1;
 	} else {
-		console.log(
-			`Policy scenario regression passed: ${comparison.completedRunCount}/${policyScenarioLaunchCount} run(s), ${comparison.outcomeSnapshotSummary.expectationCount} outcome expectation(s), and ${comparison.outcomeSnapshotSummary.metricExpectationCount} metric expectation(s).`
-		);
+		console.log(comparison.regressionGate.report.summary);
 	}
 } catch (error) {
 	await updateAdminPolicyScenarioBatchStatus(batch.id, 'failed').catch(() => undefined);

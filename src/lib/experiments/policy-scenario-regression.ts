@@ -23,10 +23,19 @@ export type PolicyScenarioRegressionFailure = {
 	snapshotId: string;
 	experimentSlug: string;
 	scenarioId: string;
+	scenarioLabel: string;
 	scope: PolicyScenarioOutcomeSnapshotScope;
 	scopeKey: string;
+	scopeLabel: string;
 	checkId: string;
 	metricKey: string;
+	expectedStatus?: string;
+	actualStatus?: string;
+	actualBlockers?: string[];
+	expectedMinimum?: number | null;
+	expectedMaximum?: number | null;
+	actualValue?: number | null;
+	rationale?: string;
 	message: string;
 };
 
@@ -34,14 +43,18 @@ export type PolicyScenarioRegressionSnapshotInput = {
 	id: string;
 	experimentSlug: string;
 	scenarioId: string;
+	scenarioLabel?: string;
 	scope: PolicyScenarioOutcomeSnapshotScope;
 	scopeKey: string;
+	scopeLabel?: string;
 	expectations: {
 		id: string;
 		metricKey: string;
 		kind: string;
 		expectedStatus: string;
 		actualStatus: string;
+		actualBlockers?: string[];
+		rationale?: string;
 		passed: boolean;
 	}[];
 	metricExpectations: {
@@ -51,6 +64,7 @@ export type PolicyScenarioRegressionSnapshotInput = {
 		expectedMaximum: number | null;
 		actualValue: number | null;
 		actualStatus: string;
+		rationale?: string;
 		passed: boolean;
 	}[];
 };
@@ -69,7 +83,25 @@ export type PolicyScenarioRegressionGateInput = {
 	outcomeSnapshots?: PolicyScenarioRegressionSnapshotInput[];
 };
 
-export type PolicyScenarioRegressionGate = {
+export type PolicyScenarioRegressionReportScenario = {
+	key: string;
+	experimentSlug: string;
+	scenarioId: string;
+	scenarioLabel: string;
+	failureCount: number;
+	lines: string[];
+};
+
+export type PolicyScenarioRegressionReport = {
+	status: PolicyScenarioRegressionStatus;
+	passed: boolean;
+	summary: string;
+	issueLines: string[];
+	failureLines: string[];
+	scenarios: PolicyScenarioRegressionReportScenario[];
+};
+
+export type PolicyScenarioRegressionGateBase = {
 	status: PolicyScenarioRegressionStatus;
 	passed: boolean;
 	expectedScenarioCount: number | null;
@@ -85,6 +117,28 @@ export type PolicyScenarioRegressionGate = {
 	issues: PolicyScenarioRegressionIssue[];
 	failures: PolicyScenarioRegressionFailure[];
 };
+
+export type PolicyScenarioRegressionGate = PolicyScenarioRegressionGateBase & {
+	report: PolicyScenarioRegressionReport;
+};
+
+function labelOrFallback(label: string | undefined, fallback: string): string {
+	return label && label.trim().length > 0 ? label : fallback;
+}
+
+function scopeLabel(
+	snapshot: Pick<PolicyScenarioRegressionSnapshotInput, 'scope' | 'scopeKey'> & {
+		scopeLabel?: string;
+	}
+): string {
+	if (snapshot.scopeLabel && snapshot.scopeLabel.trim().length > 0) {
+		return snapshot.scopeLabel;
+	}
+
+	if (snapshot.scope === 'overall') return 'Overall';
+	if (snapshot.scope === 'epoch') return `${snapshot.scopeKey} epoch`;
+	return snapshot.scopeKey;
+}
 
 function metricRangeLabel(input: {
 	expectedMinimum: number | null;
@@ -118,10 +172,16 @@ function collectFailures(
 				snapshotId: snapshot.id,
 				experimentSlug: snapshot.experimentSlug,
 				scenarioId: snapshot.scenarioId,
+				scenarioLabel: labelOrFallback(snapshot.scenarioLabel, snapshot.scenarioId),
 				scope: snapshot.scope,
 				scopeKey: snapshot.scopeKey,
+				scopeLabel: scopeLabel(snapshot),
 				checkId: expectation.id,
 				metricKey: expectation.metricKey,
+				expectedStatus: expectation.expectedStatus,
+				actualStatus: expectation.actualStatus,
+				actualBlockers: expectation.actualBlockers,
+				rationale: expectation.rationale,
 				message: `${expectation.metricKey}:${expectation.kind} expected ${expectation.expectedStatus}, got ${expectation.actualStatus}.`
 			})),
 		...snapshot.metricExpectations
@@ -131,13 +191,88 @@ function collectFailures(
 				snapshotId: snapshot.id,
 				experimentSlug: snapshot.experimentSlug,
 				scenarioId: snapshot.scenarioId,
+				scenarioLabel: labelOrFallback(snapshot.scenarioLabel, snapshot.scenarioId),
 				scope: snapshot.scope,
 				scopeKey: snapshot.scopeKey,
+				scopeLabel: scopeLabel(snapshot),
 				checkId: expectation.id,
 				metricKey: expectation.metricKey,
+				expectedMinimum: expectation.expectedMinimum,
+				expectedMaximum: expectation.expectedMaximum,
+				actualValue: expectation.actualValue,
+				actualStatus: expectation.actualStatus,
+				rationale: expectation.rationale,
 				message: `${expectation.metricKey} expected ${metricRangeLabel(expectation)}, got ${metricValueLabel(expectation.actualValue)} (${expectation.actualStatus}).`
 			}))
 	]);
+}
+
+function expectedRunCount(gate: PolicyScenarioRegressionGateBase): number {
+	return gate.expectedScenarioCount ?? gate.runCount;
+}
+
+function regressionSummary(gate: PolicyScenarioRegressionGateBase): string {
+	if (gate.passed) {
+		return `Policy scenario regression passed: ${gate.completedRunCount}/${expectedRunCount(gate)} run(s), ${gate.expectationCount} outcome expectation(s), and ${gate.metricExpectationCount} metric expectation(s).`;
+	}
+
+	if (gate.status === 'empty') {
+		return 'Policy scenario regression empty: no policy scenario runs were available.';
+	}
+
+	const scenarioFailureCount = new Set(
+		gate.failures.map((failure) => `${failure.experimentSlug}:${failure.scenarioId}`)
+	).size;
+
+	return `Policy scenario regression failed: ${gate.issueCount} issue(s), ${gate.failureCount} failing check(s), ${scenarioFailureCount} affected scenario(s).`;
+}
+
+function failureLine(failure: PolicyScenarioRegressionFailure): string {
+	return `${failure.experimentSlug} / ${failure.scenarioLabel} / ${failure.scopeLabel} / ${failure.metricKey}: ${failure.message}`;
+}
+
+export function createPolicyScenarioRegressionReport(
+	gate: PolicyScenarioRegressionGateBase
+): PolicyScenarioRegressionReport {
+	const failureLines = gate.failures.map(failureLine);
+	const scenarioMap = new Map<string, PolicyScenarioRegressionReportScenario>();
+
+	for (const failure of gate.failures) {
+		const key = `${failure.experimentSlug}:${failure.scenarioId}`;
+		const scenario = scenarioMap.get(key) ?? {
+			key,
+			experimentSlug: failure.experimentSlug,
+			scenarioId: failure.scenarioId,
+			scenarioLabel: failure.scenarioLabel,
+			failureCount: 0,
+			lines: []
+		};
+
+		scenario.failureCount += 1;
+		scenario.lines.push(failureLine(failure));
+		scenarioMap.set(key, scenario);
+	}
+
+	return {
+		status: gate.status,
+		passed: gate.passed,
+		summary: regressionSummary(gate),
+		issueLines: gate.issues.map((issue) => `${issue.code}: ${issue.message}`),
+		failureLines,
+		scenarios: [...scenarioMap.values()].sort(
+			(left, right) => right.failureCount - left.failureCount || left.key.localeCompare(right.key)
+		)
+	};
+}
+
+export function formatPolicyScenarioRegressionReport(
+	report: PolicyScenarioRegressionReport
+): string[] {
+	return [
+		report.summary,
+		...report.issueLines.map((line) => `- ${line}`),
+		...report.failureLines.map((line) => `- ${line}`)
+	];
 }
 
 export function evaluatePolicyScenarioRegressionGate({
@@ -202,8 +337,7 @@ export function evaluatePolicyScenarioRegressionGate({
 	const failures = collectFailures(outcomeSnapshots);
 	const status: PolicyScenarioRegressionStatus =
 		runCount === 0 ? 'empty' : issues.length > 0 ? 'failed' : 'passed';
-
-	return {
+	const gate: PolicyScenarioRegressionGateBase = {
 		status,
 		passed: status === 'passed',
 		expectedScenarioCount: expectedCount,
@@ -218,5 +352,10 @@ export function evaluatePolicyScenarioRegressionGate({
 		failureCount: failures.length,
 		issues,
 		failures
+	};
+
+	return {
+		...gate,
+		report: createPolicyScenarioRegressionReport(gate)
 	};
 }

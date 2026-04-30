@@ -404,12 +404,19 @@
 				).toLowerCase()}
 			</p>
 			<div class="mt-2 grid gap-1">
-				{#each data.comparison.regressionGate.issues as issue (issue.code)}
-					<p>{issue.message}</p>
+				<p>{data.comparison.regressionGate.report.summary}</p>
+				{#each data.comparison.regressionGate.report.issueLines as line (line)}
+					<p>{line}</p>
 				{/each}
-				{#each data.comparison.regressionGate.failures.slice(0, 5) as failure (failure.checkId)}
-					<p>{failure.scenarioId} · {failure.scopeKey}: {failure.message}</p>
+				{#each data.comparison.regressionGate.report.failureLines.slice(0, 8) as line (line)}
+					<p>{line}</p>
 				{/each}
+				{#if data.comparison.regressionGate.report.failureLines.length > 8}
+					<p>
+						{data.comparison.regressionGate.report.failureLines.length - 8} more failing check(s) in the
+						JSON export.
+					</p>
+				{/if}
 			</div>
 		</div>
 	{/if}

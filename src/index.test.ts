@@ -1014,7 +1014,11 @@ describe('policy scenario comparison helpers', () => {
 		expect(passedGate).toMatchObject({
 			status: 'passed',
 			passed: true,
-			issueCount: 0
+			issueCount: 0,
+			report: {
+				summary:
+					'Policy scenario regression passed: 2/2 run(s), 3 outcome expectation(s), and 4 metric expectation(s).'
+			}
 		});
 
 		const failedGate = evaluatePolicyScenarioRegressionGate({
@@ -1033,8 +1037,10 @@ describe('policy scenario comparison helpers', () => {
 					id: 'n-back:perfect-responder:overall',
 					experimentSlug: 'n-back',
 					scenarioId: 'perfect-responder',
+					scenarioLabel: 'Perfect responder',
 					scope: 'overall',
 					scopeKey: 'overall',
+					scopeLabel: 'Overall',
 					expectations: [
 						{
 							id: 'n-back-perfect-ready',
@@ -1042,6 +1048,7 @@ describe('policy scenario comparison helpers', () => {
 							kind: 'reference_percentile',
 							expectedStatus: 'ready',
 							actualStatus: 'blocked',
+							actualBlockers: ['reference data is unreviewed'],
 							passed: false
 						}
 					],
@@ -1078,6 +1085,12 @@ describe('policy scenario comparison helpers', () => {
 			type: 'metric_expectation',
 			message: 'accuracy expected 1, got 0.875 (out_of_range).'
 		});
+		expect(failedGate.report.summary).toBe(
+			'Policy scenario regression failed: 5 issue(s), 2 failing check(s), 1 affected scenario(s).'
+		);
+		expect(failedGate.report.failureLines).toContain(
+			'n-back / Perfect responder / Overall / accuracy: accuracy expected 1, got 0.875 (out_of_range).'
+		);
 	});
 });
 

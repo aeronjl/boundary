@@ -834,7 +834,13 @@ test('admin can inspect and export ten item personality inventory data', async (
 			status: expect.any(String),
 			passed: expect.any(Boolean),
 			issueCount: expect.any(Number),
-			failureCount: expect.any(Number)
+			failureCount: expect.any(Number),
+			report: {
+				summary: expect.any(String),
+				issueLines: expect.any(Array),
+				failureLines: expect.any(Array),
+				scenarios: expect.any(Array)
+			}
 		},
 		outcomeSnapshots: expect.any(Array),
 		selectedBatchId: null,
@@ -863,7 +869,11 @@ test('admin can inspect and export ten item personality inventory data', async (
 			passed: false,
 			expectedScenarioCount: null,
 			issueCount: 1,
-			failureCount: 0
+			failureCount: 0,
+			report: {
+				summary: 'Policy scenario regression empty: no policy scenario runs were available.',
+				failureLines: []
+			}
 		},
 		outcomeSnapshots: [],
 		selectedBatchId: 'missing',

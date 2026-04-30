@@ -871,8 +871,11 @@ test('admin can inspect and export ten item personality inventory data', async (
 	).toBeVisible();
 	await expect(page.getByText('Metric contracts', { exact: true })).toBeVisible();
 	await expect(page.getByRole('heading', { name: 'Comparison readiness' })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Readiness queue' })).toBeVisible();
 	await expect(page.getByText('Ready metrics')).toBeVisible();
-	await expect(page.getByText('Blocked metrics')).toBeVisible();
+	await expect(page.getByText('Blocked metrics', { exact: true })).toBeVisible();
+	await expect(page.getByRole('columnheader', { name: 'Remaining' })).toBeVisible();
+	await expect(page.getByText('Review mapping extraction status.').first()).toBeVisible();
 	await expect(page.getByText('Dataset is candidate.').first()).toBeVisible();
 	await expect(page.getByText('Mapping is candidate.').first()).toBeVisible();
 	await expect(page.getByText('Imported reference summary').first()).toBeVisible();
@@ -1012,7 +1015,13 @@ test('admin can inspect and export ten item personality inventory data', async (
 	expect(referenceJson.readiness).toMatchObject({
 		totalMetricCount: expect.any(Number),
 		readyMetricCount: expect.any(Number),
-		blockedMetricCount: expect.any(Number)
+		blockedMetricCount: expect.any(Number),
+		queue: expect.any(Array)
+	});
+	expect(referenceJson.readiness.queue[0]).toMatchObject({
+		status: 'blocked',
+		blockerCount: expect.any(Number),
+		nextAction: expect.any(String)
 	});
 	const exportedReadinessItems = referenceJson.readiness.experiments.flatMap(
 		(experiment: { items: { metricId: string; status: string; blockers: string[] }[] }) =>
@@ -1046,7 +1055,9 @@ test('admin can inspect and export ten item personality inventory data', async (
 	const referenceCsv = await referenceCsvResponse.text();
 	expect(referenceCsv).toContain('"mapping_source_metric"');
 	expect(referenceCsv).toContain('"comparison_ready"');
+	expect(referenceCsv).toContain('"readiness_next_action"');
 	expect(referenceCsv).toContain('"pilot_accuracy"');
+	expect(referenceCsv).toContain('"Review and validate dataset status."');
 	expect(referenceCsv).toContain('"Dataset is candidate."');
 
 	const validateForm = page.locator(

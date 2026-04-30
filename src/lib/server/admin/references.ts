@@ -127,6 +127,11 @@ export type AdminReferenceReadinessItem = {
 	blockers: string[];
 };
 
+export type AdminReferenceReadinessQueueItem = AdminReferenceReadinessItem & {
+	blockerCount: number;
+	nextAction: string;
+};
+
 export type AdminReferenceReadinessExperiment = {
 	experimentSlug: string;
 	totalMetricCount: number;
@@ -139,6 +144,7 @@ export type AdminReferenceReadiness = {
 	totalMetricCount: number;
 	readyMetricCount: number;
 	blockedMetricCount: number;
+	queue: AdminReferenceReadinessQueueItem[];
 	experiments: AdminReferenceReadinessExperiment[];
 };
 
@@ -686,6 +692,62 @@ function adminReferenceReadinessItem(
 	};
 }
 
+function readinessNextAction(blockers: string[]): string {
+	if (blockers.some((blocker) => blocker.startsWith('Mean and positive SD'))) {
+		return 'Import or enter mean and positive SD.';
+	}
+
+	if (blockers.some((blocker) => blocker === 'Mapping is missing.')) {
+		return 'Create a metric mapping.';
+	}
+
+	if (
+		blockers.some((blocker) =>
+			[
+				'Source metric is missing.',
+				'Source columns are missing.',
+				'Transformation is missing.',
+				'Mapping review note is missing.'
+			].includes(blocker)
+		)
+	) {
+		return 'Complete mapping fields.';
+	}
+
+	if (blockers.some((blocker) => blocker.startsWith('Mapping is '))) {
+		return 'Review mapping extraction status.';
+	}
+
+	if (blockers.some((blocker) => blocker.startsWith('Compatibility is '))) {
+		return 'Resolve dataset compatibility.';
+	}
+
+	if (blockers.some((blocker) => blocker.startsWith('Dataset is '))) {
+		return 'Review and validate dataset status.';
+	}
+
+	return 'Resolve remaining readiness blockers.';
+}
+
+function referenceReadinessQueue(
+	items: AdminReferenceReadinessItem[]
+): AdminReferenceReadinessQueueItem[] {
+	return items
+		.filter((item) => item.status === 'blocked')
+		.map((item) => ({
+			...item,
+			blockerCount: item.blockers.length,
+			nextAction: readinessNextAction(item.blockers)
+		}))
+		.sort(
+			(left, right) =>
+				left.blockerCount - right.blockerCount ||
+				left.experimentSlug.localeCompare(right.experimentSlug) ||
+				left.datasetName.localeCompare(right.datasetName) ||
+				left.metricLabel.localeCompare(right.metricLabel)
+		);
+}
+
 function buildAdminReferenceReadiness(datasets: AdminReferenceDataset[]): AdminReferenceReadiness {
 	const items = datasets.flatMap((dataset) =>
 		dataset.metrics.map((metric) => adminReferenceReadinessItem(dataset, metric))
@@ -709,6 +771,7 @@ function buildAdminReferenceReadiness(datasets: AdminReferenceDataset[]): AdminR
 		totalMetricCount: items.length,
 		readyMetricCount,
 		blockedMetricCount: items.length - readyMetricCount,
+		queue: referenceReadinessQueue(items),
 		experiments
 	};
 }
@@ -828,6 +891,8 @@ export async function getAdminReferenceRegistryCsv(): Promise<string> {
 		'mapping_direction',
 		'mapping_extraction_status',
 		'comparison_ready',
+		'readiness_blocker_count',
+		'readiness_next_action',
 		'comparison_blockers'
 	];
 	const rows = [headers.map(csvCell).join(',')];
@@ -868,6 +933,10 @@ export async function getAdminReferenceRegistryCsv(): Promise<string> {
 					metric.mapping?.direction,
 					metric.mapping?.extractionStatus,
 					readiness?.status === 'ready',
+					readiness?.blockers.length ?? 0,
+					readiness && readiness.status === 'blocked'
+						? readinessNextAction(readiness.blockers)
+						: 'Ready for participant comparisons.',
 					readiness?.blockers.join(' ')
 				]
 					.map(csvCell)

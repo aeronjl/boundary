@@ -19,6 +19,8 @@
 	const formatBinning = (value: string) => value.replaceAll('_', '-');
 	const formatBlockers = (blockers: string[]) =>
 		blockers.length > 0 ? blockers.join(' ') : 'Ready for participant comparisons.';
+
+	$: readinessQueue = data.readiness.queue.slice(0, 8);
 </script>
 
 <svelte:head>
@@ -105,6 +107,48 @@
 				<p class="font-serif text-2xl">{data.readiness.experiments.length}</p>
 			</div>
 		</div>
+		{#if readinessQueue.length > 0}
+			<section aria-label="Reference readiness queue" class="mt-4 border-t border-gray-200 pt-3">
+				<div>
+					<h3 class="font-medium">Readiness queue</h3>
+					<p class="mt-1 max-w-2xl text-gray-500">
+						Blocked metrics sorted by fewest remaining participant-facing comparison blockers.
+					</p>
+				</div>
+				<div class="mt-2 overflow-x-auto">
+					<table class="w-full min-w-[900px] text-left text-xs">
+						<thead class="text-gray-500">
+							<tr>
+								<th class="py-2 pr-3 font-medium">Remaining</th>
+								<th class="py-2 pr-3 font-medium">Metric</th>
+								<th class="py-2 pr-3 font-medium">Dataset</th>
+								<th class="py-2 pr-3 font-medium">Next action</th>
+								<th class="py-2 pr-3 font-medium">Blockers</th>
+							</tr>
+						</thead>
+						<tbody>
+							{#each readinessQueue as item (item.id)}
+								<tr class="border-t border-gray-100">
+									<td class="py-2 pr-3">
+										<p class="font-serif text-xl">{item.blockerCount}</p>
+									</td>
+									<td class="py-2 pr-3">
+										<p>{item.metricLabel}</p>
+										<p class="text-gray-500">{item.experimentSlug} / {item.metricKey}</p>
+									</td>
+									<td class="py-2 pr-3">
+										<p>{item.datasetName}</p>
+										<p class="text-gray-500">{item.cohortLabel ?? 'Unassigned cohort'}</p>
+									</td>
+									<td class="py-2 pr-3">{item.nextAction}</td>
+									<td class="py-2 pr-3">{formatBlockers(item.blockers)}</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				</div>
+			</section>
+		{/if}
 		<div class="mt-3 space-y-4">
 			{#each data.readiness.experiments as experiment (experiment.experimentSlug)}
 				<section class="border-t border-gray-200 pt-3">

@@ -1,0 +1,224 @@
+{
+	"schemaVersion": 1,
+	"importId": "openfmri-ds000115-nback-scz-sib-participants-r2-2026-04-29",
+	"datasetId": "openfmri-ds000115-nback-scz-sib",
+	"experimentSlug": "n-back",
+	"source": {
+		"name": "OpenfMRI ds000115 participants.tsv",
+		"url": "https://s3.amazonaws.com/openneuro/ds000115/ds000115_R2.0.0/uncompressed/participants.tsv",
+		"datasetUrl": "https://alpha.openfmri.org/dataset/ds000115/",
+		"revision": "ds000115_R2.0.0",
+		"sha256": "75364291e42c62851f8c1fe891742c74638476deae5767d1ce7a2d23ed2bdc08",
+		"license": "PDDL",
+		"warning": "The OpenfMRI dataset page warns that event files may be inaccurate. This summary uses participants.tsv behavioural columns rather than event TSV reconstruction."
+	},
+	"extractor": {
+		"name": "participants-tsv-summary",
+		"version": "2026-04-29",
+		"method": "Computed descriptive statistics from ds000115_R2.0.0 participants.tsv behavioural summary columns. No event-level files were parsed."
+	},
+	"review": {
+		"status": "candidate",
+		"compatibility": "partial",
+		"notes": "Imported candidate statistics. Validate task-level construct mapping before using for public cohort comparisons."
+	},
+	"dataset": {
+		"sampleSize": 35,
+		"population": "Unaffected sibling participants of schizophrenia probands from ds000115 with condit=SCZ-SIB.",
+		"taskVariant": "Letter 2-back behavioural summary columns from participants.tsv filtered to condit=SCZ-SIB.",
+		"notes": "Candidate schizophrenia-sibling subgroup summary from participants.tsv. Use only after construct and cohort mapping review."
+	},
+	"metrics": [
+		{
+			"metricKey": "accuracy",
+			"label": "Accuracy",
+			"unit": "proportion",
+			"comparisonType": "distribution",
+			"sampleSize": 34,
+			"mean": 0.8425229182941175,
+			"standardDeviation": 0.20534529854443687,
+			"minimum": 0.1833333335,
+			"maximum": 1,
+			"sourceColumns": ["condit", "nback2_nont", "nback2_targ"],
+			"method": "Filtered to condit=SCZ-SIB. Subject-level 2-back accuracy is the unweighted mean of nback2_nont and nback2_targ because trial counts are not represented in participants.tsv.",
+			"excludedRows": [{ "count": 1, "reason": "Missing nback2_nont or nback2_targ." }],
+			"distribution": {
+				"source": "participant_values",
+				"binning": "equal_width",
+				"binCount": 10,
+				"sampleSize": 34,
+				"bins": [
+					{
+						"index": 0,
+						"xStart": 0.1833333335,
+						"xEnd": 0.26500000015,
+						"count": 1,
+						"proportion": 0.029411764705882353
+					},
+					{
+						"index": 1,
+						"xStart": 0.26500000015,
+						"xEnd": 0.3466666668,
+						"count": 0,
+						"proportion": 0
+					},
+					{
+						"index": 2,
+						"xStart": 0.3466666668,
+						"xEnd": 0.42833333345,
+						"count": 2,
+						"proportion": 0.058823529411764705
+					},
+					{
+						"index": 3,
+						"xStart": 0.42833333345,
+						"xEnd": 0.5100000001,
+						"count": 1,
+						"proportion": 0.029411764705882353
+					},
+					{
+						"index": 4,
+						"xStart": 0.5100000001,
+						"xEnd": 0.59166666675,
+						"count": 0,
+						"proportion": 0
+					},
+					{
+						"index": 5,
+						"xStart": 0.59166666675,
+						"xEnd": 0.6733333334,
+						"count": 1,
+						"proportion": 0.029411764705882353
+					},
+					{
+						"index": 6,
+						"xStart": 0.6733333334,
+						"xEnd": 0.75500000005,
+						"count": 2,
+						"proportion": 0.058823529411764705
+					},
+					{
+						"index": 7,
+						"xStart": 0.75500000005,
+						"xEnd": 0.8366666667,
+						"count": 2,
+						"proportion": 0.058823529411764705
+					},
+					{
+						"index": 8,
+						"xStart": 0.8366666667,
+						"xEnd": 0.91833333335,
+						"count": 10,
+						"proportion": 0.29411764705882354
+					},
+					{
+						"index": 9,
+						"xStart": 0.91833333335,
+						"xEnd": 1,
+						"count": 15,
+						"proportion": 0.4411764705882353
+					}
+				],
+				"notes": "Equal-width bins computed from subject-level 2-back accuracy values in participants.tsv."
+			},
+			"notes": "Candidate 2-back accuracy summary derived from participants.tsv target and non-target accuracy columns."
+		},
+		{
+			"metricKey": "sensitivityIndex",
+			"label": "Sensitivity d'",
+			"unit": "count",
+			"comparisonType": "distribution",
+			"sampleSize": 32,
+			"mean": 1.91975,
+			"standardDeviation": 0.9243998576234169,
+			"minimum": 0.37,
+			"maximum": 4.257,
+			"sourceColumns": ["condit", "d4prime"],
+			"method": "Filtered to condit=SCZ-SIB. Summary of d4prime values in participants.tsv after removing missing values and one out-of-range row.",
+			"excludedRows": [
+				{ "count": 2, "reason": "Missing d4prime value." },
+				{ "count": 1, "reason": "Out-of-range d4prime value 866 for sub-03." }
+			],
+			"distribution": {
+				"source": "participant_values",
+				"binning": "equal_width",
+				"binCount": 10,
+				"sampleSize": 32,
+				"bins": [
+					{
+						"index": 0,
+						"xStart": 0.37,
+						"xEnd": 0.7586999999999999,
+						"count": 3,
+						"proportion": 0.09375
+					},
+					{
+						"index": 1,
+						"xStart": 0.7586999999999999,
+						"xEnd": 1.1473999999999998,
+						"count": 4,
+						"proportion": 0.125
+					},
+					{
+						"index": 2,
+						"xStart": 1.1473999999999998,
+						"xEnd": 1.5360999999999998,
+						"count": 5,
+						"proportion": 0.15625
+					},
+					{
+						"index": 3,
+						"xStart": 1.5360999999999998,
+						"xEnd": 1.9247999999999998,
+						"count": 4,
+						"proportion": 0.125
+					},
+					{
+						"index": 4,
+						"xStart": 1.9247999999999998,
+						"xEnd": 2.3135,
+						"count": 6,
+						"proportion": 0.1875
+					},
+					{
+						"index": 5,
+						"xStart": 2.3135,
+						"xEnd": 2.7021999999999995,
+						"count": 5,
+						"proportion": 0.15625
+					},
+					{
+						"index": 6,
+						"xStart": 2.7021999999999995,
+						"xEnd": 3.0908999999999995,
+						"count": 2,
+						"proportion": 0.0625
+					},
+					{
+						"index": 7,
+						"xStart": 3.0908999999999995,
+						"xEnd": 3.4795999999999996,
+						"count": 0,
+						"proportion": 0
+					},
+					{
+						"index": 8,
+						"xStart": 3.4795999999999996,
+						"xEnd": 3.8682999999999996,
+						"count": 2,
+						"proportion": 0.0625
+					},
+					{
+						"index": 9,
+						"xStart": 3.8682999999999996,
+						"xEnd": 4.257,
+						"count": 1,
+						"proportion": 0.03125
+					}
+				],
+				"notes": "Equal-width bins computed from d4prime values in participants.tsv after excluding missing values and the out-of-range sub-03 value."
+			},
+			"notes": "Candidate sensitivity summary from the source d4prime column; validate that d4prime aligns with Boundary's signal-detection definition before public comparisons."
+		}
+	]
+}

@@ -67,23 +67,25 @@ Experiment-specific tables, such as `tipi_responses` and `tipi_results`, should 
 ## Reference Data Imports
 
 Reference comparison stats are imported from reviewed summary JSON files. The OpenfMRI
-ds000115 n-back candidate summary lives at:
+ds000115 n-back candidate summaries live under:
 
 ```sh
-static/reference-data/n-back/openfmri-ds000115-summary.json
+static/reference-data/n-back/openfmri-ds000115-summary*.json
 ```
 
-Regenerate the summary from the source `participants.tsv` with hash verification:
+They include the mixed cohort plus `CON`, `CON-SIB`, `SCZ`, and `SCZ-SIB`
+condition-specific candidate cohorts. Regenerate summaries from the source
+`participants.tsv` with hash verification:
 
 ```sh
 bun run reference:extract:nback --check
 bun run reference:extract:nback --write
 ```
 
-Import it into the configured database with:
+Import them into the configured database with:
 
 ```sh
-bun run reference:import static/reference-data/n-back/openfmri-ds000115-summary.json
+bun run reference:import:nback
 ```
 
 The importer writes metric stats and provenance, but preserves human review fields by

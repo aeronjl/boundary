@@ -271,90 +271,209 @@ export const referenceStudySeeds: ReferenceStudySeed[] = [
 	}
 ];
 
-export const referenceDatasetSeeds: ReferenceDatasetSeed[] = [
+type OpenFmriNBackSeedGroup = {
+	datasetId: string;
+	cohortId: string;
+	name: string;
+	cohortLabel: string;
+	condition: string | null;
+	population: string;
+	groupLabel: string;
+	sampleSize: number;
+	taskVariant: string;
+	datasetNotes: string;
+	cohortNotes: string;
+};
+
+const openFmriNBackUrl = 'https://openfmri.org/dataset/ds000115/';
+const openFmriNBackLicense = 'open dataset; verify terms before reuse';
+const openFmriNBackSeedGroups: OpenFmriNBackSeedGroup[] = [
 	{
-		id: 'openfmri-ds000115-nback',
-		referenceStudyId: 'openfmri-ds000115',
-		experimentSlug: nBackExperimentSlug,
+		datasetId: 'openfmri-ds000115-nback',
+		cohortId: 'openfmri-ds000115-working-memory-participants',
 		name: 'OpenfMRI ds000115 working-memory task data',
-		url: 'https://openfmri.org/dataset/ds000115/',
-		status: 'candidate',
-		compatibility: 'partial',
-		sampleSize: null,
-		license: 'open dataset; verify terms before reuse',
+		cohortLabel: 'OpenfMRI ds000115 working-memory participants',
+		condition: null,
 		population: 'open working-memory participants',
 		taskVariant: 'working-memory task; Boundary compatibility review pending',
-		metricSummaryJson: {
-			reviewStatus: 'needs task timing and event-code validation'
-		},
-		notes:
+		groupLabel: 'mixed diagnostic and control groups',
+		sampleSize: 99,
+		datasetNotes:
 			'Candidate n-back reference data. Do not draw cohort-similarity or percentile claims until task timing, stimulus load, and participant metadata are mapped.',
-		cohorts: [
-			{
-				id: 'openfmri-ds000115-working-memory-participants',
-				label: 'OpenfMRI ds000115 working-memory participants',
-				population:
-					'Schizophrenia, unaffected sibling, control sibling, and healthy control participants from ds000115.',
-				groupLabel: 'mixed diagnostic and control groups',
-				sampleSize: 99,
-				inclusionCriteria: 'Participants represented in ds000115_R2.0.0 participants.tsv.',
-				exclusionCriteria:
-					'Metric-level exclusions apply where behavioural summary columns are missing or invalid.',
-				notes:
-					'Default mixed cohort for imported participants.tsv summaries; split diagnostic groups before making cohort-similarity claims.'
-			}
-		],
-		metrics: [
-			{
-				id: 'openfmri-ds000115-nback-accuracy',
-				metricKey: 'accuracy',
-				label: 'Accuracy',
-				unit: 'proportion',
-				comparisonType: 'distribution',
-				mean: null,
-				standardDeviation: null,
-				minimum: null,
-				maximum: null,
-				metricJson: {},
-				notes: 'Candidate metric; derive from event-level responses after validation.',
-				mapping: {
-					id: 'openfmri-ds000115-nback-accuracy-mapping',
-					referenceCohortId: 'openfmri-ds000115-working-memory-participants',
-					sourceMetric: '2-back accuracy',
-					sourceColumns: ['nback2_nont', 'nback2_targ'],
-					transformation:
-						'Subject-level 2-back accuracy is the unweighted mean of nback2_nont and nback2_targ because trial counts are not represented in participants.tsv.',
-					direction: 'same',
-					extractionStatus: 'candidate',
-					notes:
-						'Candidate mapping from participants.tsv behavioural summary columns; event-level validation remains pending.'
-				}
-			},
-			{
-				id: 'openfmri-ds000115-nback-sensitivity',
-				metricKey: 'sensitivityIndex',
-				label: "Sensitivity d'",
-				unit: 'count',
-				comparisonType: 'distribution',
-				mean: null,
-				standardDeviation: null,
-				minimum: null,
-				maximum: null,
-				metricJson: {},
-				notes: 'Candidate metric; requires hit and false-alarm reconstruction.',
-				mapping: {
-					id: 'openfmri-ds000115-nback-sensitivity-mapping',
-					referenceCohortId: 'openfmri-ds000115-working-memory-participants',
-					sourceMetric: 'd4prime',
-					sourceColumns: ['d4prime'],
-					transformation:
-						'Summary of d4prime values in participants.tsv after removing missing values and one out-of-range row.',
-					direction: 'derived',
-					extractionStatus: 'candidate',
-					notes:
-						"Candidate mapping from source d4prime column; validate alignment with Boundary's signal-detection definition."
-				}
-			}
-		]
+		cohortNotes:
+			'Default mixed cohort for imported participants.tsv summaries; split diagnostic groups before making cohort-similarity claims.'
+	},
+	{
+		datasetId: 'openfmri-ds000115-nback-con',
+		cohortId: 'openfmri-ds000115-nback-con-participants',
+		name: 'OpenfMRI ds000115 n-back healthy controls',
+		cohortLabel: 'OpenfMRI ds000115 healthy controls',
+		condition: 'CON',
+		population: 'Healthy control participants from ds000115 with condit=CON.',
+		groupLabel: 'healthy controls',
+		sampleSize: 20,
+		taskVariant:
+			'working-memory task filtered to condit=CON; Boundary compatibility review pending',
+		datasetNotes:
+			'Candidate healthy-control subgroup. Keep hidden from participant cohort-similarity prompts until construct and cohort mapping review is complete.',
+		cohortNotes:
+			'Condition-specific participants.tsv subgroup for review; not yet validated for public cohort comparisons.'
+	},
+	{
+		datasetId: 'openfmri-ds000115-nback-con-sib',
+		cohortId: 'openfmri-ds000115-nback-con-sib-participants',
+		name: 'OpenfMRI ds000115 n-back control siblings',
+		cohortLabel: 'OpenfMRI ds000115 control siblings',
+		condition: 'CON-SIB',
+		population: 'Control sibling participants from ds000115 with condit=CON-SIB.',
+		groupLabel: 'control siblings',
+		sampleSize: 21,
+		taskVariant:
+			'working-memory task filtered to condit=CON-SIB; Boundary compatibility review pending',
+		datasetNotes:
+			'Candidate control-sibling subgroup. Keep hidden from participant cohort-similarity prompts until construct and cohort mapping review is complete.',
+		cohortNotes:
+			'Condition-specific participants.tsv subgroup for review; not yet validated for public cohort comparisons.'
+	},
+	{
+		datasetId: 'openfmri-ds000115-nback-scz',
+		cohortId: 'openfmri-ds000115-nback-scz-participants',
+		name: 'OpenfMRI ds000115 n-back schizophrenia participants',
+		cohortLabel: 'OpenfMRI ds000115 schizophrenia participants',
+		condition: 'SCZ',
+		population: 'Schizophrenia participants from ds000115 with condit=SCZ.',
+		groupLabel: 'schizophrenia participants',
+		sampleSize: 23,
+		taskVariant:
+			'working-memory task filtered to condit=SCZ; Boundary compatibility review pending',
+		datasetNotes:
+			'Candidate schizophrenia subgroup. Keep hidden from participant cohort-similarity prompts until construct and cohort mapping review is complete.',
+		cohortNotes:
+			'Condition-specific participants.tsv subgroup for review; not yet validated for public cohort comparisons.'
+	},
+	{
+		datasetId: 'openfmri-ds000115-nback-scz-sib',
+		cohortId: 'openfmri-ds000115-nback-scz-sib-participants',
+		name: 'OpenfMRI ds000115 n-back schizophrenia siblings',
+		cohortLabel: 'OpenfMRI ds000115 schizophrenia siblings',
+		condition: 'SCZ-SIB',
+		population:
+			'Unaffected sibling participants of schizophrenia probands from ds000115 with condit=SCZ-SIB.',
+		groupLabel: 'unaffected siblings of schizophrenia probands',
+		sampleSize: 35,
+		taskVariant:
+			'working-memory task filtered to condit=SCZ-SIB; Boundary compatibility review pending',
+		datasetNotes:
+			'Candidate schizophrenia-sibling subgroup. Keep hidden from participant cohort-similarity prompts until construct and cohort mapping review is complete.',
+		cohortNotes:
+			'Condition-specific participants.tsv subgroup for review; not yet validated for public cohort comparisons.'
 	}
 ];
+
+function openFmriNBackTransformationPrefix(group: OpenFmriNBackSeedGroup): string {
+	return group.condition ? `Filtered to condit=${group.condition}. ` : '';
+}
+
+function openFmriNBackMetricSeeds(group: OpenFmriNBackSeedGroup): ReferenceMetricSeed[] {
+	const accuracySourceColumns = group.condition
+		? ['condit', 'nback2_nont', 'nback2_targ']
+		: ['nback2_nont', 'nback2_targ'];
+	const sensitivitySourceColumns = group.condition ? ['condit', 'd4prime'] : ['d4prime'];
+	const prefix = openFmriNBackTransformationPrefix(group);
+	const metricNotes = group.condition
+		? 'Candidate subgroup metric; do not use for participant cohort-similarity claims until reviewed.'
+		: 'Candidate metric; derive from event-level responses after validation.';
+
+	return [
+		{
+			id: `${group.datasetId}-accuracy`,
+			metricKey: 'accuracy',
+			label: 'Accuracy',
+			unit: 'proportion',
+			comparisonType: 'distribution',
+			mean: null,
+			standardDeviation: null,
+			minimum: null,
+			maximum: null,
+			metricJson: {},
+			notes: metricNotes,
+			mapping: {
+				id: `${group.datasetId}-accuracy-mapping`,
+				referenceCohortId: group.cohortId,
+				sourceMetric: '2-back accuracy',
+				sourceColumns: accuracySourceColumns,
+				transformation: `${prefix}Subject-level 2-back accuracy is the unweighted mean of nback2_nont and nback2_targ because trial counts are not represented in participants.tsv.`,
+				direction: 'same',
+				extractionStatus: 'candidate',
+				notes:
+					'Candidate mapping from participants.tsv behavioural summary columns; event-level validation remains pending.'
+			}
+		},
+		{
+			id: `${group.datasetId}-sensitivity`,
+			metricKey: 'sensitivityIndex',
+			label: "Sensitivity d'",
+			unit: 'count',
+			comparisonType: 'distribution',
+			mean: null,
+			standardDeviation: null,
+			minimum: null,
+			maximum: null,
+			metricJson: {},
+			notes: group.condition
+				? 'Candidate subgroup metric; requires review before any diagnostic-adjacent language.'
+				: 'Candidate metric; requires hit and false-alarm reconstruction.',
+			mapping: {
+				id: `${group.datasetId}-sensitivity-mapping`,
+				referenceCohortId: group.cohortId,
+				sourceMetric: 'd4prime',
+				sourceColumns: sensitivitySourceColumns,
+				transformation: `${prefix}Summary of d4prime values in participants.tsv after removing missing or invalid values.`,
+				direction: 'derived',
+				extractionStatus: 'candidate',
+				notes:
+					"Candidate mapping from source d4prime column; validate alignment with Boundary's signal-detection definition."
+			}
+		}
+	];
+}
+
+function openFmriNBackDatasetSeed(group: OpenFmriNBackSeedGroup): ReferenceDatasetSeed {
+	return {
+		id: group.datasetId,
+		referenceStudyId: 'openfmri-ds000115',
+		experimentSlug: nBackExperimentSlug,
+		name: group.name,
+		url: openFmriNBackUrl,
+		status: 'candidate',
+		compatibility: 'partial',
+		sampleSize: group.sampleSize,
+		license: openFmriNBackLicense,
+		population: group.population,
+		taskVariant: group.taskVariant,
+		metricSummaryJson: {
+			reviewStatus: 'needs task timing and event-code validation',
+			condition: group.condition ?? 'mixed'
+		},
+		notes: group.datasetNotes,
+		cohorts: [
+			{
+				id: group.cohortId,
+				label: group.cohortLabel,
+				population: group.population,
+				groupLabel: group.groupLabel,
+				sampleSize: group.sampleSize,
+				inclusionCriteria: group.condition
+					? `Participants represented in ds000115_R2.0.0 participants.tsv with condit=${group.condition}.`
+					: 'Participants represented in ds000115_R2.0.0 participants.tsv.',
+				exclusionCriteria:
+					'Metric-level exclusions apply where behavioural summary columns are missing or invalid.',
+				notes: group.cohortNotes
+			}
+		],
+		metrics: openFmriNBackMetricSeeds(group)
+	};
+}
+
+export const referenceDatasetSeeds: ReferenceDatasetSeed[] =
+	openFmriNBackSeedGroups.map(openFmriNBackDatasetSeed);

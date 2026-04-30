@@ -5,17 +5,18 @@ import { format, resolveConfig } from 'prettier';
 import { parseReferenceImportSummary } from '../src/lib/reference-data/import-summary';
 import {
 	createOpenFmriNBackSummary,
+	createOpenFmriNBackSummaries,
+	openFmriNBackSummaryTargets,
 	openFmriNBackParticipantsSha256,
-	openFmriNBackParticipantsUrl
+	openFmriNBackParticipantsUrl,
+	type OpenFmriNBackSummaryKey
 } from '../src/lib/reference-data/openfmri-nback-extractor';
 
-const defaultOutputPath = 'static/reference-data/n-back/openfmri-ds000115-summary.json';
-
-const usage = `Usage: bun run reference:extract:nback [--write | --check] [--source <path-or-url>] [--output <summary.json>] [--expected-sha256 <hash>]
+const usage = `Usage: bun run reference:extract:nback [--write | --check] [--group <key>] [--source <path-or-url>] [--output <summary.json>] [--expected-sha256 <hash>]
 
 Regenerates the OpenfMRI ds000115 n-back reference summary from participants.tsv.
-By default, writes generated JSON to stdout. Use --write to update the committed
-summary fixture, or --check to verify the committed fixture is up to date.`;
+By default, writes the mixed-cohort JSON to stdout. Use --write to update all committed
+summary fixtures, or --check to verify all committed fixtures are up to date.`;
 
 const args = process.argv.slice(2);
 
@@ -50,6 +51,17 @@ async function formattedJson(value: unknown, filePath: string): Promise<string> 
 	return format(JSON.stringify(value), { ...config, parser: 'json' });
 }
 
+function summaryKey(value: string | null): OpenFmriNBackSummaryKey {
+	const key = value ?? 'all';
+	const validKeys = openFmriNBackSummaryTargets.map((target) => target.key);
+
+	if (!validKeys.includes(key as OpenFmriNBackSummaryKey)) {
+		throw new Error(`Unknown --group ${key}. Expected one of: ${validKeys.join(', ')}.`);
+	}
+
+	return key as OpenFmriNBackSummaryKey;
+}
+
 async function main() {
 	if (args.includes('--help')) {
 		console.log(usage);
@@ -64,7 +76,8 @@ async function main() {
 	}
 
 	const source = optionValue('--source') ?? openFmriNBackParticipantsUrl;
-	const outputPath = resolve(optionValue('--output') ?? defaultOutputPath);
+	const outputArg = optionValue('--output');
+	const selectedKey = summaryKey(optionValue('--group'));
 	const expectedSha256 = optionValue('--expected-sha256') ?? openFmriNBackParticipantsSha256;
 	const participantsTsv = await readSource(source);
 	const actualSha256 = sha256Hex(participantsTsv);
@@ -75,29 +88,50 @@ async function main() {
 		);
 	}
 
-	const summary = createOpenFmriNBackSummary(participantsTsv, actualSha256);
-	parseReferenceImportSummary(summary);
-	const output = await formattedJson(summary, outputPath);
+	const summaries =
+		outputArg || (!write && !check)
+			? [
+					{
+						target: openFmriNBackSummaryTargets.find((target) => target.key === selectedKey)!,
+						summary: createOpenFmriNBackSummary(participantsTsv, actualSha256, selectedKey)
+					}
+				]
+			: createOpenFmriNBackSummaries(participantsTsv, actualSha256);
+	const outputs = await Promise.all(
+		summaries.map(async ({ target, summary }) => {
+			const outputPath = resolve(outputArg ?? target.outputPath);
+			parseReferenceImportSummary(summary);
+
+			return {
+				outputPath,
+				output: await formattedJson(summary, outputPath)
+			};
+		})
+	);
 
 	if (check) {
-		const existing = await readFile(outputPath, 'utf8');
-		if (existing !== output) {
-			throw new Error(
-				`${outputPath} is not up to date. Run bun run reference:extract:nback --write.`
-			);
+		for (const { outputPath, output } of outputs) {
+			const existing = await readFile(outputPath, 'utf8');
+			if (existing !== output) {
+				throw new Error(
+					`${outputPath} is not up to date. Run bun run reference:extract:nback --write.`
+				);
+			}
 		}
 
-		console.log(`${outputPath} is up to date.`);
+		console.log(`${outputs.length} OpenfMRI n-back summary file(s) are up to date.`);
 		return;
 	}
 
 	if (write) {
-		await writeFile(outputPath, output);
-		console.log(`Wrote ${outputPath}.`);
+		for (const { outputPath, output } of outputs) {
+			await writeFile(outputPath, output);
+			console.log(`Wrote ${outputPath}.`);
+		}
 		return;
 	}
 
-	process.stdout.write(output);
+	process.stdout.write(outputs[0].output);
 }
 
 if (import.meta.main) {

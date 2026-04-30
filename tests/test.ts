@@ -803,12 +803,18 @@ test('admin can inspect and export ten item personality inventory data', async (
 	await page.getByRole('link', { name: 'Reference registry' }).click();
 	await expect(page.getByRole('heading', { name: 'Reference registry' })).toBeVisible();
 	await expect(page.getByText('OpenfMRI ds000115').first()).toBeVisible();
+	await expect(page.getByText('OpenfMRI ds000115 n-back healthy controls').first()).toBeVisible();
+	await expect(
+		page.getByText('OpenfMRI ds000115 n-back schizophrenia participants').first()
+	).toBeVisible();
 	await expect(page.getByText('Metric contracts', { exact: true })).toBeVisible();
-	await expect(page.getByText('Imported reference summary')).toBeVisible();
+	await expect(page.getByText('Imported reference summary').first()).toBeVisible();
 	await expect(page.getByText('Imported n=98 from nback2_nont, nback2_targ')).toBeVisible();
-	await expect(page.getByText(/Extractor check:\s*(passed|failed|unknown)/)).toBeVisible();
+	await expect(page.getByText(/Extractor check:\s*(passed|failed|unknown)/).first()).toBeVisible();
 	await expect(page.getByText(/Source SHA-256:\s*75364291e42c/).first()).toBeVisible();
-	await expect(page.getByText('Command: bun run reference:extract:nback --check')).toBeVisible();
+	await expect(
+		page.getByText('Command: bun run reference:extract:nback --check').first()
+	).toBeVisible();
 	await expect(
 		page.getByText('Distribution: 10 equal-width bins, n=98, counts sum=98')
 	).toBeVisible();
@@ -835,13 +841,19 @@ test('admin can inspect and export ten item personality inventory data', async (
 	await expect(page.getByText('Reference source updated.')).toBeVisible();
 	await expect(sourceForm.getByLabel('Population')).toHaveValue('Boundary pilot participants');
 
-	const initialRevertButton = page.getByRole('button', { name: 'Revert to candidate' });
+	const initialRevertButton = page
+		.locator(
+			'form[aria-label="Revert reference dataset OpenfMRI ds000115 working-memory task data to candidate"]'
+		)
+		.getByRole('button', { name: 'Revert to candidate' });
 	if (await initialRevertButton.isVisible()) {
 		await initialRevertButton.click();
 		await expect(page.getByText('Reference dataset reverted to candidate.')).toBeVisible();
 	}
 
-	const datasetForm = page.locator('form[aria-label^="Edit reference dataset"]').first();
+	const datasetForm = page.locator(
+		'form[aria-label="Edit reference dataset OpenfMRI ds000115 working-memory task data"]'
+	);
 	await datasetForm.getByLabel('Literature source').selectOption({ label: sourceCitation });
 	await datasetForm.getByLabel('Dataset status').selectOption('candidate');
 	await datasetForm.locator('select[name="compatibility"]').selectOption('partial');
@@ -856,7 +868,9 @@ test('admin can inspect and export ten item personality inventory data', async (
 	await expect(datasetForm.getByLabel('Sample size')).toHaveValue('42');
 
 	const cohortLabel = `Boundary Pilot Cohort ${Date.now()}`;
-	const createCohortForm = page.locator('form[aria-label^="Add cohort for"]').first();
+	const createCohortForm = page.locator(
+		'form[aria-label="Add cohort for OpenfMRI ds000115 working-memory task data"]'
+	);
 	await createCohortForm.getByLabel('Source').selectOption({ label: sourceCitation });
 	await createCohortForm.getByLabel('Cohort label').fill(cohortLabel);
 	await createCohortForm.getByLabel('Group label').fill('healthy controls');
@@ -877,7 +891,9 @@ test('admin can inspect and export ten item personality inventory data', async (
 		'Cohort reviewed during smoke test.'
 	);
 
-	const mappingForm = page.locator('form[aria-label^="Edit reference mapping Accuracy"]').first();
+	const mappingForm = page.locator(
+		'form[aria-label="Edit reference mapping Accuracy for OpenfMRI ds000115 working-memory task data"]'
+	);
 	await mappingForm.getByLabel('Reference cohort').selectOption({ label: cohortLabel });
 	await mappingForm.getByLabel('Source metric').fill('pilot_accuracy');
 	await mappingForm.getByLabel('Source columns').fill('pilot_nont, pilot_targ');
@@ -918,7 +934,9 @@ test('admin can inspect and export ten item personality inventory data', async (
 	expect(referenceCsv).toContain('"mapping_source_metric"');
 	expect(referenceCsv).toContain('"pilot_accuracy"');
 
-	const validateForm = page.locator('form[aria-label^="Validate reference dataset"]').first();
+	const validateForm = page.locator(
+		'form[aria-label="Validate reference dataset OpenfMRI ds000115 working-memory task data"]'
+	);
 	await validateForm.getByLabel('Review compatibility').selectOption('compatible');
 	await validateForm
 		.getByLabel('Validation notes')
@@ -1016,7 +1034,9 @@ test('admin can inspect and export ten item personality inventory data', async (
 	expect(accuracyRecommendation.evidenceIds).toContain('meule-2017');
 	expect(accuracyRecommendation.caveat).toContain('not a diagnosis');
 
-	const metricForm = page.locator('form[aria-label^="Edit reference metric Accuracy"]').first();
+	const metricForm = page.locator(
+		'form[aria-label="Edit reference metric Accuracy for OpenfMRI ds000115 working-memory task data"]'
+	);
 	await metricForm.getByLabel('Mean').fill('0.72');
 	await metricForm.getByLabel('SD').fill('0.11');
 	await metricForm.getByLabel('Metric notes').fill('Accuracy extractable after event validation.');
@@ -1061,7 +1081,12 @@ test('admin can inspect and export ten item personality inventory data', async (
 	expect(accuracyFigure.bins).toHaveLength(10);
 	expect(accuracyFigure.currentMarkerPosition).toBeGreaterThan(accuracyFigure.meanMarkerPosition);
 
-	await page.getByRole('button', { name: 'Revert to candidate' }).click();
+	await page
+		.locator(
+			'form[aria-label="Revert reference dataset OpenfMRI ds000115 working-memory task data to candidate"]'
+		)
+		.getByRole('button', { name: 'Revert to candidate' })
+		.click();
 	await expect(page.getByText('Reference dataset reverted to candidate.')).toBeVisible();
 	const revertedReferenceContextResponse = await page.request.post(
 		'/api/reference-context/n-back',

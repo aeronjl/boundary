@@ -18,7 +18,7 @@ import {
 	type ReferenceImportSummary
 } from '$lib/reference-data/import-summary';
 import {
-	createOpenFmriNBackSummary,
+	createOpenFmriNBackSummaries,
 	openFmriNBackParticipantsSha256,
 	openFmriNBackParticipantsUrl
 } from '$lib/reference-data/openfmri-nback-extractor';
@@ -31,6 +31,10 @@ import {
 	referenceStudies
 } from '$lib/server/db/schema';
 import openFmriNBackSummary from '../../../../static/reference-data/n-back/openfmri-ds000115-summary.json';
+import openFmriNBackConSummary from '../../../../static/reference-data/n-back/openfmri-ds000115-summary-con.json';
+import openFmriNBackConSibSummary from '../../../../static/reference-data/n-back/openfmri-ds000115-summary-con-sib.json';
+import openFmriNBackSczSummary from '../../../../static/reference-data/n-back/openfmri-ds000115-summary-scz.json';
+import openFmriNBackSczSibSummary from '../../../../static/reference-data/n-back/openfmri-ds000115-summary-scz-sib.json';
 
 export type AdminReferenceExcludedRows = {
 	count: number;
@@ -396,7 +400,16 @@ function metricImportMetadata(metricJson: string): AdminReferenceMetricImport | 
 	};
 }
 
-const openFmriReferenceDatasetId = 'openfmri-ds000115-nback';
+const openFmriCommittedSummaries = [
+	openFmriNBackSummary,
+	openFmriNBackConSummary,
+	openFmriNBackConSibSummary,
+	openFmriNBackSczSummary,
+	openFmriNBackSczSibSummary
+].map((summary) => parseReferenceImportSummary(summary));
+const openFmriReferenceDatasetIds = new Set(
+	openFmriCommittedSummaries.map((summary) => summary.datasetId)
+);
 const referenceExtractorCheckCommand = 'bun run reference:extract:nback --check';
 let openFmriArtifactCheckCache: {
 	expiresAt: number;
@@ -452,18 +465,32 @@ async function openFmriReferenceArtifactCheck(): Promise<AdminReferenceArtifactC
 			return value;
 		}
 
-		const generated = createOpenFmriNBackSummary(participantsTsv, sourceSha256);
-		const committed = parseReferenceImportSummary(openFmriNBackSummary);
-		const matches = normalizedReferenceSummary(generated) === normalizedReferenceSummary(committed);
+		const generatedByDatasetId = new Map(
+			createOpenFmriNBackSummaries(participantsTsv, sourceSha256).map(({ summary }) => [
+				summary.datasetId,
+				normalizedReferenceSummary(summary)
+			])
+		);
+		const mismatchedDatasetIds = openFmriCommittedSummaries
+			.filter(
+				(summary) =>
+					generatedByDatasetId.get(summary.datasetId) !== normalizedReferenceSummary(summary)
+			)
+			.map((summary) => summary.datasetId);
+		const matches =
+			mismatchedDatasetIds.length === 0 &&
+			generatedByDatasetId.size === openFmriCommittedSummaries.length;
+		const mismatchMessage =
+			mismatchedDatasetIds.length > 0
+				? `Committed summaries differ from the extractor output: ${mismatchedDatasetIds.join(', ')}.`
+				: 'The extractor generated an unexpected set of summary files.';
 		const value: AdminReferenceArtifactCheck = {
 			status: matches ? 'passed' : 'failed',
 			checkedAt,
 			command: referenceExtractorCheckCommand,
 			expectedSha256: openFmriNBackParticipantsSha256,
 			sourceSha256,
-			message: matches
-				? 'Committed summary matches the extractor output.'
-				: 'Committed summary differs from the extractor output.'
+			message: matches ? 'Committed summaries match the extractor output.' : mismatchMessage
 		};
 		openFmriArtifactCheckCache = { expiresAt: now + 5 * 60 * 1000, value };
 		return value;
@@ -535,9 +562,19 @@ export async function listAdminReferenceRegistry(): Promise<{
 }> {
 	const [studies, datasets, cohorts, metrics, mappings, openFmriArtifactCheck] = await Promise.all([
 		db.select().from(referenceStudies).orderBy(asc(referenceStudies.shortCitation)),
-		db.select().from(referenceDatasets).orderBy(asc(referenceDatasets.experimentSlug)),
+		db
+			.select()
+			.from(referenceDatasets)
+			.orderBy(asc(referenceDatasets.experimentSlug), asc(referenceDatasets.id)),
 		db.select().from(referenceCohorts).orderBy(asc(referenceCohorts.label)),
-		db.select().from(referenceMetrics).orderBy(asc(referenceMetrics.experimentSlug)),
+		db
+			.select()
+			.from(referenceMetrics)
+			.orderBy(
+				asc(referenceMetrics.experimentSlug),
+				asc(referenceMetrics.referenceDatasetId),
+				asc(referenceMetrics.metricKey)
+			),
 		db.select().from(referenceMetricMappings).orderBy(asc(referenceMetricMappings.sourceMetric)),
 		openFmriReferenceArtifactCheck()
 	]);
@@ -577,7 +614,7 @@ export async function listAdminReferenceRegistry(): Promise<{
 			cohorts: cohortsByDatasetId.get(dataset.id) ?? [],
 			metrics: metricsByDatasetId.get(dataset.id) ?? [],
 			importMetadata: datasetImportMetadata(dataset.metricSummaryJson),
-			artifactCheck: dataset.id === openFmriReferenceDatasetId ? openFmriArtifactCheck : null
+			artifactCheck: openFmriReferenceDatasetIds.has(dataset.id) ? openFmriArtifactCheck : null
 		})),
 		metricContractCount: referenceMetricContracts.length,
 		metricCount: metrics.length,

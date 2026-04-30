@@ -35,7 +35,10 @@ import {
 	participantLiteratureClaimsForExperimentFrom,
 	validateLiteratureExtractions
 } from '$lib/reference-data/literature-schema';
-import { createOpenFmriNBackSummary } from '$lib/reference-data/openfmri-nback-extractor';
+import {
+	createOpenFmriNBackSummary,
+	openFmriNBackSummaryTargets
+} from '$lib/reference-data/openfmri-nback-extractor';
 import { crossTaskRelationshipsForMetric } from '$lib/reference-data/relationships';
 import { createReferenceContext } from '$lib/reference-data/summary';
 import { calculateNBackSignalDetectionMetrics, type NBackResult } from '$lib/experiments/n-back';
@@ -48,6 +51,7 @@ import {
 import { createOrientationInterpretation } from '$lib/experiments/orientation-interpretation';
 import { createStudyProfileInterpretation } from '$lib/studies/synthesis';
 import openFmriNBackSummary from '../static/reference-data/n-back/openfmri-ds000115-summary.json';
+import openFmriNBackConSummary from '../static/reference-data/n-back/openfmri-ds000115-summary-con.json';
 
 describe('n-back interpretation helpers', () => {
 	it('computes signal-detection rates and sensitivity', () => {
@@ -211,7 +215,7 @@ describe('reference data contracts', () => {
 			falseAlarmRate: 0.1
 		});
 
-		expect(context.candidateDatasetCount).toBe(1);
+		expect(context.candidateDatasetCount).toBe(5);
 		expect(context.validatedDatasetCount).toBe(0);
 		expect(
 			context.metrics.find((metric) => metric.metricKey === 'accuracy')?.hasCandidateDataset
@@ -308,8 +312,20 @@ describe('reference data contracts', () => {
 
 	it('validates the OpenfMRI n-back reference import summary', () => {
 		const summary = parseReferenceImportSummary(openFmriNBackSummary);
+		const conSummary = parseReferenceImportSummary(openFmriNBackConSummary);
 		const accuracy = summary.metrics.find((metric) => metric.metricKey === 'accuracy');
+		const conAccuracy = conSummary.metrics.find((metric) => metric.metricKey === 'accuracy');
+		const conSensitivity = conSummary.metrics.find(
+			(metric) => metric.metricKey === 'sensitivityIndex'
+		);
 
+		expect(openFmriNBackSummaryTargets.map((target) => target.key)).toEqual([
+			'all',
+			'CON',
+			'CON-SIB',
+			'SCZ',
+			'SCZ-SIB'
+		]);
 		expect(summary.datasetId).toBe('openfmri-ds000115-nback');
 		expect(summary.review.status).toBe('candidate');
 		expect(summary.source.sha256).toHaveLength(64);
@@ -318,6 +334,13 @@ describe('reference data contracts', () => {
 		expect(accuracy?.sourceColumns).toEqual(['nback2_nont', 'nback2_targ']);
 		expect(accuracy?.distribution?.bins).toHaveLength(10);
 		expect(accuracy?.distribution?.bins.reduce((total, bin) => total + bin.count, 0)).toBe(98);
+		expect(conSummary.datasetId).toBe('openfmri-ds000115-nback-con');
+		expect(conSummary.dataset.sampleSize).toBe(20);
+		expect(conAccuracy?.sampleSize).toBe(20);
+		expect(conAccuracy?.sourceColumns).toEqual(['condit', 'nback2_nont', 'nback2_targ']);
+		expect(conAccuracy?.distribution?.bins.reduce((total, bin) => total + bin.count, 0)).toBe(20);
+		expect(conSensitivity?.sampleSize).toBe(19);
+		expect(conSensitivity?.sourceColumns).toEqual(['condit', 'd4prime']);
 	});
 
 	it('extracts OpenfMRI n-back summaries from participants.tsv columns', () => {
@@ -352,6 +375,25 @@ describe('reference data contracts', () => {
 		});
 		expect(sensitivity?.distribution?.bins[0].count).toBe(1);
 		expect(sensitivity?.distribution?.bins[9].count).toBe(1);
+
+		const controlSummary = createOpenFmriNBackSummary(
+			[
+				'participant_id\tcondit\tnback2_nont\tnback2_targ\td4prime',
+				'sub-01\tCON\t0.6\t0.8\t1',
+				'sub-02\tCON\t0.8\t1\t2',
+				'sub-03\tSCZ\t0.5\t0.5\t1',
+				'sub-04\tSCZ\t0.6\t0.6\t2'
+			].join('\n'),
+			'test-sha',
+			'CON'
+		);
+		const controlAccuracy = controlSummary.metrics.find(
+			(metric) => metric.metricKey === 'accuracy'
+		);
+
+		expect(controlSummary.datasetId).toBe('openfmri-ds000115-nback-con');
+		expect(controlSummary.dataset.sampleSize).toBe(2);
+		expect(controlAccuracy?.sourceColumns).toEqual(['condit', 'nback2_nont', 'nback2_targ']);
 	});
 
 	it('exposes structured literature extractions for n-back reference comparisons', () => {

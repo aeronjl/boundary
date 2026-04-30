@@ -136,7 +136,9 @@ async function completeNBackRun(page: Page) {
 	await expect(page.getByRole('heading', { name: 'How this compares' })).toBeVisible();
 	await expect(page.getByText('Signal sensitivity')).toBeVisible();
 	await expect(page.getByRole('heading', { name: 'Reference context' })).toBeVisible();
-	await expect(page.getByText('Not public ready').first()).toBeVisible();
+	await expect(page.getByText('Ready').first()).toBeVisible();
+	await expect(page.getByText('Reviewed literature comparisons')).toBeVisible();
+	await expect(page.getByText('healthy-control 2-back accuracy distribution')).toBeVisible();
 }
 
 test('index page has expected h1', async ({ page }) => {
@@ -787,8 +789,9 @@ test('admin can inspect and export ten item personality inventory data', async (
 	const literatureJson = await literatureJsonResponse.json();
 	expect(literatureJson.summary).toMatchObject({
 		extractionCount: 2,
-		resultCount: 4,
-		comparisonClaimCount: 3
+		resultCount: 5,
+		comparisonClaimCount: 4,
+		publicReadyClaimCount: 1
 	});
 	expect(
 		literatureJson.extractions.find(
@@ -829,7 +832,7 @@ test('admin can inspect and export ten item personality inventory data', async (
 	).toBeVisible();
 
 	const unreviewedSubgroupValidateForm = page.locator(
-		'form[aria-label="Validate reference dataset OpenfMRI ds000115 n-back healthy controls"]'
+		'form[aria-label="Validate reference dataset OpenfMRI ds000115 n-back control siblings"]'
 	);
 	await unreviewedSubgroupValidateForm
 		.getByLabel('Review compatibility')
@@ -1066,7 +1069,14 @@ test('admin can inspect and export ten item personality inventory data', async (
 		)
 	).toBe(98);
 	expect(importedAccuracyFigure.caveat).toContain('binned participant-level');
-	expect(importedReferenceContext.literatureClaims).toEqual([]);
+	expect(importedReferenceContext.literatureClaims).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				id: 'openfmri-ds000115-nback-accuracy-healthy-control-distribution',
+				sourceCitation: 'OpenfMRI ds000115'
+			})
+		])
+	);
 	expect(importedReferenceContext.prompts).toEqual(
 		expect.arrayContaining([
 			expect.objectContaining({
@@ -1172,12 +1182,23 @@ test('admin can inspect and export ten item personality inventory data', async (
 		(comparison: { metricKey: string }) => comparison.metricKey === 'accuracy'
 	);
 	expect(revertedAccuracyComparison).toMatchObject({
-		state: 'candidate_only',
-		readinessStatus: 'blocked',
-		readinessBlockers: expect.arrayContaining(['Dataset is candidate.']),
-		zScore: null
+		state: 'comparable',
+		readinessStatus: 'ready',
+		readinessBlockers: [],
+		referenceCohortLabel: 'OpenfMRI ds000115 healthy controls',
+		referenceMean: 0.9276768921,
+		referenceStandardDeviation: 0.07203667731082324
 	});
-	expect(revertedReferenceContext.figures).toEqual([]);
+	expect(revertedAccuracyComparison.zScore).toBeCloseTo(-1.36, 2);
+	expect(revertedReferenceContext.figures).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				metricKey: 'accuracy',
+				source: 'imported_bins',
+				sampleSize: 20
+			})
+		])
+	);
 	await page.goto('/admin');
 
 	const csvResponse = await page.request.get('/admin/tipi/export.csv');

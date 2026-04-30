@@ -137,7 +137,7 @@ export function createNBackInterpretation(result: NBackResult): ExperimentInterp
 			title: 'Clinical context',
 			value: 'not diagnostic',
 			tone: 'neutral',
-			body: 'Some n-back studies compare clinical groups such as ADHD with controls, but Boundary needs matched reference samples before saying which cohort a result resembles.',
+			body: 'Some n-back studies compare clinical groups with controls, but Boundary only uses reviewed reference samples for task-specific context and does not diagnose or classify participants.',
 			evidenceIds: ['marx-2011']
 		}
 	];

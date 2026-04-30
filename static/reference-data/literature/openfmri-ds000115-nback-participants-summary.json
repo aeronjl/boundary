@@ -29,6 +29,17 @@
 			"inclusionCriteria": "Participants represented in ds000115_R2.0.0 participants.tsv.",
 			"exclusionCriteria": "Metric-level exclusions apply where behavioural summary columns are missing or invalid.",
 			"notes": "Split diagnostic groups before making cohort-similarity or clinical-context claims."
+		},
+		{
+			"id": "openfmri-ds000115-nback-con-participants",
+			"studyId": "openfmri-ds000115-working-memory-study",
+			"label": "OpenfMRI ds000115 healthy controls",
+			"population": "Healthy control participants from ds000115 with condit=CON.",
+			"groupLabel": "healthy controls",
+			"sampleSize": 20,
+			"inclusionCriteria": "Participants represented in ds000115_R2.0.0 participants.tsv with condit=CON.",
+			"exclusionCriteria": "Metric-level exclusions apply where behavioural summary columns are missing or invalid.",
+			"notes": "Healthy-control subgroup used for the first public task-specific reference comparison."
 		}
 	],
 	"tasks": [
@@ -55,6 +66,20 @@
 			"extractionStatus": "candidate",
 			"comparisonReadiness": "candidate",
 			"notes": "Candidate 2-back accuracy summary derived from participants.tsv target and non-target accuracy columns."
+		},
+		{
+			"id": "openfmri-ds000115-nback-con-accuracy-measure",
+			"taskId": "openfmri-ds000115-nback-task",
+			"experimentSlug": "n-back",
+			"metricKey": "accuracy",
+			"label": "Healthy-control accuracy",
+			"unit": "proportion",
+			"sourceMetric": "2-back accuracy",
+			"sourceColumns": ["condit", "nback2_nont", "nback2_targ"],
+			"transformation": "Filtered to condit=CON. Subject-level 2-back accuracy is the unweighted mean of nback2_nont and nback2_targ because trial counts are not represented in participants.tsv.",
+			"extractionStatus": "reviewed",
+			"comparisonReadiness": "reviewed",
+			"notes": "Reviewed healthy-control 2-back accuracy summary from participants.tsv for task-specific reference context."
 		},
 		{
 			"id": "openfmri-ds000115-nback-sensitivityIndex-measure",
@@ -92,6 +117,23 @@
 				]
 			},
 			"notes": "Candidate 2-back accuracy summary derived from participants.tsv target and non-target accuracy columns."
+		},
+		{
+			"id": "openfmri-ds000115-nback-accuracy-healthy-control-result",
+			"measureId": "openfmri-ds000115-nback-con-accuracy-measure",
+			"sampleId": "openfmri-ds000115-nback-con-participants",
+			"resultType": "distribution",
+			"sampleSize": 20,
+			"mean": 0.9276768921,
+			"standardDeviation": 0.07203667731082324,
+			"minimum": 0.8,
+			"maximum": 1,
+			"statisticJson": {
+				"sourceColumns": ["condit", "nback2_nont", "nback2_targ"],
+				"filter": "condit=CON",
+				"excludedRows": []
+			},
+			"notes": "Reviewed healthy-control 2-back accuracy summary derived from participants.tsv target and non-target accuracy columns."
 		},
 		{
 			"id": "openfmri-ds000115-nback-sensitivityIndex-mixed-result",
@@ -133,6 +175,18 @@
 			"participantUse": "internal_review"
 		},
 		{
+			"id": "openfmri-ds000115-nback-accuracy-healthy-control-distribution",
+			"experimentSlug": "n-back",
+			"metricKey": "accuracy",
+			"claimType": "cohort_distribution",
+			"status": "reviewed",
+			"resultIds": ["openfmri-ds000115-nback-accuracy-healthy-control-result"],
+			"citationIds": ["openfmri-ds000115"],
+			"claim": "This run's n-back accuracy can be compared with the OpenfMRI ds000115 healthy-control 2-back accuracy distribution as task-specific reference context.",
+			"guardrail": "Similarity to this healthy-control reference distribution is not a diagnosis, trait label, or clinical classification; the source used a letter 2-back summary and Boundary uses its own short task variant.",
+			"participantUse": "public_prompt_ready"
+		},
+		{
 			"id": "openfmri-ds000115-nback-sensitivity-candidate-distribution",
 			"experimentSlug": "n-back",
 			"metricKey": "sensitivityIndex",
@@ -147,9 +201,9 @@
 	],
 	"guardrails": [
 		"The OpenfMRI dataset page warns that event files may be inaccurate. This summary uses participants.tsv behavioural columns rather than event TSV reconstruction.",
-		"Imported candidate statistics. Validate task-level construct mapping before using for public cohort comparisons.",
+		"Healthy-control 2-back accuracy is reviewed for task-specific reference context; other metrics and diagnostic subgroups remain candidate-only.",
 		"The sample mixes diagnostic and control groups; split cohorts before resemblance claims."
 	],
 	"updatedAt": "2026-04-30",
-	"reviewerNotes": "First structured extraction seed. It preserves candidate status until task compatibility and source metric semantics are reviewed."
+	"reviewerNotes": "First structured extraction seed. Healthy-control accuracy is reviewed for a guarded participant-facing reference comparison; sensitivity and mixed-diagnostic claims remain candidate-only."
 }

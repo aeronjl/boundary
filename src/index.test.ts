@@ -489,13 +489,14 @@ describe('reference data contracts', () => {
 		).toBe(true);
 		expect(exportData.summary).toMatchObject({
 			extractionCount: 2,
-			resultCount: 4,
-			comparisonClaimCount: 3,
-			publicReadyClaimCount: 0
+			resultCount: 5,
+			comparisonClaimCount: 4,
+			publicReadyClaimCount: 1
 		});
 		expect(exportData.extractions[0].schemaVersion).toBe(1);
 		expect(extraction?.comparisonClaims.map((claim) => claim.participantUse)).toEqual([
 			'internal_review',
+			'public_prompt_ready',
 			'internal_review'
 		]);
 		expect(adhdExtraction?.comparisonClaims[0]).toMatchObject({
@@ -522,8 +523,16 @@ describe('reference data contracts', () => {
 		const adhdReviewItem = reviewQueue.find(
 			(item) => item.id === 'marx-2011-adhd-nback-clinical-context'
 		);
+		const publicClaims = participantLiteratureClaimsForExperiment('n-back');
 
-		expect(participantLiteratureClaimsForExperiment('n-back')).toEqual([]);
+		expect(publicClaims).toEqual([
+			expect.objectContaining({
+				id: 'openfmri-ds000115-nback-accuracy-healthy-control-distribution',
+				sourceCitation: 'OpenfMRI ds000115'
+			})
+		]);
+		expect(publicClaims[0].body).toContain('healthy-control 2-back accuracy distribution');
+		expect(publicClaims[0].caveat).toContain('not a diagnosis');
 		expect(adhdReviewItem).toMatchObject({
 			participantExposure: 'hidden',
 			reviewState: 'needs_evidence',
@@ -617,14 +626,20 @@ describe('reference data contracts', () => {
 			reviewedDistributionExtraction
 		]).find((item) => item.id === 'openfmri-ds000115-nback-accuracy-candidate-distribution');
 
-		expect(claims).toEqual([
-			expect.objectContaining({
-				id: 'openfmri-ds000115-nback-accuracy-candidate-distribution',
-				sourceCitation: 'OpenfMRI ds000115',
-				sourceUrl: 'https://openfmri.org/dataset/ds000115/'
-			})
-		]);
-		expect(claims[0].caveat).toContain('Do not present this as a diagnosis');
+		expect(claims).toHaveLength(2);
+		expect(claims).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					id: 'openfmri-ds000115-nback-accuracy-candidate-distribution',
+					sourceCitation: 'OpenfMRI ds000115',
+					sourceUrl: 'https://openfmri.org/dataset/ds000115/'
+				})
+			])
+		);
+		expect(
+			claims.find((claim) => claim.id === 'openfmri-ds000115-nback-accuracy-candidate-distribution')
+				?.caveat
+		).toContain('Do not present this as a diagnosis');
 		expect(promotedReviewItem).toMatchObject({
 			participantExposure: 'public',
 			reviewState: 'public_ready'

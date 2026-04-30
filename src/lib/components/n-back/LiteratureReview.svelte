@@ -35,8 +35,9 @@
 	</ul>
 	<h2>Reference Data Direction</h2>
 	<p>
-		The next step is to validate open datasets against this task variant before drawing percentile
-		or cohort-similarity plots.
+		Boundary now has a reviewed OpenfMRI healthy-control accuracy reference for cautious
+		task-specific context. Other metrics and diagnostic-adjacent subgroup comparisons remain
+		candidate-only until their mappings are reviewed.
 	</p>
 	<ul>
 		{#each nBackOpenDatasetCandidates as dataset (dataset.id)}
@@ -50,7 +51,7 @@
 	{#if extractedMetrics.length > 0}
 		<h2>Structured Extraction</h2>
 		<ul>
-			{#each extractedMetrics as metric (`${metric.extractionId}-${metric.metricKey}`)}
+			{#each extractedMetrics as metric (`${metric.extractionId}-${metric.metricKey}-${metric.sampleLabel}`)}
 				<li>
 					<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
 					<a href={metric.sourceUrl} rel="noreferrer" target="_blank">{metric.sourceCitation}</a>:

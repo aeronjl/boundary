@@ -253,6 +253,46 @@ export const studyTasks = sqliteTable(
 	]
 );
 
+export const policyScenarioBatches = sqliteTable(
+	'policy_scenario_batches',
+	{
+		id: text('id').primaryKey(),
+		label: text('label').notNull(),
+		status: text('status').notNull().default('started'),
+		scenarioCount: integer('scenario_count').notNull().default(0),
+		metadataJson: text('metadata_json').notNull().default('{}'),
+		createdAt: integer('created_at').notNull(),
+		updatedAt: integer('updated_at').notNull(),
+		completedAt: integer('completed_at')
+	},
+	(table) => [
+		index('policy_scenario_batches_status_idx').on(table.status),
+		index('policy_scenario_batches_created_idx').on(table.createdAt)
+	]
+);
+
+export const policyScenarioBatchRuns = sqliteTable(
+	'policy_scenario_batch_runs',
+	{
+		id: text('id').primaryKey(),
+		batchId: text('batch_id')
+			.notNull()
+			.references(() => policyScenarioBatches.id, { onDelete: 'cascade' }),
+		runId: text('run_id')
+			.notNull()
+			.references(() => experimentRuns.id, { onDelete: 'cascade' }),
+		experimentSlug: text('experiment_slug').notNull(),
+		scenarioId: text('scenario_id').notNull(),
+		scenarioLabel: text('scenario_label').notNull(),
+		createdAt: integer('created_at').notNull()
+	},
+	(table) => [
+		index('policy_scenario_batch_runs_batch_idx').on(table.batchId),
+		index('policy_scenario_batch_runs_scenario_idx').on(table.experimentSlug, table.scenarioId),
+		uniqueIndex('policy_scenario_batch_runs_run_unique').on(table.runId)
+	]
+);
+
 export const studySessionReviews = sqliteTable(
 	'study_session_reviews',
 	{

@@ -1,0 +1,1944 @@
+{
+	"version": "6",
+	"dialect": "sqlite",
+	"id": "02e913c6-3e23-45ce-aa66-4f3e78d1199b",
+	"prevId": "298094a8-4a62-4b7e-9cd0-ee0ceeb1c4a5",
+	"tables": {
+		"experiment_events": {
+			"name": "experiment_events",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"run_id": {
+					"name": "run_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"event_type": {
+					"name": "event_type",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"trial_index": {
+					"name": "trial_index",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"payload_json": {
+					"name": "payload_json",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'{}'"
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				}
+			},
+			"indexes": {
+				"experiment_events_run_idx": {
+					"name": "experiment_events_run_idx",
+					"columns": ["run_id"],
+					"isUnique": false
+				},
+				"experiment_events_run_event_type_idx": {
+					"name": "experiment_events_run_event_type_idx",
+					"columns": ["run_id", "event_type"],
+					"isUnique": false
+				},
+				"experiment_events_run_trial_idx": {
+					"name": "experiment_events_run_trial_idx",
+					"columns": ["run_id", "trial_index"],
+					"isUnique": false
+				}
+			},
+			"foreignKeys": {
+				"experiment_events_run_id_experiment_runs_id_fk": {
+					"name": "experiment_events_run_id_experiment_runs_id_fk",
+					"tableFrom": "experiment_events",
+					"tableTo": "experiment_runs",
+					"columnsFrom": ["run_id"],
+					"columnsTo": ["id"],
+					"onDelete": "cascade",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"experiment_responses": {
+			"name": "experiment_responses",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"run_id": {
+					"name": "run_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"trial_index": {
+					"name": "trial_index",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"item_id": {
+					"name": "item_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"response_type": {
+					"name": "response_type",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"response_json": {
+					"name": "response_json",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"score_json": {
+					"name": "score_json",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"metadata_json": {
+					"name": "metadata_json",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'{}'"
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				}
+			},
+			"indexes": {
+				"experiment_responses_run_idx": {
+					"name": "experiment_responses_run_idx",
+					"columns": ["run_id"],
+					"isUnique": false
+				},
+				"experiment_responses_run_trial_idx": {
+					"name": "experiment_responses_run_trial_idx",
+					"columns": ["run_id", "trial_index"],
+					"isUnique": false
+				},
+				"experiment_responses_run_item_idx": {
+					"name": "experiment_responses_run_item_idx",
+					"columns": ["run_id", "item_id"],
+					"isUnique": false
+				},
+				"experiment_responses_run_trial_unique": {
+					"name": "experiment_responses_run_trial_unique",
+					"columns": ["run_id", "trial_index"],
+					"isUnique": true
+				}
+			},
+			"foreignKeys": {
+				"experiment_responses_run_id_experiment_runs_id_fk": {
+					"name": "experiment_responses_run_id_experiment_runs_id_fk",
+					"tableFrom": "experiment_responses",
+					"tableTo": "experiment_runs",
+					"columnsFrom": ["run_id"],
+					"columnsTo": ["id"],
+					"onDelete": "cascade",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"experiment_run_reviews": {
+			"name": "experiment_run_reviews",
+			"columns": {
+				"run_id": {
+					"name": "run_id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"status": {
+					"name": "status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'included'"
+				},
+				"reason": {
+					"name": "reason",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"note": {
+					"name": "note",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "''"
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				}
+			},
+			"indexes": {
+				"experiment_run_reviews_status_idx": {
+					"name": "experiment_run_reviews_status_idx",
+					"columns": ["status"],
+					"isUnique": false
+				},
+				"experiment_run_reviews_reason_idx": {
+					"name": "experiment_run_reviews_reason_idx",
+					"columns": ["reason"],
+					"isUnique": false
+				}
+			},
+			"foreignKeys": {
+				"experiment_run_reviews_run_id_experiment_runs_id_fk": {
+					"name": "experiment_run_reviews_run_id_experiment_runs_id_fk",
+					"tableFrom": "experiment_run_reviews",
+					"tableTo": "experiment_runs",
+					"columnsFrom": ["run_id"],
+					"columnsTo": ["id"],
+					"onDelete": "cascade",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"experiment_runs": {
+			"name": "experiment_runs",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"participant_session_id": {
+					"name": "participant_session_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"experiment_version_id": {
+					"name": "experiment_version_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"status": {
+					"name": "status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'started'"
+				},
+				"question_order_json": {
+					"name": "question_order_json",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'[]'"
+				},
+				"started_at": {
+					"name": "started_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"completed_at": {
+					"name": "completed_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				}
+			},
+			"indexes": {
+				"experiment_runs_participant_session_idx": {
+					"name": "experiment_runs_participant_session_idx",
+					"columns": ["participant_session_id"],
+					"isUnique": false
+				},
+				"experiment_runs_experiment_version_idx": {
+					"name": "experiment_runs_experiment_version_idx",
+					"columns": ["experiment_version_id"],
+					"isUnique": false
+				}
+			},
+			"foreignKeys": {
+				"experiment_runs_participant_session_id_participant_sessions_id_fk": {
+					"name": "experiment_runs_participant_session_id_participant_sessions_id_fk",
+					"tableFrom": "experiment_runs",
+					"tableTo": "participant_sessions",
+					"columnsFrom": ["participant_session_id"],
+					"columnsTo": ["id"],
+					"onDelete": "cascade",
+					"onUpdate": "no action"
+				},
+				"experiment_runs_experiment_version_id_experiment_versions_id_fk": {
+					"name": "experiment_runs_experiment_version_id_experiment_versions_id_fk",
+					"tableFrom": "experiment_runs",
+					"tableTo": "experiment_versions",
+					"columnsFrom": ["experiment_version_id"],
+					"columnsTo": ["id"],
+					"onDelete": "cascade",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"experiment_versions": {
+			"name": "experiment_versions",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"experiment_id": {
+					"name": "experiment_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"version": {
+					"name": "version",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"status": {
+					"name": "status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'draft'"
+				},
+				"config_json": {
+					"name": "config_json",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'{}'"
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"published_at": {
+					"name": "published_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				}
+			},
+			"indexes": {
+				"experiment_versions_experiment_version_unique": {
+					"name": "experiment_versions_experiment_version_unique",
+					"columns": ["experiment_id", "version"],
+					"isUnique": true
+				}
+			},
+			"foreignKeys": {
+				"experiment_versions_experiment_id_experiments_id_fk": {
+					"name": "experiment_versions_experiment_id_experiments_id_fk",
+					"tableFrom": "experiment_versions",
+					"tableTo": "experiments",
+					"columnsFrom": ["experiment_id"],
+					"columnsTo": ["id"],
+					"onDelete": "cascade",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"experiments": {
+			"name": "experiments",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"slug": {
+					"name": "slug",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"name": {
+					"name": "name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"description": {
+					"name": "description",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "''"
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				}
+			},
+			"indexes": {
+				"experiments_slug_unique": {
+					"name": "experiments_slug_unique",
+					"columns": ["slug"],
+					"isUnique": true
+				}
+			},
+			"foreignKeys": {},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"participant_consents": {
+			"name": "participant_consents",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"participant_session_id": {
+					"name": "participant_session_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"consent_version": {
+					"name": "consent_version",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"user_agent": {
+					"name": "user_agent",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"details_json": {
+					"name": "details_json",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'{}'"
+				},
+				"accepted_at": {
+					"name": "accepted_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				}
+			},
+			"indexes": {
+				"participant_consents_session_idx": {
+					"name": "participant_consents_session_idx",
+					"columns": ["participant_session_id"],
+					"isUnique": false
+				},
+				"participant_consents_session_version_unique": {
+					"name": "participant_consents_session_version_unique",
+					"columns": ["participant_session_id", "consent_version"],
+					"isUnique": true
+				}
+			},
+			"foreignKeys": {
+				"participant_consents_participant_session_id_participant_sessions_id_fk": {
+					"name": "participant_consents_participant_session_id_participant_sessions_id_fk",
+					"tableFrom": "participant_consents",
+					"tableTo": "participant_sessions",
+					"columnsFrom": ["participant_session_id"],
+					"columnsTo": ["id"],
+					"onDelete": "cascade",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"participant_sessions": {
+			"name": "participant_sessions",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"user_agent": {
+					"name": "user_agent",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"last_seen_at": {
+					"name": "last_seen_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"policy_scenario_batch_runs": {
+			"name": "policy_scenario_batch_runs",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"batch_id": {
+					"name": "batch_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"run_id": {
+					"name": "run_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"experiment_slug": {
+					"name": "experiment_slug",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"scenario_id": {
+					"name": "scenario_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"scenario_label": {
+					"name": "scenario_label",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				}
+			},
+			"indexes": {
+				"policy_scenario_batch_runs_batch_idx": {
+					"name": "policy_scenario_batch_runs_batch_idx",
+					"columns": ["batch_id"],
+					"isUnique": false
+				},
+				"policy_scenario_batch_runs_scenario_idx": {
+					"name": "policy_scenario_batch_runs_scenario_idx",
+					"columns": ["experiment_slug", "scenario_id"],
+					"isUnique": false
+				},
+				"policy_scenario_batch_runs_run_unique": {
+					"name": "policy_scenario_batch_runs_run_unique",
+					"columns": ["run_id"],
+					"isUnique": true
+				}
+			},
+			"foreignKeys": {
+				"policy_scenario_batch_runs_batch_id_policy_scenario_batches_id_fk": {
+					"name": "policy_scenario_batch_runs_batch_id_policy_scenario_batches_id_fk",
+					"tableFrom": "policy_scenario_batch_runs",
+					"tableTo": "policy_scenario_batches",
+					"columnsFrom": ["batch_id"],
+					"columnsTo": ["id"],
+					"onDelete": "cascade",
+					"onUpdate": "no action"
+				},
+				"policy_scenario_batch_runs_run_id_experiment_runs_id_fk": {
+					"name": "policy_scenario_batch_runs_run_id_experiment_runs_id_fk",
+					"tableFrom": "policy_scenario_batch_runs",
+					"tableTo": "experiment_runs",
+					"columnsFrom": ["run_id"],
+					"columnsTo": ["id"],
+					"onDelete": "cascade",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"policy_scenario_batches": {
+			"name": "policy_scenario_batches",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"label": {
+					"name": "label",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"status": {
+					"name": "status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'started'"
+				},
+				"scenario_count": {
+					"name": "scenario_count",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": 0
+				},
+				"metadata_json": {
+					"name": "metadata_json",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'{}'"
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"completed_at": {
+					"name": "completed_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				}
+			},
+			"indexes": {
+				"policy_scenario_batches_status_idx": {
+					"name": "policy_scenario_batches_status_idx",
+					"columns": ["status"],
+					"isUnique": false
+				},
+				"policy_scenario_batches_created_idx": {
+					"name": "policy_scenario_batches_created_idx",
+					"columns": ["created_at"],
+					"isUnique": false
+				}
+			},
+			"foreignKeys": {},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"reference_cohorts": {
+			"name": "reference_cohorts",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"reference_study_id": {
+					"name": "reference_study_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"reference_dataset_id": {
+					"name": "reference_dataset_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"label": {
+					"name": "label",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"population": {
+					"name": "population",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "''"
+				},
+				"group_label": {
+					"name": "group_label",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "''"
+				},
+				"sample_size": {
+					"name": "sample_size",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"inclusion_criteria": {
+					"name": "inclusion_criteria",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "''"
+				},
+				"exclusion_criteria": {
+					"name": "exclusion_criteria",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "''"
+				},
+				"notes": {
+					"name": "notes",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "''"
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				}
+			},
+			"indexes": {
+				"reference_cohorts_study_idx": {
+					"name": "reference_cohorts_study_idx",
+					"columns": ["reference_study_id"],
+					"isUnique": false
+				},
+				"reference_cohorts_dataset_idx": {
+					"name": "reference_cohorts_dataset_idx",
+					"columns": ["reference_dataset_id"],
+					"isUnique": false
+				}
+			},
+			"foreignKeys": {
+				"reference_cohorts_reference_study_id_reference_studies_id_fk": {
+					"name": "reference_cohorts_reference_study_id_reference_studies_id_fk",
+					"tableFrom": "reference_cohorts",
+					"tableTo": "reference_studies",
+					"columnsFrom": ["reference_study_id"],
+					"columnsTo": ["id"],
+					"onDelete": "set null",
+					"onUpdate": "no action"
+				},
+				"reference_cohorts_reference_dataset_id_reference_datasets_id_fk": {
+					"name": "reference_cohorts_reference_dataset_id_reference_datasets_id_fk",
+					"tableFrom": "reference_cohorts",
+					"tableTo": "reference_datasets",
+					"columnsFrom": ["reference_dataset_id"],
+					"columnsTo": ["id"],
+					"onDelete": "cascade",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"reference_datasets": {
+			"name": "reference_datasets",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"reference_study_id": {
+					"name": "reference_study_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"experiment_slug": {
+					"name": "experiment_slug",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"name": {
+					"name": "name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"url": {
+					"name": "url",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"status": {
+					"name": "status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'candidate'"
+				},
+				"compatibility": {
+					"name": "compatibility",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'partial'"
+				},
+				"sample_size": {
+					"name": "sample_size",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"license": {
+					"name": "license",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "''"
+				},
+				"population": {
+					"name": "population",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "''"
+				},
+				"task_variant": {
+					"name": "task_variant",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "''"
+				},
+				"metric_summary_json": {
+					"name": "metric_summary_json",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'{}'"
+				},
+				"notes": {
+					"name": "notes",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "''"
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				}
+			},
+			"indexes": {
+				"reference_datasets_study_idx": {
+					"name": "reference_datasets_study_idx",
+					"columns": ["reference_study_id"],
+					"isUnique": false
+				},
+				"reference_datasets_experiment_slug_idx": {
+					"name": "reference_datasets_experiment_slug_idx",
+					"columns": ["experiment_slug"],
+					"isUnique": false
+				},
+				"reference_datasets_status_idx": {
+					"name": "reference_datasets_status_idx",
+					"columns": ["status"],
+					"isUnique": false
+				}
+			},
+			"foreignKeys": {
+				"reference_datasets_reference_study_id_reference_studies_id_fk": {
+					"name": "reference_datasets_reference_study_id_reference_studies_id_fk",
+					"tableFrom": "reference_datasets",
+					"tableTo": "reference_studies",
+					"columnsFrom": ["reference_study_id"],
+					"columnsTo": ["id"],
+					"onDelete": "set null",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"reference_metric_mappings": {
+			"name": "reference_metric_mappings",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"reference_metric_id": {
+					"name": "reference_metric_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"reference_cohort_id": {
+					"name": "reference_cohort_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"source_metric": {
+					"name": "source_metric",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "''"
+				},
+				"source_columns_json": {
+					"name": "source_columns_json",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'[]'"
+				},
+				"transformation": {
+					"name": "transformation",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "''"
+				},
+				"direction": {
+					"name": "direction",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'same'"
+				},
+				"extraction_status": {
+					"name": "extraction_status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'candidate'"
+				},
+				"notes": {
+					"name": "notes",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "''"
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				}
+			},
+			"indexes": {
+				"reference_metric_mappings_metric_idx": {
+					"name": "reference_metric_mappings_metric_idx",
+					"columns": ["reference_metric_id"],
+					"isUnique": false
+				},
+				"reference_metric_mappings_cohort_idx": {
+					"name": "reference_metric_mappings_cohort_idx",
+					"columns": ["reference_cohort_id"],
+					"isUnique": false
+				},
+				"reference_metric_mappings_metric_unique": {
+					"name": "reference_metric_mappings_metric_unique",
+					"columns": ["reference_metric_id"],
+					"isUnique": true
+				}
+			},
+			"foreignKeys": {
+				"reference_metric_mappings_reference_metric_id_reference_metrics_id_fk": {
+					"name": "reference_metric_mappings_reference_metric_id_reference_metrics_id_fk",
+					"tableFrom": "reference_metric_mappings",
+					"tableTo": "reference_metrics",
+					"columnsFrom": ["reference_metric_id"],
+					"columnsTo": ["id"],
+					"onDelete": "cascade",
+					"onUpdate": "no action"
+				},
+				"reference_metric_mappings_reference_cohort_id_reference_cohorts_id_fk": {
+					"name": "reference_metric_mappings_reference_cohort_id_reference_cohorts_id_fk",
+					"tableFrom": "reference_metric_mappings",
+					"tableTo": "reference_cohorts",
+					"columnsFrom": ["reference_cohort_id"],
+					"columnsTo": ["id"],
+					"onDelete": "set null",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"reference_metrics": {
+			"name": "reference_metrics",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"reference_dataset_id": {
+					"name": "reference_dataset_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"experiment_slug": {
+					"name": "experiment_slug",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"metric_key": {
+					"name": "metric_key",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"label": {
+					"name": "label",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"unit": {
+					"name": "unit",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "''"
+				},
+				"comparison_type": {
+					"name": "comparison_type",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'distribution'"
+				},
+				"mean": {
+					"name": "mean",
+					"type": "real",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"standard_deviation": {
+					"name": "standard_deviation",
+					"type": "real",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"minimum": {
+					"name": "minimum",
+					"type": "real",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"maximum": {
+					"name": "maximum",
+					"type": "real",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"metric_json": {
+					"name": "metric_json",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'{}'"
+				},
+				"notes": {
+					"name": "notes",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "''"
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				}
+			},
+			"indexes": {
+				"reference_metrics_dataset_idx": {
+					"name": "reference_metrics_dataset_idx",
+					"columns": ["reference_dataset_id"],
+					"isUnique": false
+				},
+				"reference_metrics_experiment_metric_idx": {
+					"name": "reference_metrics_experiment_metric_idx",
+					"columns": ["experiment_slug", "metric_key"],
+					"isUnique": false
+				},
+				"reference_metrics_dataset_metric_unique": {
+					"name": "reference_metrics_dataset_metric_unique",
+					"columns": ["reference_dataset_id", "metric_key"],
+					"isUnique": true
+				}
+			},
+			"foreignKeys": {
+				"reference_metrics_reference_dataset_id_reference_datasets_id_fk": {
+					"name": "reference_metrics_reference_dataset_id_reference_datasets_id_fk",
+					"tableFrom": "reference_metrics",
+					"tableTo": "reference_datasets",
+					"columnsFrom": ["reference_dataset_id"],
+					"columnsTo": ["id"],
+					"onDelete": "cascade",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"reference_studies": {
+			"name": "reference_studies",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"short_citation": {
+					"name": "short_citation",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"title": {
+					"name": "title",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"url": {
+					"name": "url",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"doi": {
+					"name": "doi",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"publication_year": {
+					"name": "publication_year",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"source_type": {
+					"name": "source_type",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'literature'"
+				},
+				"population": {
+					"name": "population",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "''"
+				},
+				"sample_size": {
+					"name": "sample_size",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"notes": {
+					"name": "notes",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "''"
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"study_session_reviews": {
+			"name": "study_session_reviews",
+			"columns": {
+				"study_session_id": {
+					"name": "study_session_id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"status": {
+					"name": "status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'included'"
+				},
+				"reason": {
+					"name": "reason",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"note": {
+					"name": "note",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "''"
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				}
+			},
+			"indexes": {
+				"study_session_reviews_status_idx": {
+					"name": "study_session_reviews_status_idx",
+					"columns": ["status"],
+					"isUnique": false
+				},
+				"study_session_reviews_reason_idx": {
+					"name": "study_session_reviews_reason_idx",
+					"columns": ["reason"],
+					"isUnique": false
+				}
+			},
+			"foreignKeys": {
+				"study_session_reviews_study_session_id_study_sessions_id_fk": {
+					"name": "study_session_reviews_study_session_id_study_sessions_id_fk",
+					"tableFrom": "study_session_reviews",
+					"tableTo": "study_sessions",
+					"columnsFrom": ["study_session_id"],
+					"columnsTo": ["id"],
+					"onDelete": "cascade",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"study_sessions": {
+			"name": "study_sessions",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"participant_session_id": {
+					"name": "participant_session_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"protocol_id": {
+					"name": "protocol_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"status": {
+					"name": "status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'started'"
+				},
+				"task_order_json": {
+					"name": "task_order_json",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'[]'"
+				},
+				"started_at": {
+					"name": "started_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"completed_at": {
+					"name": "completed_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				}
+			},
+			"indexes": {
+				"study_sessions_participant_session_idx": {
+					"name": "study_sessions_participant_session_idx",
+					"columns": ["participant_session_id"],
+					"isUnique": false
+				},
+				"study_sessions_protocol_idx": {
+					"name": "study_sessions_protocol_idx",
+					"columns": ["protocol_id"],
+					"isUnique": false
+				},
+				"study_sessions_participant_protocol_unique": {
+					"name": "study_sessions_participant_protocol_unique",
+					"columns": ["participant_session_id", "protocol_id"],
+					"isUnique": true
+				}
+			},
+			"foreignKeys": {
+				"study_sessions_participant_session_id_participant_sessions_id_fk": {
+					"name": "study_sessions_participant_session_id_participant_sessions_id_fk",
+					"tableFrom": "study_sessions",
+					"tableTo": "participant_sessions",
+					"columnsFrom": ["participant_session_id"],
+					"columnsTo": ["id"],
+					"onDelete": "cascade",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"study_tasks": {
+			"name": "study_tasks",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"study_session_id": {
+					"name": "study_session_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"experiment_slug": {
+					"name": "experiment_slug",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"position": {
+					"name": "position",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"status": {
+					"name": "status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'pending'"
+				},
+				"run_id": {
+					"name": "run_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"started_at": {
+					"name": "started_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"completed_at": {
+					"name": "completed_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				}
+			},
+			"indexes": {
+				"study_tasks_study_session_idx": {
+					"name": "study_tasks_study_session_idx",
+					"columns": ["study_session_id"],
+					"isUnique": false
+				},
+				"study_tasks_run_idx": {
+					"name": "study_tasks_run_idx",
+					"columns": ["run_id"],
+					"isUnique": false
+				},
+				"study_tasks_session_position_unique": {
+					"name": "study_tasks_session_position_unique",
+					"columns": ["study_session_id", "position"],
+					"isUnique": true
+				},
+				"study_tasks_session_experiment_unique": {
+					"name": "study_tasks_session_experiment_unique",
+					"columns": ["study_session_id", "experiment_slug"],
+					"isUnique": true
+				}
+			},
+			"foreignKeys": {
+				"study_tasks_study_session_id_study_sessions_id_fk": {
+					"name": "study_tasks_study_session_id_study_sessions_id_fk",
+					"tableFrom": "study_tasks",
+					"tableTo": "study_sessions",
+					"columnsFrom": ["study_session_id"],
+					"columnsTo": ["id"],
+					"onDelete": "cascade",
+					"onUpdate": "no action"
+				},
+				"study_tasks_run_id_experiment_runs_id_fk": {
+					"name": "study_tasks_run_id_experiment_runs_id_fk",
+					"tableFrom": "study_tasks",
+					"tableTo": "experiment_runs",
+					"columnsFrom": ["run_id"],
+					"columnsTo": ["id"],
+					"onDelete": "set null",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"tipi_questions": {
+			"name": "tipi_questions",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"experiment_version_id": {
+					"name": "experiment_version_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"item_number": {
+					"name": "item_number",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"prompt": {
+					"name": "prompt",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"scale": {
+					"name": "scale",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"scoring": {
+					"name": "scoring",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				}
+			},
+			"indexes": {
+				"tipi_questions_version_item_unique": {
+					"name": "tipi_questions_version_item_unique",
+					"columns": ["experiment_version_id", "item_number"],
+					"isUnique": true
+				},
+				"tipi_questions_version_idx": {
+					"name": "tipi_questions_version_idx",
+					"columns": ["experiment_version_id"],
+					"isUnique": false
+				}
+			},
+			"foreignKeys": {
+				"tipi_questions_experiment_version_id_experiment_versions_id_fk": {
+					"name": "tipi_questions_experiment_version_id_experiment_versions_id_fk",
+					"tableFrom": "tipi_questions",
+					"tableTo": "experiment_versions",
+					"columnsFrom": ["experiment_version_id"],
+					"columnsTo": ["id"],
+					"onDelete": "cascade",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"tipi_responses": {
+			"name": "tipi_responses",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"run_id": {
+					"name": "run_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"question_id": {
+					"name": "question_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"trial_index": {
+					"name": "trial_index",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"response": {
+					"name": "response",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"score": {
+					"name": "score",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				}
+			},
+			"indexes": {
+				"tipi_responses_run_trial_unique": {
+					"name": "tipi_responses_run_trial_unique",
+					"columns": ["run_id", "trial_index"],
+					"isUnique": true
+				},
+				"tipi_responses_run_idx": {
+					"name": "tipi_responses_run_idx",
+					"columns": ["run_id"],
+					"isUnique": false
+				}
+			},
+			"foreignKeys": {
+				"tipi_responses_run_id_experiment_runs_id_fk": {
+					"name": "tipi_responses_run_id_experiment_runs_id_fk",
+					"tableFrom": "tipi_responses",
+					"tableTo": "experiment_runs",
+					"columnsFrom": ["run_id"],
+					"columnsTo": ["id"],
+					"onDelete": "cascade",
+					"onUpdate": "no action"
+				},
+				"tipi_responses_question_id_tipi_questions_id_fk": {
+					"name": "tipi_responses_question_id_tipi_questions_id_fk",
+					"tableFrom": "tipi_responses",
+					"tableTo": "tipi_questions",
+					"columnsFrom": ["question_id"],
+					"columnsTo": ["id"],
+					"onDelete": "restrict",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"tipi_results": {
+			"name": "tipi_results",
+			"columns": {
+				"run_id": {
+					"name": "run_id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"extroversion": {
+					"name": "extroversion",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"agreeableness": {
+					"name": "agreeableness",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"conscientiousness": {
+					"name": "conscientiousness",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"neuroticism": {
+					"name": "neuroticism",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"openness": {
+					"name": "openness",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"result_json": {
+					"name": "result_json",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"tipi_results_run_id_experiment_runs_id_fk": {
+					"name": "tipi_results_run_id_experiment_runs_id_fk",
+					"tableFrom": "tipi_results",
+					"tableTo": "experiment_runs",
+					"columnsFrom": ["run_id"],
+					"columnsTo": ["id"],
+					"onDelete": "cascade",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		}
+	},
+	"views": {},
+	"enums": {},
+	"_meta": {
+		"schemas": {},
+		"tables": {},
+		"columns": {}
+	},
+	"internal": {
+		"indexes": {}
+	}
+}

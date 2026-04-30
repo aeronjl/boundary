@@ -813,7 +813,18 @@ test('admin can inspect and export ten item personality inventory data', async (
 	expect(scenarioJsonResponse.status()).toBe(200);
 	expect(await scenarioJsonResponse.json()).toMatchObject({
 		scenarioCount: expect.any(Number),
-		runCount: expect.any(Number)
+		runCount: expect.any(Number),
+		selectedBatchId: null,
+		batches: []
+	});
+
+	const emptyBatchResponse = await page.request.get('/admin/scenarios/export.json?batch=missing');
+	expect(emptyBatchResponse.status()).toBe(200);
+	expect(await emptyBatchResponse.json()).toMatchObject({
+		scenarioCount: 0,
+		runCount: 0,
+		selectedBatchId: 'missing',
+		selectedBatch: null
 	});
 
 	await page.goto('/admin');

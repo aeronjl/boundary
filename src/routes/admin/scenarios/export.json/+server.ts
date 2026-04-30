@@ -1,12 +1,24 @@
 import { json, redirect } from '@sveltejs/kit';
 import { isAdminAuthenticated } from '$lib/server/admin/auth';
-import { getAdminPolicyScenarioComparison } from '$lib/server/admin/scenarios';
+import {
+	getAdminPolicyScenarioBatch,
+	getAdminPolicyScenarioComparison,
+	listAdminPolicyScenarioBatches
+} from '$lib/server/admin/scenarios';
 import type { RequestHandler } from './$types';
 
-export const GET: RequestHandler = async ({ cookies }) => {
+export const GET: RequestHandler = async ({ cookies, url }) => {
 	if (!isAdminAuthenticated(cookies)) {
 		throw redirect(303, '/admin');
 	}
 
-	return json(await getAdminPolicyScenarioComparison());
+	const selectedBatchId = url.searchParams.get('batch');
+	const comparison = await getAdminPolicyScenarioComparison({ batchId: selectedBatchId });
+
+	return json({
+		...comparison,
+		selectedBatchId,
+		selectedBatch: selectedBatchId ? await getAdminPolicyScenarioBatch(selectedBatchId) : null,
+		batches: await listAdminPolicyScenarioBatches()
+	});
 };

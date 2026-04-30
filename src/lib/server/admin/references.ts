@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { asc, eq } from 'drizzle-orm';
+import { asc, eq, inArray } from 'drizzle-orm';
 import {
 	referenceCompatibilities,
 	referenceDatasetStatuses,
@@ -518,6 +518,17 @@ function hasUsableReferenceStats(metric: typeof referenceMetrics.$inferSelect): 
 	);
 }
 
+function hasReviewedReferenceMapping(
+	mapping: typeof referenceMetricMappings.$inferSelect | undefined
+): boolean {
+	return (
+		mapping?.extractionStatus === 'reviewed' &&
+		trimmed(mapping.sourceMetric).length > 0 &&
+		sourceColumnsValue(mapping.sourceColumnsJson).length > 0 &&
+		trimmed(mapping.transformation).length > 0
+	);
+}
+
 async function validateReferenceReview(
 	datasetId: string,
 	status: ReferenceDatasetStatus,
@@ -543,6 +554,33 @@ async function validateReferenceReview(
 			ok: false,
 			status: 400,
 			message: 'At least one reference metric needs a mean and positive SD before validation.'
+		};
+	}
+
+	const mappings = await db
+		.select()
+		.from(referenceMetricMappings)
+		.where(
+			inArray(
+				referenceMetricMappings.referenceMetricId,
+				metrics.map((metric) => metric.id)
+			)
+		);
+	const mappingByMetricId = new Map(
+		mappings.map((mapping) => [mapping.referenceMetricId, mapping])
+	);
+	const hasReviewedUsableMetric = metrics.some(
+		(metric) =>
+			hasUsableReferenceStats(metric) &&
+			hasReviewedReferenceMapping(mappingByMetricId.get(metric.id))
+	);
+
+	if (!hasReviewedUsableMetric) {
+		return {
+			ok: false,
+			status: 400,
+			message:
+				'At least one reference metric needs usable stats and a reviewed mapping before validation.'
 		};
 	}
 

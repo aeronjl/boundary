@@ -819,6 +819,22 @@ test('admin can inspect and export ten item personality inventory data', async (
 		page.getByText('Distribution: 10 equal-width bins, n=98, counts sum=98')
 	).toBeVisible();
 
+	const unreviewedSubgroupValidateForm = page.locator(
+		'form[aria-label="Validate reference dataset OpenfMRI ds000115 n-back healthy controls"]'
+	);
+	await unreviewedSubgroupValidateForm
+		.getByLabel('Review compatibility')
+		.selectOption('compatible');
+	await unreviewedSubgroupValidateForm
+		.getByLabel('Validation notes')
+		.fill('Attempting to validate before mapping review.');
+	await unreviewedSubgroupValidateForm.getByRole('button', { name: 'Mark validated' }).click();
+	await expect(
+		page.getByText(
+			'At least one reference metric needs usable stats and a reviewed mapping before validation.'
+		)
+	).toBeVisible();
+
 	const sourceCitation = `Boundary Pilot ${Date.now()}`;
 	const createSourceForm = page.locator('form[aria-label="Add literature source"]');
 	await createSourceForm.getByLabel('Short citation').fill(sourceCitation);

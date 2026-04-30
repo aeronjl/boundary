@@ -8,6 +8,7 @@ export type ReferenceComparisonState =
 	| 'not_registered'
 	| 'candidate_only'
 	| 'validated_no_stats'
+	| 'validated_mapping_unreviewed'
 	| 'missing_current_value'
 	| 'comparable';
 
@@ -229,6 +230,10 @@ export function createComparisonSummary(input: ComparisonSummaryInput): string {
 
 	if (input.state === 'validated_no_stats') {
 		return `A compatible validated dataset is registered for ${input.label}, but mean and SD are not available yet.`;
+	}
+
+	if (input.state === 'validated_mapping_unreviewed') {
+		return `A compatible validated dataset is registered for ${input.label}, but the metric mapping is not reviewed yet.`;
 	}
 
 	if (input.state === 'missing_current_value') {

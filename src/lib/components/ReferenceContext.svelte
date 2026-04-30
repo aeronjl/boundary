@@ -157,8 +157,8 @@
 				{/if}
 			</p>
 			<p class="mt-1 text-gray-600">
-				Comparisons require a compatible validated dataset with mean and SD reviewed in the
-				registry.
+				Comparisons require a compatible validated dataset with mean, SD, and reviewed metric
+				mapping in the registry.
 			</p>
 		</div>
 	</div>

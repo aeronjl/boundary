@@ -242,6 +242,19 @@ describe('reference data contracts', () => {
 				percentile
 			})
 		).toContain('above the reference mean');
+		expect(
+			createComparisonSummary({
+				label: 'Accuracy',
+				unit: 'proportion',
+				currentValue: 0.83,
+				state: 'validated_mapping_unreviewed',
+				datasetName: 'OpenfMRI smoke test',
+				referenceCohortLabel: 'Candidate cohort',
+				referenceMean: 0.72,
+				zScore: null,
+				percentile: null
+			})
+		).toContain('metric mapping is not reviewed');
 
 		const comparison: ReferenceComparison = {
 			metricKey: 'accuracy',

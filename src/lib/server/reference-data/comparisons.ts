@@ -66,6 +66,23 @@ function hasUsableStats(metric: ReferenceMetricRow): boolean {
 	);
 }
 
+function hasReviewedMapping(reference: MetricReference): boolean {
+	return (
+		reference.mapping?.extractionStatus === 'reviewed' &&
+		reference.mapping.sourceMetric.trim().length > 0 &&
+		reference.sourceColumns.length > 0 &&
+		reference.mapping.transformation.trim().length > 0
+	);
+}
+
+function hasReadyReference(reference: MetricReference): boolean {
+	return (
+		hasComparableDataset(reference.dataset) &&
+		hasUsableStats(reference.metric) &&
+		hasReviewedMapping(reference)
+	);
+}
+
 function sourceColumnsValue(value: string): string[] {
 	try {
 		const parsed = JSON.parse(value) as unknown;
@@ -177,11 +194,7 @@ function metricReferences(
 }
 
 function selectMetricReference(references: MetricReference[]): MetricReference | null {
-	return (
-		references.find(
-			({ metric, dataset }) => hasComparableDataset(dataset) && hasUsableStats(metric)
-		) ?? null
-	);
+	return references.find(hasReadyReference) ?? null;
 }
 
 function emptyComparison(
@@ -243,6 +256,8 @@ function createMetricComparison(
 	);
 	const comparableReferences = references.filter(({ dataset }) => hasComparableDataset(dataset));
 	const firstComparableReference = comparableReferences[0] ?? null;
+	const firstComparableReferenceWithStats =
+		comparableReferences.find(({ metric }) => hasUsableStats(metric)) ?? null;
 
 	if (references.length === 0) {
 		return emptyComparison(contract, currentValue, 'not_registered', null);
@@ -254,6 +269,15 @@ function createMetricComparison(
 
 	const reference = selectMetricReference(comparableReferences);
 	if (!reference) {
+		if (firstComparableReferenceWithStats) {
+			return emptyComparison(
+				contract,
+				currentValue,
+				'validated_mapping_unreviewed',
+				firstComparableReferenceWithStats
+			);
+		}
+
 		return emptyComparison(contract, currentValue, 'validated_no_stats', firstComparableReference);
 	}
 
@@ -307,6 +331,9 @@ function comparisonSummary(comparisons: ReferenceComparison[]): string {
 	const incompleteStatsCount = comparisons.filter(
 		(comparison) => comparison.state === 'validated_no_stats'
 	).length;
+	const unreviewedMappingCount = comparisons.filter(
+		(comparison) => comparison.state === 'validated_mapping_unreviewed'
+	).length;
 	const candidateOnlyCount = comparisons.filter(
 		(comparison) => comparison.state === 'candidate_only'
 	).length;
@@ -322,6 +349,10 @@ function comparisonSummary(comparisons: ReferenceComparison[]): string {
 
 	if (incompleteStatsCount > 0) {
 		return 'Validated references exist, but distribution statistics are incomplete.';
+	}
+
+	if (unreviewedMappingCount > 0) {
+		return 'Validated references exist, but metric mappings still need review before participant comparisons are shown.';
 	}
 
 	if (candidateOnlyCount > 0) {

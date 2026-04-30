@@ -14,6 +14,10 @@ import {
 	type PolicyScenarioOutcomeSnapshotInput,
 	type PolicyScenarioComparisonRunInput
 } from '$lib/experiments/policy-scenario-comparison';
+import {
+	evaluatePolicyScenarioRegressionGate,
+	type PolicyScenarioRegressionGate
+} from '$lib/experiments/policy-scenario-regression';
 import type {
 	ReferenceComparisonReadinessStatus,
 	ReferenceComparisonState,
@@ -113,10 +117,15 @@ export type AdminPolicyScenarioOutcomeSnapshotSummary = {
 export type AdminPolicyScenarioComparison = PolicyScenarioComparison & {
 	outcomeSnapshots: AdminPolicyScenarioOutcomeSnapshot[];
 	outcomeSnapshotSummary: AdminPolicyScenarioOutcomeSnapshotSummary;
+	regressionGate: PolicyScenarioRegressionGate;
 };
 
 type AdminPolicyScenarioComparisonOptions = {
 	batchId?: string | null;
+};
+
+type WithOutcomeSnapshotOptions = {
+	expectedScenarioCount?: number | null;
 };
 
 type CreateAdminPolicyScenarioBatchInput = {
@@ -256,16 +265,26 @@ async function createOutcomeSnapshot(
 }
 
 async function withOutcomeSnapshots(
-	comparison: PolicyScenarioComparison
+	comparison: PolicyScenarioComparison,
+	{ expectedScenarioCount = null }: WithOutcomeSnapshotOptions = {}
 ): Promise<AdminPolicyScenarioComparison> {
 	const outcomeSnapshots = await Promise.all(
 		createPolicyScenarioOutcomeSnapshotInputs(comparison.summaries).map(createOutcomeSnapshot)
 	);
+	const snapshotSummary = outcomeSnapshotSummary(outcomeSnapshots);
 
 	return {
 		...comparison,
 		outcomeSnapshots,
-		outcomeSnapshotSummary: outcomeSnapshotSummary(outcomeSnapshots)
+		outcomeSnapshotSummary: snapshotSummary,
+		regressionGate: evaluatePolicyScenarioRegressionGate({
+			expectedScenarioCount,
+			scenarioCount: comparison.scenarioCount,
+			runCount: comparison.runCount,
+			completedRunCount: comparison.completedRunCount,
+			outcomeSnapshotSummary: snapshotSummary,
+			outcomeSnapshots
+		})
 	};
 }
 
@@ -389,13 +408,23 @@ export async function updateAdminPolicyScenarioBatchStatus(
 	status: AdminPolicyScenarioBatchStatus
 ): Promise<AdminPolicyScenarioBatch | null> {
 	const now = Date.now();
+	const existingBatch = await getAdminPolicyScenarioBatch(batchId);
+
+	if (!existingBatch) return null;
+
+	let finalStatus = status;
+
+	if (status === 'completed') {
+		const comparison = await getAdminPolicyScenarioComparison({ batchId });
+		finalStatus = comparison.regressionGate.passed ? 'completed' : 'failed';
+	}
 
 	await db
 		.update(policyScenarioBatches)
 		.set({
-			status,
+			status: finalStatus,
 			updatedAt: now,
-			completedAt: status === 'started' ? null : now
+			completedAt: finalStatus === 'started' ? null : now
 		})
 		.where(eq(policyScenarioBatches.id, batchId));
 
@@ -405,6 +434,7 @@ export async function updateAdminPolicyScenarioBatchStatus(
 export async function getAdminPolicyScenarioComparison({
 	batchId = null
 }: AdminPolicyScenarioComparisonOptions = {}): Promise<AdminPolicyScenarioComparison> {
+	const selectedBatch = batchId ? await getAdminPolicyScenarioBatch(batchId) : null;
 	const batchRunIds = batchId
 		? (
 				await db
@@ -413,9 +443,10 @@ export async function getAdminPolicyScenarioComparison({
 					.where(eq(policyScenarioBatchRuns.batchId, batchId))
 			).map((row) => row.runId)
 		: null;
+	const expectedScenarioCount = selectedBatch?.scenarioCount ?? null;
 
 	if (batchRunIds && batchRunIds.length === 0) {
-		return withOutcomeSnapshots(createPolicyScenarioComparison([]));
+		return withOutcomeSnapshots(createPolicyScenarioComparison([]), { expectedScenarioCount });
 	}
 
 	const rows = await db
@@ -460,5 +491,7 @@ export async function getAdminPolicyScenarioComparison({
 		runsById.set(row.run.id, run);
 	}
 
-	return withOutcomeSnapshots(createPolicyScenarioComparison([...runsById.values()]));
+	return withOutcomeSnapshots(createPolicyScenarioComparison([...runsById.values()]), {
+		expectedScenarioCount
+	});
 }

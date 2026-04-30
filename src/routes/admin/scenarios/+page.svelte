@@ -52,6 +52,8 @@
 	const formatLabel = (value: string) => value.replaceAll('-', ' ');
 	const formatOutcomeKind = (value: string) => formatLabel(value).replaceAll('_', ' ');
 	const formatReadyCount = (ready: number, total: number) => `${ready}/${total}`;
+	const formatRegressionStatus = (value: string) =>
+		value === 'passed' ? 'Passed' : value === 'failed' ? 'Failed' : 'No runs';
 	const formatMetricExpectationValue = (value: number | null) => {
 		if (value === null) return '-';
 		if (Number.isInteger(value)) return value.toFixed(0);
@@ -85,6 +87,12 @@
 		passed
 			? 'border-green-200 bg-green-50 text-green-800'
 			: 'border-red-200 bg-red-50 text-red-800';
+	const regressionTone = (status: string) =>
+		status === 'passed'
+			? 'border-green-200 bg-green-50 text-green-800'
+			: status === 'failed'
+				? 'border-red-200 bg-red-50 text-red-800'
+				: 'border-amber-200 bg-amber-50 text-amber-800';
 	const batchApiPath = (batchId: string) =>
 		`${resolve('/admin/scenarios/batches')}/${encodeURIComponent(batchId)}`;
 	const scenarioKey = (
@@ -129,7 +137,7 @@
 	}
 
 	async function updateScenarioBatchStatus(batchId: string, status: 'completed' | 'failed') {
-		await parseJsonResponse<PolicyScenarioBatch>(
+		return parseJsonResponse<PolicyScenarioBatch>(
 			await fetch(batchApiPath(batchId), {
 				method: 'PATCH',
 				headers: { 'content-type': 'application/json' },
@@ -193,9 +201,12 @@
 			}
 
 			await recordScenarioBatchRun(batch, target, scenario, result.runId);
-			await updateScenarioBatchStatus(batch.id, 'completed');
+			const completedBatch = await updateScenarioBatchStatus(batch.id, 'completed');
 			completedLaunchCount = 1;
-			launchMessage = `Completed ${scenario.label} in ${batch.label}.`;
+			launchMessage =
+				completedBatch.status === 'failed'
+					? `Completed ${scenario.label}, but the regression gate failed.`
+					: `Completed ${scenario.label} in ${batch.label}.`;
 			await invalidateAll();
 		} catch (error) {
 			if (batch) {
@@ -245,9 +256,12 @@
 				}
 			}
 
-			await updateScenarioBatchStatus(batch.id, 'completed');
+			const completedBatch = await updateScenarioBatchStatus(batch.id, 'completed');
 			activeScenarioKey = '';
-			launchMessage = `Completed ${completedLaunchCount} policy scenario runs in ${batch.label}.`;
+			launchMessage =
+				completedBatch.status === 'failed'
+					? `Completed ${completedLaunchCount} policy scenario runs, but the regression gate failed.`
+					: `Completed ${completedLaunchCount} policy scenario runs in ${batch.label}.`;
 			await invalidateAll();
 		} catch (error) {
 			if (batch) {
@@ -313,7 +327,7 @@
 		</div>
 	{/if}
 
-	<div class="grid grid-cols-2 gap-3 md:grid-cols-8">
+	<div class="grid grid-cols-2 gap-3 md:grid-cols-9">
 		<div class="border-t border-gray-200 py-3">
 			<p class="text-xs text-gray-500">Batches</p>
 			<p class="font-serif text-2xl">{data.batches.length}</p>
@@ -369,7 +383,36 @@
 				{data.comparison.outcomeSnapshotSummary.failedMetricExpectationCount} failing
 			</p>
 		</div>
+		<div class="border-t border-gray-200 py-3">
+			<p class="text-xs text-gray-500">Regression gate</p>
+			<p class="font-serif text-2xl">
+				{formatRegressionStatus(data.comparison.regressionGate.status)}
+			</p>
+			<p class="text-xs text-gray-500">
+				{data.comparison.regressionGate.issueCount} issue(s)
+			</p>
+		</div>
 	</div>
+
+	{#if !data.comparison.regressionGate.passed}
+		<div
+			class={`rounded-sm border p-3 text-xs ${regressionTone(data.comparison.regressionGate.status)}`}
+		>
+			<p class="font-medium">
+				Regression gate {formatRegressionStatus(
+					data.comparison.regressionGate.status
+				).toLowerCase()}
+			</p>
+			<div class="mt-2 grid gap-1">
+				{#each data.comparison.regressionGate.issues as issue (issue.code)}
+					<p>{issue.message}</p>
+				{/each}
+				{#each data.comparison.regressionGate.failures.slice(0, 5) as failure (failure.checkId)}
+					<p>{failure.scenarioId} · {failure.scopeKey}: {failure.message}</p>
+				{/each}
+			</div>
+		</div>
+	{/if}
 
 	{#if dev}
 		<div class="border-t border-gray-200 pt-4">

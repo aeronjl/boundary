@@ -27,7 +27,8 @@
 		"reference:extract:nback:check": "bun run reference:extract:nback --check",
 		"reference:import": "bun run scripts/reference-import.ts",
 		"reference:import:nback": "bun run reference:import static/reference-data/n-back/openfmri-ds000115-summary.json static/reference-data/n-back/openfmri-ds000115-summary-con.json static/reference-data/n-back/openfmri-ds000115-summary-con-sib.json static/reference-data/n-back/openfmri-ds000115-summary-scz.json static/reference-data/n-back/openfmri-ds000115-summary-scz-sib.json",
-		"reference:review:nback": "bun run scripts/reference-review-openfmri-nback.ts"
+		"reference:review:nback": "bun run scripts/reference-review-openfmri-nback.ts",
+		"scenario:regression": "bun run scripts/policy-scenario-regression.ts"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",

@@ -37,6 +37,7 @@ import {
 	policyScenarioLaunchTargets,
 	policyScenarioRunPath
 } from '$lib/experiments/policy-scenario-launch';
+import { evaluatePolicyScenarioRegressionGate } from '$lib/experiments/policy-scenario-regression';
 import {
 	referenceMetricContracts,
 	referenceOutcomeTargetContracts
@@ -992,6 +993,90 @@ describe('policy scenario comparison helpers', () => {
 			actualValue: 0.875,
 			actualStatus: 'out_of_range',
 			passed: false
+		});
+	});
+
+	it('summarizes policy scenario regression gate failures', () => {
+		const passedGate = evaluatePolicyScenarioRegressionGate({
+			expectedScenarioCount: 2,
+			scenarioCount: 2,
+			runCount: 2,
+			completedRunCount: 2,
+			outcomeSnapshotSummary: {
+				expectationCount: 3,
+				failedExpectationCount: 0,
+				metricExpectationCount: 4,
+				failedMetricExpectationCount: 0
+			},
+			outcomeSnapshots: []
+		});
+
+		expect(passedGate).toMatchObject({
+			status: 'passed',
+			passed: true,
+			issueCount: 0
+		});
+
+		const failedGate = evaluatePolicyScenarioRegressionGate({
+			expectedScenarioCount: 2,
+			scenarioCount: 1,
+			runCount: 1,
+			completedRunCount: 0,
+			outcomeSnapshotSummary: {
+				expectationCount: 1,
+				failedExpectationCount: 1,
+				metricExpectationCount: 1,
+				failedMetricExpectationCount: 1
+			},
+			outcomeSnapshots: [
+				{
+					id: 'n-back:perfect-responder:overall',
+					experimentSlug: 'n-back',
+					scenarioId: 'perfect-responder',
+					scope: 'overall',
+					scopeKey: 'overall',
+					expectations: [
+						{
+							id: 'n-back-perfect-ready',
+							metricKey: 'accuracy',
+							kind: 'reference_percentile',
+							expectedStatus: 'ready',
+							actualStatus: 'blocked',
+							passed: false
+						}
+					],
+					metricExpectations: [
+						{
+							id: 'n-back-perfect-accuracy-one',
+							metricKey: 'accuracy',
+							expectedMinimum: 1,
+							expectedMaximum: 1,
+							actualValue: 0.875,
+							actualStatus: 'out_of_range',
+							passed: false
+						}
+					]
+				}
+			]
+		});
+
+		expect(failedGate).toMatchObject({
+			status: 'failed',
+			passed: false,
+			failedExpectationCount: 1,
+			failedMetricExpectationCount: 1,
+			failureCount: 2
+		});
+		expect(failedGate.issues.map((issue) => issue.code)).toEqual([
+			'missing_scenarios',
+			'missing_runs',
+			'incomplete_runs',
+			'outcome_expectation_failures',
+			'metric_expectation_failures'
+		]);
+		expect(failedGate.failures[1]).toMatchObject({
+			type: 'metric_expectation',
+			message: 'accuracy expected 1, got 0.875 (out_of_range).'
 		});
 	});
 });

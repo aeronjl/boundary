@@ -808,6 +808,7 @@ test('admin can inspect and export ten item personality inventory data', async (
 	await expect(page.getByRole('heading', { name: 'Policy scenarios' })).toBeVisible();
 	await expect(page.getByText('Generated runs')).toBeVisible();
 	await expect(page.getByText('Outcome snapshots')).toBeVisible();
+	await expect(page.getByText('Regression gate')).toBeVisible();
 	await expect(page.getByRole('columnheader', { name: 'Expectations' })).toBeVisible();
 	await expect(page.getByRole('columnheader', { name: 'Metric checks' })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Export JSON' })).toBeVisible();
@@ -828,6 +829,12 @@ test('admin can inspect and export ten item personality inventory data', async (
 			metricExpectationCount: expect.any(Number),
 			passedMetricExpectationCount: expect.any(Number),
 			failedMetricExpectationCount: expect.any(Number)
+		},
+		regressionGate: {
+			status: expect.any(String),
+			passed: expect.any(Boolean),
+			issueCount: expect.any(Number),
+			failureCount: expect.any(Number)
 		},
 		outcomeSnapshots: expect.any(Array),
 		selectedBatchId: null,
@@ -850,6 +857,13 @@ test('admin can inspect and export ten item personality inventory data', async (
 			metricExpectationCount: 0,
 			passedMetricExpectationCount: 0,
 			failedMetricExpectationCount: 0
+		},
+		regressionGate: {
+			status: 'empty',
+			passed: false,
+			expectedScenarioCount: null,
+			issueCount: 1,
+			failureCount: 0
 		},
 		outcomeSnapshots: [],
 		selectedBatchId: 'missing',

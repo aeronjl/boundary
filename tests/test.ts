@@ -809,6 +809,7 @@ test('admin can inspect and export ten item personality inventory data', async (
 	await expect(page.getByText('Generated runs')).toBeVisible();
 	await expect(page.getByText('Outcome snapshots')).toBeVisible();
 	await expect(page.getByRole('columnheader', { name: 'Expectations' })).toBeVisible();
+	await expect(page.getByRole('columnheader', { name: 'Metric checks' })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Export JSON' })).toBeVisible();
 
 	const scenarioJsonResponse = await page.request.get('/admin/scenarios/export.json');
@@ -823,7 +824,10 @@ test('admin can inspect and export ten item personality inventory data', async (
 			blockedTargetCount: expect.any(Number),
 			expectationCount: expect.any(Number),
 			passedExpectationCount: expect.any(Number),
-			failedExpectationCount: expect.any(Number)
+			failedExpectationCount: expect.any(Number),
+			metricExpectationCount: expect.any(Number),
+			passedMetricExpectationCount: expect.any(Number),
+			failedMetricExpectationCount: expect.any(Number)
 		},
 		outcomeSnapshots: expect.any(Array),
 		selectedBatchId: null,
@@ -842,7 +846,10 @@ test('admin can inspect and export ten item personality inventory data', async (
 			blockedTargetCount: 0,
 			expectationCount: 0,
 			passedExpectationCount: 0,
-			failedExpectationCount: 0
+			failedExpectationCount: 0,
+			metricExpectationCount: 0,
+			passedMetricExpectationCount: 0,
+			failedMetricExpectationCount: 0
 		},
 		outcomeSnapshots: [],
 		selectedBatchId: 'missing',

@@ -25,6 +25,12 @@
 		runId?: string;
 	};
 
+	type MetricExpectationRange = {
+		actualValue: number | null;
+		expectedMinimum: number | null;
+		expectedMaximum: number | null;
+	};
+
 	let launchBusy = false;
 	let launchError = '';
 	let launchMessage = '';
@@ -46,6 +52,31 @@
 	const formatLabel = (value: string) => value.replaceAll('-', ' ');
 	const formatOutcomeKind = (value: string) => formatLabel(value).replaceAll('_', ' ');
 	const formatReadyCount = (ready: number, total: number) => `${ready}/${total}`;
+	const formatMetricExpectationValue = (value: number | null) => {
+		if (value === null) return '-';
+		if (Number.isInteger(value)) return value.toFixed(0);
+		if (Math.abs(value) <= 1) return value.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
+		return value.toFixed(1);
+	};
+	const formatMetricExpectationRange = (expectation: MetricExpectationRange) => {
+		const { expectedMinimum, expectedMaximum } = expectation;
+
+		if (
+			expectedMinimum !== null &&
+			expectedMaximum !== null &&
+			Math.abs(expectedMinimum - expectedMaximum) < 0.000001
+		) {
+			return `= ${formatMetricExpectationValue(expectedMinimum)}`;
+		}
+
+		if (expectedMinimum !== null && expectedMaximum !== null) {
+			return `${formatMetricExpectationValue(expectedMinimum)}-${formatMetricExpectationValue(expectedMaximum)}`;
+		}
+
+		if (expectedMinimum !== null) return `>= ${formatMetricExpectationValue(expectedMinimum)}`;
+		if (expectedMaximum !== null) return `<= ${formatMetricExpectationValue(expectedMaximum)}`;
+		return 'expected';
+	};
 	const targetTone = (status: string) =>
 		status === 'ready'
 			? 'border-green-200 bg-green-50 text-green-800'
@@ -282,7 +313,7 @@
 		</div>
 	{/if}
 
-	<div class="grid grid-cols-2 gap-3 md:grid-cols-7">
+	<div class="grid grid-cols-2 gap-3 md:grid-cols-8">
 		<div class="border-t border-gray-200 py-3">
 			<p class="text-xs text-gray-500">Batches</p>
 			<p class="font-serif text-2xl">{data.batches.length}</p>
@@ -324,6 +355,18 @@
 			</p>
 			<p class="text-xs text-gray-500">
 				{data.comparison.outcomeSnapshotSummary.failedExpectationCount} failing
+			</p>
+		</div>
+		<div class="border-t border-gray-200 py-3">
+			<p class="text-xs text-gray-500">Metric checks</p>
+			<p class="font-serif text-2xl">
+				{formatReadyCount(
+					data.comparison.outcomeSnapshotSummary.passedMetricExpectationCount,
+					data.comparison.outcomeSnapshotSummary.metricExpectationCount
+				)}
+			</p>
+			<p class="text-xs text-gray-500">
+				{data.comparison.outcomeSnapshotSummary.failedMetricExpectationCount} failing
 			</p>
 		</div>
 	</div>
@@ -411,7 +454,7 @@
 			</div>
 
 			<div class="mt-4 overflow-x-auto">
-				<table class="w-full min-w-[1120px] text-left text-xs">
+				<table class="w-full min-w-[1280px] text-left text-xs">
 					<thead class="text-gray-500">
 						<tr>
 							<th class="py-2 pr-3 font-medium">Scenario</th>
@@ -420,6 +463,7 @@
 							<th class="py-2 pr-3 font-medium">Targets</th>
 							<th class="py-2 pr-3 font-medium">Target gates</th>
 							<th class="py-2 pr-3 font-medium">Expectations</th>
+							<th class="py-2 pr-3 font-medium">Metric checks</th>
 							<th class="py-2 pr-3 font-medium">Blockers</th>
 						</tr>
 					</thead>
@@ -464,6 +508,26 @@
 													{expectation.passed
 														? 'ok'
 														: `expected ${expectation.expectedStatus}, got ${expectation.actualStatus}`}
+												</span>
+											{/each}
+										</div>
+									{:else}
+										<span class="text-gray-500">None</span>
+									{/if}
+								</td>
+								<td class="py-2 pr-3">
+									{#if snapshot.metricExpectations.length > 0}
+										<div class="flex max-w-md flex-wrap gap-1">
+											{#each snapshot.metricExpectations as expectation (expectation.id)}
+												<span
+													class={`rounded-sm border px-2 py-1 ${expectationTone(expectation.passed)}`}
+													title={expectation.rationale}
+												>
+													{expectation.metricKey}
+													{formatMetricExpectationRange(expectation)}
+													{expectation.passed
+														? 'ok'
+														: `got ${formatMetricExpectationValue(expectation.actualValue)}`}
 												</span>
 											{/each}
 										</div>

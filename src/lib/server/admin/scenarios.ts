@@ -1,7 +1,10 @@
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import {
+	evaluatePolicyScenarioMetricExpectations,
 	evaluatePolicyScenarioOutcomeExpectations,
+	summarizePolicyScenarioMetricExpectations,
 	summarizePolicyScenarioOutcomeExpectations,
+	type PolicyScenarioMetricExpectationEvaluation,
 	type PolicyScenarioOutcomeExpectationEvaluation
 } from '$lib/experiments/policy-scenario-expectations';
 import {
@@ -86,6 +89,10 @@ export type AdminPolicyScenarioOutcomeSnapshot = Omit<
 	expectationCount: number;
 	passedExpectationCount: number;
 	failedExpectationCount: number;
+	metricExpectations: PolicyScenarioMetricExpectationEvaluation[];
+	metricExpectationCount: number;
+	passedMetricExpectationCount: number;
+	failedMetricExpectationCount: number;
 	metrics: AdminPolicyScenarioOutcomeSnapshotMetric[];
 };
 
@@ -98,6 +105,9 @@ export type AdminPolicyScenarioOutcomeSnapshotSummary = {
 	expectationCount: number;
 	passedExpectationCount: number;
 	failedExpectationCount: number;
+	metricExpectationCount: number;
+	passedMetricExpectationCount: number;
+	failedMetricExpectationCount: number;
 };
 
 export type AdminPolicyScenarioComparison = PolicyScenarioComparison & {
@@ -159,6 +169,9 @@ function outcomeSnapshotSummary(
 	const expectationSummary = summarizePolicyScenarioOutcomeExpectations(
 		snapshots.flatMap((snapshot) => snapshot.expectations)
 	);
+	const metricExpectationSummary = summarizePolicyScenarioMetricExpectations(
+		snapshots.flatMap((snapshot) => snapshot.metricExpectations)
+	);
 
 	return {
 		snapshotCount: snapshots.length,
@@ -166,7 +179,8 @@ function outcomeSnapshotSummary(
 		readyTargetCount: targets.filter((target) => target.status === 'ready').length,
 		blockedTargetCount: targets.filter((target) => target.status === 'blocked').length,
 		blockers: outcomeSnapshotBlockers(targets),
-		...expectationSummary
+		...expectationSummary,
+		...metricExpectationSummary
 	};
 }
 
@@ -211,6 +225,14 @@ async function createOutcomeSnapshot(
 		targets
 	});
 	const expectationSummary = summarizePolicyScenarioOutcomeExpectations(expectations);
+	const metricExpectations = evaluatePolicyScenarioMetricExpectations({
+		experimentSlug: input.experimentSlug,
+		scenarioId: input.scenarioId,
+		scope: input.scope,
+		scopeKey: input.scopeKey,
+		metricValues: input.metrics
+	});
+	const metricExpectationSummary = summarizePolicyScenarioMetricExpectations(metricExpectations);
 
 	return {
 		id: input.id,
@@ -227,6 +249,8 @@ async function createOutcomeSnapshot(
 		blockers: outcomeSnapshotBlockers(targets),
 		expectations,
 		...expectationSummary,
+		metricExpectations,
+		...metricExpectationSummary,
 		metrics
 	};
 }

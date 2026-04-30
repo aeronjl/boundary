@@ -25,8 +25,11 @@ import {
 	createPolicyScenarioOutcomeSnapshotInputs
 } from '$lib/experiments/policy-scenario-comparison';
 import {
+	evaluatePolicyScenarioMetricExpectations,
 	evaluatePolicyScenarioOutcomeExpectations,
+	policyScenarioMetricExpectationContracts,
 	policyScenarioOutcomeExpectationContracts,
+	summarizePolicyScenarioMetricExpectations,
 	summarizePolicyScenarioOutcomeExpectations
 } from '$lib/experiments/policy-scenario-expectations';
 import {
@@ -953,6 +956,41 @@ describe('policy scenario comparison helpers', () => {
 
 		expect(missingTargetEvaluation).toMatchObject({
 			actualStatus: 'missing',
+			passed: false
+		});
+
+		expect(policyScenarioMetricExpectationContracts.length).toBeGreaterThan(25);
+		const perfectMetricEvaluations = evaluatePolicyScenarioMetricExpectations({
+			experimentSlug: 'n-back',
+			scenarioId: 'perfect-responder',
+			scope: 'overall',
+			scopeKey: 'overall',
+			metricValues: {
+				accuracy: 1,
+				falseAlarmRate: null,
+				sensitivityIndex: null
+			}
+		});
+
+		expect(summarizePolicyScenarioMetricExpectations(perfectMetricEvaluations)).toEqual({
+			metricExpectationCount: 1,
+			passedMetricExpectationCount: 1,
+			failedMetricExpectationCount: 0
+		});
+
+		const driftedMetricEvaluation = evaluatePolicyScenarioMetricExpectations({
+			experimentSlug: 'n-back',
+			scenarioId: 'perfect-responder',
+			scope: 'overall',
+			scopeKey: 'overall',
+			metricValues: {
+				accuracy: 0.875
+			}
+		})[0];
+
+		expect(driftedMetricEvaluation).toMatchObject({
+			actualValue: 0.875,
+			actualStatus: 'out_of_range',
 			passed: false
 		});
 	});

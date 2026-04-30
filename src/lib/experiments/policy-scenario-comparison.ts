@@ -213,7 +213,8 @@ function overallOutcomeMetrics(summary: PolicyScenarioSummary): Record<string, n
 		return {
 			accuracy: metricValue(summary.meanAccuracy),
 			sensitivityIndex: metricValue(summary.meanSensitivityIndex),
-			falseAlarmRate: metricValue(summary.meanFalseAlarmRate)
+			falseAlarmRate: metricValue(summary.meanFalseAlarmRate),
+			matchResponseRate: metricValue(summary.meanMatchResponseRate)
 		};
 	}
 
@@ -221,6 +222,7 @@ function overallOutcomeMetrics(summary: PolicyScenarioSummary): Record<string, n
 		return {
 			accuracy: metricValue(summary.meanAccuracy),
 			estimatedThresholdDegrees: metricValue(summary.meanEstimatedThresholdDegrees),
+			clockwiseResponseRate: metricValue(summary.meanClockwiseResponseRate),
 			meanResponseTimeMs: metricValue(summary.meanResponseTimeMs)
 		};
 	}
@@ -249,13 +251,15 @@ function phaseOutcomeMetrics(
 		return {
 			accuracy: metricValue(summary.accuracy),
 			sensitivityIndex: metricValue(summary.sensitivityIndex),
-			falseAlarmRate: metricValue(summary.falseAlarmRate)
+			falseAlarmRate: metricValue(summary.falseAlarmRate),
+			matchResponseRate: metricValue(summary.matchResponseRate)
 		};
 	}
 
 	if (experimentSlug === orientationExperimentSlug) {
 		return {
 			accuracy: metricValue(summary.accuracy),
+			clockwiseResponseRate: metricValue(summary.clockwiseResponseRate),
 			meanResponseTimeMs: metricValue(summary.meanResponseTimeMs)
 		};
 	}

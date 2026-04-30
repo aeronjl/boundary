@@ -1,6 +1,7 @@
 import {
 	getLiteratureExtractionCsvFor,
 	getLiteratureExtractionExportFor,
+	literatureClaimReviewQueueFrom,
 	literatureExtractionsForExperimentFrom,
 	literatureMetricSummariesForExperimentFrom,
 	participantLiteratureClaimsForExperimentFrom,
@@ -11,6 +12,9 @@ import {
 } from './literature-schema';
 
 export type {
+	LiteratureClaimParticipantExposure,
+	LiteratureClaimReviewQueueItem,
+	LiteratureClaimReviewState,
 	LiteratureComparisonClaim,
 	LiteratureComparisonClaimStatus,
 	LiteratureExtractionStatus,
@@ -59,6 +63,10 @@ export function literatureMetricSummariesForExperiment(experimentSlug: string) {
 
 export function participantLiteratureClaimsForExperiment(experimentSlug: string) {
 	return participantLiteratureClaimsForExperimentFrom(literatureExtractions, experimentSlug);
+}
+
+export function literatureClaimReviewQueue() {
+	return literatureClaimReviewQueueFrom(literatureExtractions);
 }
 
 export function getLiteratureExtractionExport() {

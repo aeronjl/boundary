@@ -8,6 +8,13 @@
 			? '-'
 			: new Intl.NumberFormat('en-GB', { maximumFractionDigits: 3 }).format(value);
 	const formatColumns = (values: string[]) => (values.length === 0 ? '-' : values.join(', '));
+	const formatLabel = (value: string) => value.replaceAll('_', ' ');
+
+	$: reviewQueue = data.reviewQueue ?? [];
+	$: publicReadyClaims = reviewQueue.filter((item) => item.participantExposure === 'public').length;
+	$: claimsNeedingEvidence = reviewQueue.filter(
+		(item) => item.reviewState === 'needs_evidence'
+	).length;
 </script>
 
 <svelte:head>
@@ -24,7 +31,7 @@
 		</p>
 	</div>
 
-	<div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+	<div class="grid grid-cols-2 gap-3 md:grid-cols-6">
 		<div class="border-t border-gray-200 py-3">
 			<p class="text-xs text-gray-500">Extractions</p>
 			<p class="font-serif text-2xl">{data.summary.extractionCount}</p>
@@ -40,6 +47,14 @@
 		<div class="border-t border-gray-200 py-3">
 			<p class="text-xs text-gray-500">Claims</p>
 			<p class="font-serif text-2xl">{data.summary.comparisonClaimCount}</p>
+		</div>
+		<div class="border-t border-gray-200 py-3">
+			<p class="text-xs text-gray-500">Public-ready</p>
+			<p class="font-serif text-2xl">{publicReadyClaims}</p>
+		</div>
+		<div class="border-t border-gray-200 py-3">
+			<p class="text-xs text-gray-500">Need evidence</p>
+			<p class="font-serif text-2xl">{claimsNeedingEvidence}</p>
 		</div>
 	</div>
 
@@ -68,6 +83,94 @@
 			</ul>
 		</div>
 	{/if}
+
+	<section class="border-t border-gray-200 pt-4">
+		<div class="grid gap-3 md:grid-cols-[1fr_260px]">
+			<div>
+				<h2 class="font-serif text-2xl">Claim review queue</h2>
+				<p class="mt-1 max-w-3xl text-gray-600">
+					Participant-facing literature claims stay hidden until the claim is reviewed,
+					public-ready, and all evidence blockers are resolved.
+				</p>
+			</div>
+			<div class="text-xs text-gray-500">
+				<p>Promote locally with source-controlled JSON edits.</p>
+				<code class="mt-1 block rounded-sm bg-gray-100 p-2 break-words">
+					bun run literature:promote &lt;claim-id&gt; --status reviewed --participant-use
+					public_prompt_ready --write
+				</code>
+			</div>
+		</div>
+
+		<div class="mt-4 overflow-x-auto border-t border-gray-100">
+			<table class="w-full min-w-[1100px] text-left text-xs">
+				<thead class="text-gray-500">
+					<tr>
+						<th class="py-2 pr-3 font-medium">Claim</th>
+						<th class="py-2 pr-3 font-medium">Source</th>
+						<th class="py-2 pr-3 font-medium">State</th>
+						<th class="py-2 pr-3 font-medium">Evidence</th>
+						<th class="py-2 pr-3 font-medium">Blockers</th>
+						<th class="py-2 pr-3 font-medium">Next action</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each reviewQueue as item (item.id)}
+						<tr class="border-t border-gray-100 align-top">
+							<td class="max-w-sm py-2 pr-3">
+								<p class="font-medium text-gray-700">{item.claim}</p>
+								<p class="mt-1 font-mono text-[11px] text-gray-500">{item.id}</p>
+								<p class="mt-1 text-gray-500">{item.guardrail}</p>
+							</td>
+							<td class="py-2 pr-3">
+								<p>{item.sourceCitation}</p>
+								<p class="mt-1 font-mono text-[11px] text-gray-500">
+									{item.experimentSlug}:{item.metricKey}
+								</p>
+							</td>
+							<td class="py-2 pr-3">
+								<p>{formatLabel(item.reviewState)}</p>
+								<p class="mt-1 text-gray-500">
+									{formatLabel(item.status)} / {formatLabel(item.participantUse)}
+								</p>
+								<p class="mt-1 text-gray-500">
+									Exposure: {formatLabel(item.participantExposure)}
+								</p>
+							</td>
+							<td class="py-2 pr-3">
+								<p>{item.resultCount} result(s), {item.numericResultCount} numeric</p>
+								<p class="mt-1 text-gray-500">
+									{formatColumns(item.measureLabels)}
+								</p>
+								<p class="mt-1 text-gray-500">
+									{formatColumns(item.sampleLabels)}
+								</p>
+							</td>
+							<td class="max-w-xs py-2 pr-3 text-gray-600">
+								{#if item.promotionBlockers.length > 0}
+									<ul class="list-disc space-y-1 pl-4">
+										{#each item.promotionBlockers as blocker (blocker)}
+											<li>{blocker}</li>
+										{/each}
+									</ul>
+								{:else}
+									Ready for final review.
+								{/if}
+							</td>
+							<td class="max-w-xs py-2 pr-3 text-gray-600">
+								<p>{item.nextAction}</p>
+								{#if item.canPromoteToPublic}
+									<code class="mt-2 block rounded-sm bg-gray-100 p-2 break-words">
+										{item.promotionCommand}
+									</code>
+								{/if}
+							</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
+	</section>
 
 	{#each data.extractions as extraction (extraction.id)}
 		<section class="border-t border-gray-200 pt-4">

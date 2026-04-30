@@ -25,10 +25,15 @@ import {
 	literatureExtractionFilePaths,
 	literatureExtractionValidations,
 	literatureExtractions,
+	literatureClaimReviewQueue,
 	literatureMetricSummariesForExperiment,
 	participantLiteratureClaimsForExperiment
 } from '$lib/reference-data/literature';
-import { participantLiteratureClaimsForExperimentFrom } from '$lib/reference-data/literature-schema';
+import {
+	literatureClaimReviewQueueFrom,
+	participantLiteratureClaimsForExperimentFrom,
+	validateLiteratureExtractions
+} from '$lib/reference-data/literature-schema';
 import { crossTaskRelationshipsForMetric } from '$lib/reference-data/relationships';
 import { createReferenceContext } from '$lib/reference-data/summary';
 import { calculateNBackSignalDetectionMetrics, type NBackResult } from '$lib/experiments/n-back';
@@ -309,7 +314,8 @@ describe('reference data contracts', () => {
 		expect(exportData.summary).toMatchObject({
 			extractionCount: 2,
 			resultCount: 4,
-			comparisonClaimCount: 3
+			comparisonClaimCount: 3,
+			publicReadyClaimCount: 0
 		});
 		expect(exportData.extractions[0].schemaVersion).toBe(1);
 		expect(extraction?.comparisonClaims.map((claim) => claim.participantUse)).toEqual([
@@ -330,15 +336,32 @@ describe('reference data contracts', () => {
 	});
 
 	it('only exposes reviewed public-ready literature claims to participants', () => {
+		const openFmriExtraction = literatureExtractions.find(
+			(candidate) => candidate.id === 'openfmri-ds000115-nback-participants-summary'
+		);
 		const adhdExtraction = literatureExtractions.find(
 			(candidate) => candidate.id === 'marx-2011-adhd-emotional-nback'
 		);
+		const reviewQueue = literatureClaimReviewQueue();
+		const adhdReviewItem = reviewQueue.find(
+			(item) => item.id === 'marx-2011-adhd-nback-clinical-context'
+		);
 
 		expect(participantLiteratureClaimsForExperiment('n-back')).toEqual([]);
+		expect(adhdReviewItem).toMatchObject({
+			participantExposure: 'hidden',
+			reviewState: 'needs_evidence',
+			canPromoteToPublic: false
+		});
+		expect(adhdReviewItem?.promotionBlockers).toContain(
+			'Add numeric mean and standard deviation evidence for participant comparison.'
+		);
+		expect(openFmriExtraction).toBeTruthy();
 		expect(adhdExtraction).toBeTruthy();
+		if (!openFmriExtraction) throw new Error('OpenfMRI extraction fixture is missing.');
 		if (!adhdExtraction) throw new Error('ADHD extraction fixture is missing.');
 
-		const reviewedExtraction = {
+		const unsafeAdhdExtraction = {
 			...adhdExtraction,
 			comparisonClaims: adhdExtraction.comparisonClaims.map((claim) => ({
 				...claim,
@@ -346,16 +369,54 @@ describe('reference data contracts', () => {
 				participantUse: 'public_prompt_ready' as const
 			}))
 		};
-		const claims = participantLiteratureClaimsForExperimentFrom([reviewedExtraction], 'n-back');
+		expect(
+			validateLiteratureExtractions([unsafeAdhdExtraction]).map((issue) => issue.code)
+		).toContain('public_claim_not_ready');
+		expect(participantLiteratureClaimsForExperimentFrom([unsafeAdhdExtraction], 'n-back')).toEqual(
+			[]
+		);
+
+		const reviewedDistributionExtraction = {
+			...openFmriExtraction,
+			measures: openFmriExtraction.measures.map((measure) =>
+				measure.metricKey === 'accuracy'
+					? {
+							...measure,
+							extractionStatus: 'reviewed' as const,
+							comparisonReadiness: 'reviewed' as const
+						}
+					: measure
+			),
+			comparisonClaims: openFmriExtraction.comparisonClaims.map((claim) =>
+				claim.metricKey === 'accuracy'
+					? {
+							...claim,
+							status: 'reviewed' as const,
+							participantUse: 'public_prompt_ready' as const
+						}
+					: claim
+			)
+		};
+		const claims = participantLiteratureClaimsForExperimentFrom(
+			[reviewedDistributionExtraction],
+			'n-back'
+		);
+		const promotedReviewItem = literatureClaimReviewQueueFrom([
+			reviewedDistributionExtraction
+		]).find((item) => item.id === 'openfmri-ds000115-nback-accuracy-candidate-distribution');
 
 		expect(claims).toEqual([
 			expect.objectContaining({
-				id: 'marx-2011-adhd-nback-clinical-context',
-				sourceCitation: 'Marx et al., 2011',
-				sourceUrl: 'https://pubmed.ncbi.nlm.nih.gov/21905999/'
+				id: 'openfmri-ds000115-nback-accuracy-candidate-distribution',
+				sourceCitation: 'OpenfMRI ds000115',
+				sourceUrl: 'https://openfmri.org/dataset/ds000115/'
 			})
 		]);
-		expect(claims[0].caveat).toContain('Do not use this source to classify');
+		expect(claims[0].caveat).toContain('Do not present this as a diagnosis');
+		expect(promotedReviewItem).toMatchObject({
+			participantExposure: 'public',
+			reviewState: 'public_ready'
+		});
 	});
 });
 

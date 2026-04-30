@@ -768,8 +768,14 @@ test('admin can inspect and export ten item personality inventory data', async (
 	await expect(page.getByRole('heading', { name: 'Literature extractions' })).toBeVisible();
 	await expect(page.getByText('openfmri-ds000115-nback-participants-summary')).toBeVisible();
 	await expect(page.getByText('marx-2011-adhd-emotional-nback')).toBeVisible();
-	await expect(page.getByText('2-back accuracy')).toBeVisible();
-	await expect(page.getByRole('cell', { name: 'Adults with ADHD' })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Claim review queue' })).toBeVisible();
+	await expect(page.getByText('Need evidence')).toBeVisible();
+	await expect(page.getByText('2-back accuracy').first()).toBeVisible();
+	await expect(page.getByRole('cell', { name: 'Adults with ADHD', exact: true })).toBeVisible();
+	await expect(page.getByText('Resolve blocker(s) before public promotion.').first()).toBeVisible();
+	await expect(
+		page.getByText('Add numeric mean and standard deviation evidence for participant comparison.')
+	).toBeVisible();
 	await expect(page.getByText('candidate comparison claim').first()).toBeVisible();
 
 	const literatureJsonResponse = await page.request.get('/admin/literature/export.json');

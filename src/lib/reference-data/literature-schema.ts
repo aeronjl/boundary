@@ -148,6 +148,9 @@ export type LiteratureExtractionSummary = {
 	resultCount: number;
 	comparisonClaimCount: number;
 	reviewedClaimCount: number;
+	publicReadyClaimCount: number;
+	publicCandidateClaimCount: number;
+	internalReviewClaimCount: number;
 };
 
 export type LiteratureExtractionValidationIssue = {
@@ -186,6 +189,36 @@ export type ParticipantLiteratureClaim = {
 	sourceCitation: string;
 	sourceUrl: string;
 	evidenceIds: string[];
+};
+
+export type LiteratureClaimReviewState = 'public_ready' | 'ready_to_promote' | 'needs_evidence';
+
+export type LiteratureClaimParticipantExposure = 'hidden' | 'candidate' | 'public';
+
+export type LiteratureClaimReviewQueueItem = {
+	id: string;
+	extractionId: string;
+	sourceCitation: string;
+	sourceUrl: string;
+	experimentSlug: string;
+	metricKey: string;
+	claimType: LiteratureComparisonClaim['claimType'];
+	status: LiteratureComparisonClaimStatus;
+	participantUse: LiteratureParticipantUse;
+	participantExposure: LiteratureClaimParticipantExposure;
+	reviewState: LiteratureClaimReviewState;
+	claim: string;
+	guardrail: string;
+	resultIds: string[];
+	citationIds: string[];
+	resultCount: number;
+	numericResultCount: number;
+	sampleLabels: string[];
+	measureLabels: string[];
+	promotionBlockers: string[];
+	canPromoteToPublic: boolean;
+	nextAction: string;
+	promotionCommand: string;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -438,8 +471,110 @@ export function summarizeLiteratureExtractions(
 			(total, extraction) =>
 				total + extraction.comparisonClaims.filter((claim) => claim.status === 'reviewed').length,
 			0
+		),
+		publicReadyClaimCount: extractions.reduce(
+			(total, extraction) =>
+				total +
+				extraction.comparisonClaims.filter(
+					(claim) =>
+						claim.status === 'reviewed' &&
+						claim.participantUse === 'public_prompt_ready' &&
+						literatureClaimPromotionBlockersFor(extraction, claim).length === 0
+				).length,
+			0
+		),
+		publicCandidateClaimCount: extractions.reduce(
+			(total, extraction) =>
+				total +
+				extraction.comparisonClaims.filter(
+					(claim) => claim.participantUse === 'public_prompt_candidate'
+				).length,
+			0
+		),
+		internalReviewClaimCount: extractions.reduce(
+			(total, extraction) =>
+				total +
+				extraction.comparisonClaims.filter((claim) => claim.participantUse === 'internal_review')
+					.length,
+			0
 		)
 	};
+}
+
+function uniqueStrings(values: string[]): string[] {
+	return [...new Set(values)];
+}
+
+function resultHasDistributionStats(result: LiteratureResult): boolean {
+	return result.mean !== null && result.standardDeviation !== null;
+}
+
+export function literatureClaimPromotionBlockersFor(
+	extraction: StructuredLiteratureExtraction,
+	claim: LiteratureComparisonClaim
+): string[] {
+	const blockers: string[] = [];
+	const resultById = new Map(extraction.results.map((result) => [result.id, result]));
+	const measureById = new Map(extraction.measures.map((measure) => [measure.id, measure]));
+	const referencedResults: LiteratureResult[] = [];
+	const referencedMeasures: LiteratureMeasure[] = [];
+
+	if (claim.resultIds.length === 0) {
+		blockers.push('Add at least one result citation before public use.');
+	}
+
+	if (claim.citationIds.length === 0) {
+		blockers.push('Add at least one source citation before public use.');
+	}
+
+	for (const resultId of claim.resultIds) {
+		const result = resultById.get(resultId);
+		if (!result) {
+			blockers.push(`Resolve missing result ${resultId}.`);
+			continue;
+		}
+
+		referencedResults.push(result);
+		const measure = measureById.get(result.measureId);
+
+		if (!measure) {
+			blockers.push(`Resolve missing measure ${result.measureId}.`);
+			continue;
+		}
+
+		referencedMeasures.push(measure);
+
+		if (measure.experimentSlug !== claim.experimentSlug) {
+			blockers.push(
+				`Align ${measure.id} with claim experiment ${claim.experimentSlug} before public use.`
+			);
+		}
+
+		if (measure.metricKey !== claim.metricKey) {
+			blockers.push(`Align ${measure.id} with claim metric ${claim.metricKey} before public use.`);
+		}
+	}
+
+	for (const measure of uniqueStrings(referencedMeasures.map((measure) => measure.id))
+		.map((id) => measureById.get(id))
+		.filter((measure): measure is LiteratureMeasure => measure !== undefined)) {
+		if (measure.extractionStatus !== 'reviewed') {
+			blockers.push(`Review extraction status for ${measure.label}.`);
+		}
+
+		if (measure.comparisonReadiness !== 'reviewed') {
+			blockers.push(`Review comparison readiness for ${measure.label}.`);
+		}
+	}
+
+	if (
+		claim.claimType !== 'construct_context' &&
+		!referencedResults.some(resultHasDistributionStats)
+	) {
+		blockers.push('Add numeric mean and standard deviation evidence for participant comparison.');
+	}
+
+	return uniqueStrings(blockers);
 }
 
 export function validateLiteratureExtraction(
@@ -536,6 +671,16 @@ export function validateLiteratureExtraction(
 				message: `${claim.id} is public-ready without reviewed status.`
 			});
 		}
+
+		if (claim.participantUse === 'public_prompt_ready') {
+			for (const blocker of literatureClaimPromotionBlockersFor(extraction, claim)) {
+				issues.push({
+					extractionId: extraction.id,
+					code: 'public_claim_not_ready',
+					message: `${claim.id} is public-ready but blocked: ${blocker}`
+				});
+			}
+		}
 	}
 
 	if (extraction.guardrails.length === 0) {
@@ -631,6 +776,43 @@ function literatureClaimTitle(claim: LiteratureComparisonClaim): string {
 	return 'Reviewed task context';
 }
 
+function literatureClaimParticipantExposure(
+	claim: LiteratureComparisonClaim,
+	promotionBlockers: string[]
+): LiteratureClaimParticipantExposure {
+	if (
+		claim.status === 'reviewed' &&
+		claim.participantUse === 'public_prompt_ready' &&
+		promotionBlockers.length === 0
+	) {
+		return 'public';
+	}
+
+	if (claim.participantUse === 'public_prompt_candidate') return 'candidate';
+	return 'hidden';
+}
+
+function literatureClaimReviewState(
+	participantExposure: LiteratureClaimParticipantExposure,
+	promotionBlockers: string[]
+): LiteratureClaimReviewState {
+	if (participantExposure === 'public') return 'public_ready';
+	if (promotionBlockers.length === 0) return 'ready_to_promote';
+	return 'needs_evidence';
+}
+
+function literatureClaimNextAction(
+	claim: LiteratureComparisonClaim,
+	reviewState: LiteratureClaimReviewState
+): string {
+	if (reviewState === 'public_ready') return 'Visible to participants.';
+	if (reviewState === 'ready_to_promote') {
+		return `Run bun run literature:promote ${claim.id} --status reviewed --participant-use public_prompt_ready --write after final human review.`;
+	}
+
+	return 'Resolve blocker(s) before public promotion.';
+}
+
 export function participantLiteratureClaimsForExperimentFrom(
 	extractions: StructuredLiteratureExtraction[],
 	experimentSlug: string
@@ -640,7 +822,8 @@ export function participantLiteratureClaimsForExperimentFrom(
 			if (
 				claim.experimentSlug !== experimentSlug ||
 				claim.status !== 'reviewed' ||
-				claim.participantUse !== 'public_prompt_ready'
+				claim.participantUse !== 'public_prompt_ready' ||
+				literatureClaimPromotionBlockersFor(extraction, claim).length > 0
 			) {
 				return [];
 			}
@@ -663,6 +846,57 @@ export function participantLiteratureClaimsForExperimentFrom(
 	);
 }
 
+export function literatureClaimReviewQueueFrom(
+	extractions: StructuredLiteratureExtraction[]
+): LiteratureClaimReviewQueueItem[] {
+	return extractions.flatMap((extraction) => {
+		const resultById = new Map(extraction.results.map((result) => [result.id, result]));
+		const measureById = new Map(extraction.measures.map((measure) => [measure.id, measure]));
+		const sampleById = new Map(extraction.samples.map((sample) => [sample.id, sample]));
+
+		return extraction.comparisonClaims.map((claim) => {
+			const results = claim.resultIds
+				.map((resultId) => resultById.get(resultId))
+				.filter((result): result is LiteratureResult => result !== undefined);
+			const measures = results
+				.map((result) => measureById.get(result.measureId))
+				.filter((measure): measure is LiteratureMeasure => measure !== undefined);
+			const samples = results
+				.map((result) => sampleById.get(result.sampleId))
+				.filter((sample): sample is LiteratureSample => sample !== undefined);
+			const promotionBlockers = literatureClaimPromotionBlockersFor(extraction, claim);
+			const participantExposure = literatureClaimParticipantExposure(claim, promotionBlockers);
+			const reviewState = literatureClaimReviewState(participantExposure, promotionBlockers);
+
+			return {
+				id: claim.id,
+				extractionId: extraction.id,
+				sourceCitation: extraction.source.shortCitation,
+				sourceUrl: extraction.source.url,
+				experimentSlug: claim.experimentSlug,
+				metricKey: claim.metricKey,
+				claimType: claim.claimType,
+				status: claim.status,
+				participantUse: claim.participantUse,
+				participantExposure,
+				reviewState,
+				claim: claim.claim,
+				guardrail: claim.guardrail,
+				resultIds: claim.resultIds,
+				citationIds: claim.citationIds,
+				resultCount: results.length,
+				numericResultCount: results.filter(resultHasDistributionStats).length,
+				sampleLabels: uniqueStrings(samples.map((sample) => sample.label)),
+				measureLabels: uniqueStrings(measures.map((measure) => measure.label)),
+				promotionBlockers,
+				canPromoteToPublic: reviewState === 'ready_to_promote',
+				nextAction: literatureClaimNextAction(claim, reviewState),
+				promotionCommand: `bun run literature:promote ${claim.id} --status reviewed --participant-use public_prompt_ready --write`
+			};
+		});
+	});
+}
+
 export function getLiteratureExtractionExportFor(extractions: StructuredLiteratureExtraction[]) {
 	const validations = validateLiteratureExtractions(extractions);
 
@@ -670,6 +904,7 @@ export function getLiteratureExtractionExportFor(extractions: StructuredLiteratu
 		schemaVersion: 1,
 		summary: summarizeLiteratureExtractions(extractions),
 		validations,
+		reviewQueue: literatureClaimReviewQueueFrom(extractions),
 		extractions
 	};
 }

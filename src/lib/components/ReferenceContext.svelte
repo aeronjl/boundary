@@ -39,6 +39,19 @@
 	$: distributionFigures = serverContext?.figures ?? [];
 	$: taskRecommendations = serverContext?.recommendations ?? [];
 	$: literatureClaims = serverContext?.literatureClaims ?? [];
+	$: storyFigures = distributionFigures.filter(
+		(figure) => comparisonByKey.get(figure.metricKey)?.state === 'comparable'
+	);
+	$: storyMetricKeys = new Set(storyFigures.map((figure) => figure.metricKey));
+	$: remainingDistributionFigures = distributionFigures.filter(
+		(figure) => !storyMetricKeys.has(figure.metricKey)
+	);
+	$: remainingInterpretationPrompts = interpretationPrompts.filter(
+		(prompt) => !storyMetricKeys.has(prompt.metricKey)
+	);
+	$: remainingLiteratureClaims = literatureClaims.filter(
+		(claim) => !storyMetricKeys.has(claim.metricKey)
+	);
 	$: if (mounted) {
 		void loadComparison(metricsRequestKey);
 	}
@@ -158,6 +171,26 @@
 	function formatZScore(value: number) {
 		return `${value >= 0 ? '+' : ''}${value.toFixed(2)} SD`;
 	}
+
+	function sourceLine(comparison: ReferenceComparison | undefined): string {
+		if (!comparison) return '';
+
+		const source =
+			comparison.referenceSourceCitation ?? comparison.datasetName ?? 'reviewed source';
+		const cohort = comparison.referenceCohortLabel ?? 'reference cohort';
+		const sampleSize = comparison.referenceCohortSampleSize ?? comparison.datasetSampleSize;
+		const sampleText = sampleSize ? `, n=${sampleSize}` : '';
+
+		return `${source}: ${cohort}${sampleText}`;
+	}
+
+	function claimForMetric(metricKey: string) {
+		return literatureClaims.find((claim) => claim.metricKey === metricKey);
+	}
+
+	function promptForMetric(metricKey: string) {
+		return interpretationPrompts.find((prompt) => prompt.metricKey === metricKey);
+	}
 </script>
 
 <section class="mt-6">
@@ -200,6 +233,123 @@
 			</p>
 		</div>
 	</div>
+
+	{#if storyFigures.length > 0}
+		<div class="mt-4 border-t border-gray-200 pt-3">
+			<h4 class="font-medium">Reference interpretation</h4>
+			<ul class="mt-2 space-y-4">
+				{#each storyFigures as figure (figure.id)}
+					{@const comparison = comparisonByKey.get(figure.metricKey)}
+					{@const claim = claimForMetric(figure.metricKey)}
+					{@const prompt = promptForMetric(figure.metricKey)}
+					<li class="border-l-2 border-green-500 py-1 pl-3">
+						<div class="grid gap-4 md:grid-cols-[minmax(0,1fr)_240px]">
+							<div>
+								<div class="flex flex-wrap items-center gap-2">
+									<p class="text-xs text-gray-500">{figure.label}</p>
+									<span class="rounded-sm bg-green-50 px-2 py-1 text-xs text-green-800">
+										Reviewed comparison
+									</span>
+								</div>
+								<p class="mt-1 font-serif text-2xl">{formatPercentile(figure.percentile)}</p>
+								<p class="mt-1 text-gray-700">{comparisonLabel(comparison)}</p>
+								{#if claim}
+									<p class="mt-2 text-gray-600">{claim.body}</p>
+								{:else if prompt}
+									<p class="mt-2 text-gray-600">{prompt.body}</p>
+								{/if}
+								<div class="mt-3 grid grid-cols-2 gap-2 text-xs md:grid-cols-4">
+									<div>
+										<p class="text-gray-500">This run</p>
+										<p class="font-medium">
+											{formatReferenceValue(figure.currentValue, figure.unit)}
+										</p>
+									</div>
+									<div>
+										<p class="text-gray-500">Reference mean</p>
+										<p class="font-medium">
+											{formatReferenceValue(figure.referenceMean, figure.unit)}
+										</p>
+									</div>
+									<div>
+										<p class="text-gray-500">Distance</p>
+										<p class="font-medium">{formatZScore(figure.zScore)}</p>
+									</div>
+									<div>
+										<p class="text-gray-500">Evidence</p>
+										<p class="font-medium">
+											{figure.source === 'imported_bins' ? 'Binned data' : 'Summary stats'}
+										</p>
+									</div>
+								</div>
+								<p class="mt-3 text-xs text-gray-500">{sourceLine(comparison)}</p>
+								<p class="mt-1 text-xs text-gray-500">
+									{claim?.caveat ?? prompt?.caveat ?? figure.caveat}
+								</p>
+								{#if figure.sourceCitation && figure.sourceUrl}
+									<!-- eslint-disable svelte/no-navigation-without-resolve -->
+									<a
+										class="mt-1 inline-block text-xs underline"
+										href={figure.sourceUrl}
+										rel="noreferrer"
+										target="_blank"
+									>
+										{figure.sourceCitation}
+									</a>
+									<!-- eslint-enable svelte/no-navigation-without-resolve -->
+								{/if}
+							</div>
+							<div>
+								<div class="relative h-28 border-b border-l border-gray-200">
+									<svg
+										aria-label={`${figure.label} reference distribution`}
+										class="h-full w-full overflow-visible"
+										preserveAspectRatio="none"
+										role="img"
+										viewBox="0 0 100 52"
+									>
+										<title>{figure.title}</title>
+										{#each figure.bins as bin (bin.index)}
+											<rect
+												class="text-gray-300"
+												fill="currentColor"
+												height={bin.height * 42}
+												width={Math.max(0.8, bin.width * 100 - 0.5)}
+												x={bin.xPosition * 100}
+												y={48 - bin.height * 42}
+											/>
+										{/each}
+										<line
+											class="text-gray-500"
+											stroke="currentColor"
+											stroke-dasharray="2 2"
+											stroke-width="0.8"
+											x1={figure.meanMarkerPosition * 100}
+											x2={figure.meanMarkerPosition * 100}
+											y1="5"
+											y2="50"
+										/>
+										<line
+											class="text-black"
+											stroke="currentColor"
+											stroke-width="1.2"
+											x1={figure.currentMarkerPosition * 100}
+											x2={figure.currentMarkerPosition * 100}
+											y1="0"
+											y2="50"
+										/>
+									</svg>
+								</div>
+								<p class="mt-2 text-[11px] text-gray-500">
+									Black marker: this run. Dashed marker: reference mean.
+								</p>
+							</div>
+						</div>
+					</li>
+				{/each}
+			</ul>
+		</div>
+	{/if}
 
 	{#if context.metrics.length > 0}
 		<div class="mt-4 overflow-x-auto">
@@ -246,11 +396,11 @@
 		</div>
 	{/if}
 
-	{#if distributionFigures.length > 0}
+	{#if remainingDistributionFigures.length > 0}
 		<div class="mt-4 border-t border-gray-200 pt-3">
 			<h4 class="font-medium">Reference distributions</h4>
 			<ul class="mt-2 space-y-3">
-				{#each distributionFigures as figure (figure.id)}
+				{#each remainingDistributionFigures as figure (figure.id)}
 					<li class="border-l-2 border-gray-200 py-1 pl-3">
 						<div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
 							<div>
@@ -350,11 +500,11 @@
 		</div>
 	{/if}
 
-	{#if interpretationPrompts.length > 0}
+	{#if remainingInterpretationPrompts.length > 0}
 		<div class="mt-4 border-t border-gray-200 pt-3">
 			<h4 class="font-medium">Source-backed prompts</h4>
 			<ul class="mt-2 space-y-2">
-				{#each interpretationPrompts as prompt (prompt.metricKey)}
+				{#each remainingInterpretationPrompts as prompt (prompt.metricKey)}
 					<li class="border-l-2 border-gray-200 py-1 pl-3">
 						<p class="font-medium">{prompt.title}</p>
 						<p class="mt-1 text-gray-600">{prompt.body}</p>
@@ -377,11 +527,11 @@
 		</div>
 	{/if}
 
-	{#if literatureClaims.length > 0}
+	{#if remainingLiteratureClaims.length > 0}
 		<div class="mt-4 border-t border-gray-200 pt-3">
 			<h4 class="font-medium">Reviewed literature comparisons</h4>
 			<ul class="mt-2 space-y-2">
-				{#each literatureClaims as claim (claim.id)}
+				{#each remainingLiteratureClaims as claim (claim.id)}
 					<li class="border-l-2 border-gray-200 py-1 pl-3">
 						<p class="font-medium">{claim.title}</p>
 						<p class="mt-1 text-gray-600">{claim.body}</p>

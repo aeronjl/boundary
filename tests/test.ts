@@ -137,8 +137,12 @@ async function completeNBackRun(page: Page) {
 	await expect(page.getByText('Signal sensitivity')).toBeVisible();
 	await expect(page.getByRole('heading', { name: 'Reference context' })).toBeVisible();
 	await expect(page.getByText('Ready').first()).toBeVisible();
-	await expect(page.getByText('Reviewed literature comparisons')).toBeVisible();
+	await expect(page.getByText('Reference interpretation')).toBeVisible();
+	await expect(page.getByText('Reviewed comparison')).toBeVisible();
 	await expect(page.getByText('healthy-control 2-back accuracy distribution')).toBeVisible();
+	await expect(
+		page.getByText('Black marker: this run. Dashed marker: reference mean.')
+	).toBeVisible();
 }
 
 test('index page has expected h1', async ({ page }) => {

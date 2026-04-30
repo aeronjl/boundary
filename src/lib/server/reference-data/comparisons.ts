@@ -17,6 +17,11 @@ import {
 	type ReferenceComparisonState
 } from '$lib/reference-data/comparison';
 import { participantLiteratureClaimsForExperiment } from '$lib/reference-data/literature';
+import {
+	hasComparableReferenceDataset,
+	hasUsableReferenceStats,
+	isReferenceComparisonReady
+} from '$lib/reference-data/readiness';
 import { db } from '$lib/server/db';
 import {
 	referenceCohorts,
@@ -44,44 +49,21 @@ type MetricReference = {
 	distributionBins: ReferenceDistributionBin[];
 };
 
-const comparableDatasetCompatibilities = new Set(['compatible', 'partial']);
-
 function toMetricValue(value: number | null | undefined): number | null {
 	return value !== null && value !== undefined && Number.isFinite(value) ? value : null;
 }
 
-function hasComparableDataset(dataset: ReferenceDatasetRow): boolean {
-	return (
-		dataset.status === 'validated' && comparableDatasetCompatibilities.has(dataset.compatibility)
-	);
-}
-
-function hasUsableStats(metric: ReferenceMetricRow): boolean {
-	return (
-		metric.mean !== null &&
-		Number.isFinite(metric.mean) &&
-		metric.standardDeviation !== null &&
-		Number.isFinite(metric.standardDeviation) &&
-		metric.standardDeviation > 0
-	);
-}
-
-function hasReviewedMapping(reference: MetricReference): boolean {
-	return (
-		reference.mapping?.extractionStatus === 'reviewed' &&
-		reference.mapping.sourceMetric.trim().length > 0 &&
-		reference.sourceColumns.length > 0 &&
-		reference.mapping.transformation.trim().length > 0 &&
-		reference.mapping.notes.trim().length > 0
-	);
-}
-
 function hasReadyReference(reference: MetricReference): boolean {
-	return (
-		hasComparableDataset(reference.dataset) &&
-		hasUsableStats(reference.metric) &&
-		hasReviewedMapping(reference)
-	);
+	return isReferenceComparisonReady({
+		dataset: reference.dataset,
+		metric: reference.metric,
+		mapping: reference.mapping
+			? {
+					...reference.mapping,
+					sourceColumns: reference.sourceColumns
+				}
+			: null
+	});
 }
 
 function sourceColumnsValue(value: string): string[] {
@@ -255,10 +237,12 @@ function createMetricComparison(
 		cohortsById,
 		mappingsByMetricId
 	);
-	const comparableReferences = references.filter(({ dataset }) => hasComparableDataset(dataset));
+	const comparableReferences = references.filter(({ dataset }) =>
+		hasComparableReferenceDataset(dataset)
+	);
 	const firstComparableReference = comparableReferences[0] ?? null;
 	const firstComparableReferenceWithStats =
-		comparableReferences.find(({ metric }) => hasUsableStats(metric)) ?? null;
+		comparableReferences.find(({ metric }) => hasUsableReferenceStats(metric)) ?? null;
 
 	if (references.length === 0) {
 		return emptyComparison(contract, currentValue, 'not_registered', null);

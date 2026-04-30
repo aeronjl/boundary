@@ -40,6 +40,10 @@ import {
 	openFmriNBackSummaryTargets
 } from '$lib/reference-data/openfmri-nback-extractor';
 import { crossTaskRelationshipsForMetric } from '$lib/reference-data/relationships';
+import {
+	isReferenceComparisonReady,
+	referenceComparisonBlockers
+} from '$lib/reference-data/readiness';
 import { createReferenceContext } from '$lib/reference-data/summary';
 import { calculateNBackSignalDetectionMetrics, type NBackResult } from '$lib/experiments/n-back';
 import { createNBackInterpretation } from '$lib/experiments/n-back-interpretation';
@@ -219,6 +223,45 @@ describe('reference data contracts', () => {
 		expect(context.validatedDatasetCount).toBe(0);
 		expect(
 			context.metrics.find((metric) => metric.metricKey === 'accuracy')?.hasCandidateDataset
+		).toBe(true);
+	});
+
+	it('reports blockers before a reference metric can be participant-facing', () => {
+		expect(
+			referenceComparisonBlockers({
+				dataset: { status: 'candidate', compatibility: 'incompatible' },
+				metric: { mean: 0.8, standardDeviation: 0 },
+				mapping: {
+					extractionStatus: 'candidate',
+					sourceMetric: '',
+					sourceColumns: [],
+					transformation: '',
+					notes: ''
+				}
+			})
+		).toEqual([
+			'Dataset is candidate.',
+			'Compatibility is incompatible.',
+			'Mean and positive SD are required.',
+			'Mapping is candidate.',
+			'Source metric is missing.',
+			'Source columns are missing.',
+			'Transformation is missing.',
+			'Mapping review note is missing.'
+		]);
+
+		expect(
+			isReferenceComparisonReady({
+				dataset: { status: 'validated', compatibility: 'partial' },
+				metric: { mean: 0.8, standardDeviation: 0.1 },
+				mapping: {
+					extractionStatus: 'reviewed',
+					sourceMetric: 'accuracy',
+					sourceColumns: ['nback2_nont', 'nback2_targ'],
+					transformation: 'Mean of target and non-target accuracy.',
+					notes: 'Reviewed against participants.tsv columns.'
+				}
+			})
 		).toBe(true);
 	});
 

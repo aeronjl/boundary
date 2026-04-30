@@ -808,6 +808,11 @@ test('admin can inspect and export ten item personality inventory data', async (
 		page.getByText('OpenfMRI ds000115 n-back schizophrenia participants').first()
 	).toBeVisible();
 	await expect(page.getByText('Metric contracts', { exact: true })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Comparison readiness' })).toBeVisible();
+	await expect(page.getByText('Ready metrics')).toBeVisible();
+	await expect(page.getByText('Blocked metrics')).toBeVisible();
+	await expect(page.getByText('Dataset is candidate.').first()).toBeVisible();
+	await expect(page.getByText('Mapping is candidate.').first()).toBeVisible();
 	await expect(page.getByText('Imported reference summary').first()).toBeVisible();
 	await expect(page.getByText('Imported n=98 from nback2_nont, nback2_targ')).toBeVisible();
 	await expect(page.getByText(/Extractor check:\s*(passed|failed|unknown)/).first()).toBeVisible();
@@ -942,6 +947,23 @@ test('admin can inspect and export ten item personality inventory data', async (
 	const referenceJsonResponse = await page.request.get('/admin/references/export.json');
 	expect(referenceJsonResponse.status()).toBe(200);
 	const referenceJson = await referenceJsonResponse.json();
+	expect(referenceJson.readiness).toMatchObject({
+		totalMetricCount: expect.any(Number),
+		readyMetricCount: expect.any(Number),
+		blockedMetricCount: expect.any(Number)
+	});
+	const exportedReadinessItems = referenceJson.readiness.experiments.flatMap(
+		(experiment: { items: { metricId: string; status: string; blockers: string[] }[] }) =>
+			experiment.items
+	);
+	expect(
+		exportedReadinessItems.find(
+			(item: { metricId: string }) => item.metricId === 'openfmri-ds000115-nback-accuracy'
+		)
+	).toMatchObject({
+		status: 'blocked',
+		blockers: expect.arrayContaining(['Dataset is candidate.'])
+	});
 	const exportedDataset = referenceJson.datasets.find(
 		(dataset: { id: string }) => dataset.id === 'openfmri-ds000115-nback'
 	);
@@ -961,7 +983,9 @@ test('admin can inspect and export ten item personality inventory data', async (
 	expect(referenceCsvResponse.status()).toBe(200);
 	const referenceCsv = await referenceCsvResponse.text();
 	expect(referenceCsv).toContain('"mapping_source_metric"');
+	expect(referenceCsv).toContain('"comparison_ready"');
 	expect(referenceCsv).toContain('"pilot_accuracy"');
+	expect(referenceCsv).toContain('"Dataset is candidate."');
 
 	const validateForm = page.locator(
 		'form[aria-label="Validate reference dataset OpenfMRI ds000115 working-memory task data"]'

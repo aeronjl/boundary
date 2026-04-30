@@ -22,6 +22,11 @@ import {
 	openFmriNBackParticipantsSha256,
 	openFmriNBackParticipantsUrl
 } from '$lib/reference-data/openfmri-nback-extractor';
+import {
+	hasReviewedReferenceMapping as hasReviewedReferenceMappingFields,
+	hasUsableReferenceStats as hasUsableReferenceStatsFields,
+	referenceComparisonBlockers
+} from '$lib/reference-data/readiness';
 import { db } from '$lib/server/db';
 import {
 	referenceCohorts,
@@ -102,6 +107,39 @@ export type AdminReferenceDataset = typeof referenceDatasets.$inferSelect & {
 	metrics: AdminReferenceMetric[];
 	importMetadata: AdminReferenceDatasetImport | null;
 	artifactCheck: AdminReferenceArtifactCheck | null;
+};
+
+export type AdminReferenceReadinessItem = {
+	id: string;
+	experimentSlug: string;
+	datasetId: string;
+	datasetName: string;
+	datasetStatus: string;
+	datasetCompatibility: string;
+	sourceCitation: string | null;
+	metricId: string;
+	metricKey: string;
+	metricLabel: string;
+	cohortId: string | null;
+	cohortLabel: string | null;
+	mappingStatus: string | null;
+	status: 'ready' | 'blocked';
+	blockers: string[];
+};
+
+export type AdminReferenceReadinessExperiment = {
+	experimentSlug: string;
+	totalMetricCount: number;
+	readyMetricCount: number;
+	blockedMetricCount: number;
+	items: AdminReferenceReadinessItem[];
+};
+
+export type AdminReferenceReadiness = {
+	totalMetricCount: number;
+	readyMetricCount: number;
+	blockedMetricCount: number;
+	experiments: AdminReferenceReadinessExperiment[];
 };
 
 export type AdminSetReferenceDatasetInput = {
@@ -515,25 +553,18 @@ async function openFmriReferenceArtifactCheck(): Promise<AdminReferenceArtifactC
 }
 
 function hasUsableReferenceStats(metric: typeof referenceMetrics.$inferSelect): boolean {
-	return (
-		metric.mean !== null &&
-		Number.isFinite(metric.mean) &&
-		metric.standardDeviation !== null &&
-		Number.isFinite(metric.standardDeviation) &&
-		metric.standardDeviation > 0
-	);
+	return hasUsableReferenceStatsFields(metric);
 }
 
 function hasReviewedReferenceMapping(
 	mapping: typeof referenceMetricMappings.$inferSelect | undefined
 ): boolean {
-	return (
-		mapping?.extractionStatus === 'reviewed' &&
-		trimmed(mapping.sourceMetric).length > 0 &&
-		sourceColumnsValue(mapping.sourceColumnsJson).length > 0 &&
-		trimmed(mapping.transformation).length > 0 &&
-		trimmed(mapping.notes).length > 0
-	);
+	if (!mapping) return false;
+
+	return hasReviewedReferenceMappingFields({
+		...mapping,
+		sourceColumns: sourceColumnsValue(mapping.sourceColumnsJson)
+	});
 }
 
 function validateMappingReviewFields(
@@ -619,9 +650,73 @@ async function validateReferenceReview(
 	return { ok: true };
 }
 
+function adminReferenceReadinessItem(
+	dataset: AdminReferenceDataset,
+	metric: AdminReferenceMetric
+): AdminReferenceReadinessItem {
+	const cohort =
+		dataset.cohorts.find((candidate) => candidate.id === metric.mapping?.referenceCohortId) ?? null;
+	const blockers = referenceComparisonBlockers({
+		dataset,
+		metric,
+		mapping: metric.mapping
+			? {
+					...metric.mapping,
+					sourceColumns: metric.mapping.sourceColumns
+				}
+			: null
+	});
+
+	return {
+		id: `${dataset.id}:${metric.id}`,
+		experimentSlug: dataset.experimentSlug,
+		datasetId: dataset.id,
+		datasetName: dataset.name,
+		datasetStatus: dataset.status,
+		datasetCompatibility: dataset.compatibility,
+		sourceCitation: dataset.study?.shortCitation ?? null,
+		metricId: metric.id,
+		metricKey: metric.metricKey,
+		metricLabel: metric.label,
+		cohortId: cohort?.id ?? null,
+		cohortLabel: cohort?.label ?? null,
+		mappingStatus: metric.mapping?.extractionStatus ?? null,
+		status: blockers.length === 0 ? 'ready' : 'blocked',
+		blockers
+	};
+}
+
+function buildAdminReferenceReadiness(datasets: AdminReferenceDataset[]): AdminReferenceReadiness {
+	const items = datasets.flatMap((dataset) =>
+		dataset.metrics.map((metric) => adminReferenceReadinessItem(dataset, metric))
+	);
+	const experimentSlugs = [...new Set(items.map((item) => item.experimentSlug))].sort();
+	const experiments = experimentSlugs.map((experimentSlug) => {
+		const experimentItems = items.filter((item) => item.experimentSlug === experimentSlug);
+		const readyMetricCount = experimentItems.filter((item) => item.status === 'ready').length;
+
+		return {
+			experimentSlug,
+			totalMetricCount: experimentItems.length,
+			readyMetricCount,
+			blockedMetricCount: experimentItems.length - readyMetricCount,
+			items: experimentItems
+		};
+	});
+	const readyMetricCount = items.filter((item) => item.status === 'ready').length;
+
+	return {
+		totalMetricCount: items.length,
+		readyMetricCount,
+		blockedMetricCount: items.length - readyMetricCount,
+		experiments
+	};
+}
+
 export async function listAdminReferenceRegistry(): Promise<{
 	studies: AdminReferenceStudy[];
 	datasets: AdminReferenceDataset[];
+	readiness: AdminReferenceReadiness;
 	metricContractCount: number;
 	metricCount: number;
 	datasetStatuses: typeof referenceDatasetStatuses;
@@ -676,16 +771,19 @@ export async function listAdminReferenceRegistry(): Promise<{
 		metricsByDatasetId.set(metric.referenceDatasetId, existing);
 	}
 
+	const adminDatasets = datasets.map((dataset) => ({
+		...dataset,
+		study: dataset.referenceStudyId ? (studyById.get(dataset.referenceStudyId) ?? null) : null,
+		cohorts: cohortsByDatasetId.get(dataset.id) ?? [],
+		metrics: metricsByDatasetId.get(dataset.id) ?? [],
+		importMetadata: datasetImportMetadata(dataset.metricSummaryJson),
+		artifactCheck: openFmriReferenceDatasetIds.has(dataset.id) ? openFmriArtifactCheck : null
+	}));
+
 	return {
 		studies,
-		datasets: datasets.map((dataset) => ({
-			...dataset,
-			study: dataset.referenceStudyId ? (studyById.get(dataset.referenceStudyId) ?? null) : null,
-			cohorts: cohortsByDatasetId.get(dataset.id) ?? [],
-			metrics: metricsByDatasetId.get(dataset.id) ?? [],
-			importMetadata: datasetImportMetadata(dataset.metricSummaryJson),
-			artifactCheck: openFmriReferenceDatasetIds.has(dataset.id) ? openFmriArtifactCheck : null
-		})),
+		datasets: adminDatasets,
+		readiness: buildAdminReferenceReadiness(adminDatasets),
 		metricContractCount: referenceMetricContracts.length,
 		metricCount: metrics.length,
 		datasetStatuses: referenceDatasetStatuses,
@@ -728,9 +826,16 @@ export async function getAdminReferenceRegistryCsv(): Promise<string> {
 		'mapping_source_metric',
 		'mapping_source_columns',
 		'mapping_direction',
-		'mapping_extraction_status'
+		'mapping_extraction_status',
+		'comparison_ready',
+		'comparison_blockers'
 	];
 	const rows = [headers.map(csvCell).join(',')];
+	const readinessByMetricId = new Map(
+		registry.readiness.experiments.flatMap((experiment) =>
+			experiment.items.map((item): [string, AdminReferenceReadinessItem] => [item.metricId, item])
+		)
+	);
 
 	for (const dataset of registry.datasets) {
 		for (const metric of dataset.metrics) {
@@ -738,6 +843,7 @@ export async function getAdminReferenceRegistryCsv(): Promise<string> {
 				dataset.cohorts.find((candidate) => candidate.id === metric.mapping?.referenceCohortId) ??
 				dataset.cohorts[0] ??
 				null;
+			const readiness = readinessByMetricId.get(metric.id);
 
 			rows.push(
 				[
@@ -760,7 +866,9 @@ export async function getAdminReferenceRegistryCsv(): Promise<string> {
 					metric.mapping?.sourceMetric,
 					metric.mapping?.sourceColumns.join('|'),
 					metric.mapping?.direction,
-					metric.mapping?.extractionStatus
+					metric.mapping?.extractionStatus,
+					readiness?.status === 'ready',
+					readiness?.blockers.join(' ')
 				]
 					.map(csvCell)
 					.join(',')

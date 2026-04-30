@@ -17,6 +17,8 @@
 	const formatColumnsInput = (value: string[]) => value.join(', ');
 	const shortHash = (value: string) => (value.length > 12 ? `${value.slice(0, 12)}...` : value);
 	const formatBinning = (value: string) => value.replaceAll('_', '-');
+	const formatBlockers = (blockers: string[]) =>
+		blockers.length > 0 ? blockers.join(' ') : 'Ready for participant comparisons.';
 </script>
 
 <svelte:head>
@@ -77,6 +79,87 @@
 			Export CSV
 		</a>
 	</div>
+
+	<section aria-label="Reference comparison readiness">
+		<div>
+			<h2 class="font-serif text-2xl">Comparison readiness</h2>
+			<p class="mt-1 max-w-2xl text-gray-500">
+				Participant-facing comparison eligibility by experiment, dataset, cohort, and metric.
+			</p>
+		</div>
+		<div class="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
+			<div class="border-t border-gray-200 py-3">
+				<p class="text-xs text-gray-500">Ready metrics</p>
+				<p class="font-serif text-2xl">{data.readiness.readyMetricCount}</p>
+			</div>
+			<div class="border-t border-gray-200 py-3">
+				<p class="text-xs text-gray-500">Blocked metrics</p>
+				<p class="font-serif text-2xl">{data.readiness.blockedMetricCount}</p>
+			</div>
+			<div class="border-t border-gray-200 py-3">
+				<p class="text-xs text-gray-500">Total metrics</p>
+				<p class="font-serif text-2xl">{data.readiness.totalMetricCount}</p>
+			</div>
+			<div class="border-t border-gray-200 py-3">
+				<p class="text-xs text-gray-500">Experiments</p>
+				<p class="font-serif text-2xl">{data.readiness.experiments.length}</p>
+			</div>
+		</div>
+		<div class="mt-3 space-y-4">
+			{#each data.readiness.experiments as experiment (experiment.experimentSlug)}
+				<section class="border-t border-gray-200 pt-3">
+					<div class="flex flex-wrap items-baseline justify-between gap-2">
+						<h3 class="font-medium">{experiment.experimentSlug}</h3>
+						<p class="text-xs text-gray-500">
+							{experiment.readyMetricCount}/{experiment.totalMetricCount} ready
+						</p>
+					</div>
+					<div class="mt-2 overflow-x-auto">
+						<table class="w-full min-w-[900px] text-left text-xs">
+							<thead class="text-gray-500">
+								<tr>
+									<th class="py-2 pr-3 font-medium">Status</th>
+									<th class="py-2 pr-3 font-medium">Metric</th>
+									<th class="py-2 pr-3 font-medium">Dataset</th>
+									<th class="py-2 pr-3 font-medium">Cohort</th>
+									<th class="py-2 pr-3 font-medium">Mapping</th>
+									<th class="py-2 pr-3 font-medium">Blockers</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each experiment.items as item (item.id)}
+									<tr class="border-t border-gray-100">
+										<td class="py-2 pr-3">
+											<span
+												class="rounded-sm px-2 py-1 {item.status === 'ready'
+													? 'bg-green-50 text-green-800'
+													: 'bg-amber-50 text-amber-800'}"
+											>
+												{item.status}
+											</span>
+										</td>
+										<td class="py-2 pr-3">
+											<p>{item.metricLabel}</p>
+											<p class="text-gray-500">{item.metricKey}</p>
+										</td>
+										<td class="py-2 pr-3">
+											<p>{item.datasetName}</p>
+											<p class="text-gray-500">
+												{item.datasetStatus}, {item.datasetCompatibility}
+											</p>
+										</td>
+										<td class="py-2 pr-3">{item.cohortLabel ?? 'Unassigned'}</td>
+										<td class="py-2 pr-3">{item.mappingStatus ?? 'missing'}</td>
+										<td class="py-2 pr-3">{formatBlockers(item.blockers)}</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				</section>
+			{/each}
+		</div>
+	</section>
 
 	<div>
 		<h2 class="font-serif text-2xl">Registered datasets</h2>

@@ -14,7 +14,7 @@
 		"format": "prettier --write .",
 		"test:integration": "playwright test",
 		"test:unit": "vitest",
-		"ci": "bun run check && bun run literature:validate && bun run lint && bun run test && bun run scenario:matrix && bun run build",
+		"ci": "bun run check && bun run literature:validate && bun run lint && bun run test && bun run scenario:matrix:ci && bun run build",
 		"db:generate": "drizzle-kit generate",
 		"db:migrate": "bun run scripts/db-migrate.ts",
 		"db:seed": "bun run scripts/db-seed.ts",
@@ -29,7 +29,8 @@
 		"reference:import:nback": "bun run reference:import static/reference-data/n-back/openfmri-ds000115-summary.json static/reference-data/n-back/openfmri-ds000115-summary-con.json static/reference-data/n-back/openfmri-ds000115-summary-con-sib.json static/reference-data/n-back/openfmri-ds000115-summary-scz.json static/reference-data/n-back/openfmri-ds000115-summary-scz-sib.json",
 		"reference:review:nback": "bun run scripts/reference-review-openfmri-nback.ts",
 		"scenario:regression": "bun run scripts/policy-scenario-regression.ts",
-		"scenario:matrix": "bun run scripts/policy-scenario-matrix.ts"
+		"scenario:matrix": "bun run scripts/policy-scenario-matrix.ts",
+		"scenario:matrix:ci": "bun run scripts/policy-scenario-ci.ts"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",

@@ -5,6 +5,7 @@ node_modules
 /package
 /test-results
 /playwright-report
+artifacts
 /.vercel
 /data
 .env

@@ -107,6 +107,9 @@ bun run preview
 bun run check
 bun run lint
 bun run test
+bun run ci
 ```
 
 Playwright integration tests build and preview the app automatically on port `4174`.
+`bun run ci` also runs the policy scenario matrix against a throwaway local SQLite
+database and writes `artifacts/policy-scenario-export.json` for CI debugging.

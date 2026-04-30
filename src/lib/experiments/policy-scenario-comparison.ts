@@ -25,6 +25,20 @@ export type PolicyScenarioEpochSummary = {
 	meanResponseTimeMs: number | null;
 };
 
+export type PolicyScenarioPhaseSummary = {
+	phase: string;
+	choiceCount: number;
+	delayedChoiceCount: number;
+	delayedChoiceRate: number | null;
+	bestArmSelectionCount: number | null;
+	bestArmSelectionRate: number | null;
+	totalReward: number | null;
+	rewardRate: number | null;
+	meanLaterNetAdvantage: number | null;
+	meanMinimumLaterAdvantage: number | null;
+	meanResponseTimeMs: number | null;
+};
+
 export type PolicyScenarioRunSummary = {
 	runId: string;
 	experimentSlug: string;
@@ -37,8 +51,13 @@ export type PolicyScenarioRunSummary = {
 	delayedChoiceCount: number;
 	delayedChoiceRate: number | null;
 	totalDelaySeconds: number;
-	netGain: number;
+	netGain: number | null;
 	finalWealth: number | null;
+	totalReward: number | null;
+	rewardRate: number | null;
+	bestArmSelectionCount: number | null;
+	bestArmSelectionRate: number | null;
+	sampledArmCount: number | null;
 	meanResponseTimeMs: number | null;
 };
 
@@ -53,8 +72,12 @@ export type PolicyScenarioSummary = {
 	meanNetGain: number | null;
 	meanFinalWealth: number | null;
 	meanTotalDelaySeconds: number | null;
+	meanRewardRate: number | null;
+	meanBestArmSelectionRate: number | null;
+	meanSampledArmCount: number | null;
 	meanResponseTimeMs: number | null;
 	epochSummaries: PolicyScenarioEpochSummary[];
+	phaseSummaries: PolicyScenarioPhaseSummary[];
 	runs: PolicyScenarioRunSummary[];
 };
 
@@ -71,11 +94,15 @@ type PolicyScenarioChoice = {
 	scenarioId: string;
 	scenarioLabel: string;
 	experimentSlug: string;
-	epoch: IntertemporalEpoch;
-	delayed: boolean;
+	epoch: IntertemporalEpoch | null;
+	phase: string;
+	delayed: boolean | null;
 	delaySeconds: number;
-	netValue: number;
+	netValue: number | null;
 	wealthAfter: number | null;
+	reward: number | null;
+	bestArmSelected: boolean | null;
+	armId: string | null;
 	laterNetAdvantage: number | null;
 	minimumLaterAdvantage: number | null;
 	responseTimeMs: number | null;
@@ -118,23 +145,31 @@ function scenarioChoice(
 	const scenarioId = stringValue(policyScenario?.scenarioId);
 	const scenarioLabel = stringValue(policyScenario?.scenarioLabel);
 	const epoch = epochValue(policyScenario?.epoch);
+	const phase = stringValue(policyScenario?.phase) ?? epoch;
 
-	if (!scenarioId || !scenarioLabel || !epoch) return null;
+	if (!scenarioId || !scenarioLabel || !phase) return null;
 
 	const delaySeconds = numberValue(score?.delaySeconds) ?? 0;
 	const timeCost = numberValue(score?.timeCost) ?? 0;
 	const amount = numberValue(score?.amount) ?? 0;
-	const netValue = numberValue(score?.netValue) ?? amount - timeCost;
+	const reward = numberValue(score?.reward);
+	const selectedArmId = stringValue(policyScenario?.armId);
+	const knownBestArmId = stringValue(policyScenario?.knownBestArmId);
+	const netValue = numberValue(score?.netValue);
 
 	return {
 		scenarioId,
 		scenarioLabel,
 		experimentSlug: run.experimentSlug,
 		epoch,
-		delayed: delaySeconds > 0,
+		phase,
+		delayed: score && 'delaySeconds' in score ? delaySeconds > 0 : null,
 		delaySeconds,
-		netValue,
+		netValue: netValue ?? (score && 'amount' in score ? amount - timeCost : null),
 		wealthAfter: numberValue(score?.wealthAfter),
+		reward,
+		bestArmSelected: selectedArmId && knownBestArmId ? selectedArmId === knownBestArmId : null,
+		armId: selectedArmId,
 		laterNetAdvantage: numberValue(policyScenario?.laterNetAdvantage),
 		minimumLaterAdvantage: numberValue(policyScenario?.minimumLaterAdvantage),
 		responseTimeMs: numberValue(policyScenario?.responseTimeMs)
@@ -148,9 +183,19 @@ function createRunSummary(
 	if (choices.length === 0) return null;
 
 	const firstChoice = choices[0];
-	const delayedChoiceCount = choices.filter((choice) => choice.delayed).length;
+	const delayedChoices = choices.filter((choice) => choice.delayed !== null);
+	const delayedChoiceCount = delayedChoices.filter((choice) => choice.delayed).length;
+	const rewards = choices.flatMap((choice) => (choice.reward === null ? [] : [choice.reward]));
+	const bestArmChoices = choices.filter((choice) => choice.bestArmSelected !== null);
+	const bestArmSelectionCount = bestArmChoices.filter((choice) => choice.bestArmSelected).length;
+	const sampledArmIds = new Set(
+		choices.flatMap((choice) => (choice.armId === null ? [] : [choice.armId]))
+	);
 	const responseTimes = choices.flatMap((choice) =>
 		choice.responseTimeMs === null ? [] : [choice.responseTimeMs]
+	);
+	const netValues = choices.flatMap((choice) =>
+		choice.netValue === null ? [] : [choice.netValue]
 	);
 
 	return {
@@ -163,11 +208,19 @@ function createRunSummary(
 		completedAt: run.completedAt,
 		totalTrials: choices.length,
 		delayedChoiceCount,
-		delayedChoiceRate: ratio(delayedChoiceCount, choices.length),
+		delayedChoiceRate: ratio(delayedChoiceCount, delayedChoices.length),
 		totalDelaySeconds: choices.reduce((total, choice) => total + choice.delaySeconds, 0),
-		netGain: choices.reduce((total, choice) => total + choice.netValue, 0),
+		netGain: netValues.length > 0 ? netValues.reduce((total, value) => total + value, 0) : null,
 		finalWealth:
 			[...choices].reverse().find((choice) => choice.wealthAfter !== null)?.wealthAfter ?? null,
+		totalReward: rewards.length > 0 ? rewards.reduce((total, value) => total + value, 0) : null,
+		rewardRate:
+			rewards.length > 0
+				? rewards.reduce((total, value) => total + value, 0) / rewards.length
+				: null,
+		bestArmSelectionCount: bestArmChoices.length > 0 ? bestArmSelectionCount : null,
+		bestArmSelectionRate: ratio(bestArmSelectionCount, bestArmChoices.length),
+		sampledArmCount: sampledArmIds.size > 0 ? sampledArmIds.size : null,
 		meanResponseTimeMs: mean(responseTimes)
 	};
 }
@@ -177,13 +230,14 @@ function createEpochSummary(
 	choices: PolicyScenarioChoice[]
 ): PolicyScenarioEpochSummary {
 	const epochChoices = choices.filter((choice) => choice.epoch === epoch);
-	const delayedChoiceCount = epochChoices.filter((choice) => choice.delayed).length;
+	const delayedChoices = epochChoices.filter((choice) => choice.delayed !== null);
+	const delayedChoiceCount = delayedChoices.filter((choice) => choice.delayed).length;
 
 	return {
 		epoch,
 		choiceCount: epochChoices.length,
 		delayedChoiceCount,
-		delayedChoiceRate: ratio(delayedChoiceCount, epochChoices.length),
+		delayedChoiceRate: ratio(delayedChoiceCount, delayedChoices.length),
 		meanLaterNetAdvantage: mean(
 			epochChoices.flatMap((choice) =>
 				choice.laterNetAdvantage === null ? [] : [choice.laterNetAdvantage]
@@ -196,6 +250,45 @@ function createEpochSummary(
 		),
 		meanResponseTimeMs: mean(
 			epochChoices.flatMap((choice) =>
+				choice.responseTimeMs === null ? [] : [choice.responseTimeMs]
+			)
+		)
+	};
+}
+
+function createPhaseSummary(
+	phase: string,
+	choices: PolicyScenarioChoice[]
+): PolicyScenarioPhaseSummary {
+	const phaseChoices = choices.filter((choice) => choice.phase === phase);
+	const delayedChoices = phaseChoices.filter((choice) => choice.delayed !== null);
+	const delayedChoiceCount = delayedChoices.filter((choice) => choice.delayed).length;
+	const bestArmChoices = phaseChoices.filter((choice) => choice.bestArmSelected !== null);
+	const bestArmSelectionCount = bestArmChoices.filter((choice) => choice.bestArmSelected).length;
+	const rewards = phaseChoices.flatMap((choice) => (choice.reward === null ? [] : [choice.reward]));
+	const totalReward = rewards.reduce((total, reward) => total + reward, 0);
+
+	return {
+		phase,
+		choiceCount: phaseChoices.length,
+		delayedChoiceCount,
+		delayedChoiceRate: ratio(delayedChoiceCount, delayedChoices.length),
+		bestArmSelectionCount: bestArmChoices.length > 0 ? bestArmSelectionCount : null,
+		bestArmSelectionRate: ratio(bestArmSelectionCount, bestArmChoices.length),
+		totalReward: rewards.length > 0 ? totalReward : null,
+		rewardRate: ratio(totalReward, rewards.length),
+		meanLaterNetAdvantage: mean(
+			phaseChoices.flatMap((choice) =>
+				choice.laterNetAdvantage === null ? [] : [choice.laterNetAdvantage]
+			)
+		),
+		meanMinimumLaterAdvantage: mean(
+			phaseChoices.flatMap((choice) =>
+				choice.minimumLaterAdvantage === null ? [] : [choice.minimumLaterAdvantage]
+			)
+		),
+		meanResponseTimeMs: mean(
+			phaseChoices.flatMap((choice) =>
 				choice.responseTimeMs === null ? [] : [choice.responseTimeMs]
 			)
 		)
@@ -231,6 +324,7 @@ export function createPolicyScenarioComparison(
 				.sort((left, right) => right.startedAt - left.startedAt);
 			const choices = entries.flatMap((entry) => entry.choices);
 			const completedRuns = runsForScenario.filter((run) => run.status === 'completed');
+			const phases = [...new Set(choices.map((choice) => choice.phase))].sort();
 
 			return {
 				scenarioId,
@@ -244,17 +338,33 @@ export function createPolicyScenarioComparison(
 						run.delayedChoiceRate === null ? [] : [run.delayedChoiceRate]
 					)
 				),
-				meanNetGain: mean(runsForScenario.map((run) => run.netGain)),
+				meanNetGain: mean(
+					runsForScenario.flatMap((run) => (run.netGain === null ? [] : [run.netGain]))
+				),
 				meanFinalWealth: mean(
 					runsForScenario.flatMap((run) => (run.finalWealth === null ? [] : [run.finalWealth]))
 				),
 				meanTotalDelaySeconds: mean(runsForScenario.map((run) => run.totalDelaySeconds)),
+				meanRewardRate: mean(
+					runsForScenario.flatMap((run) => (run.rewardRate === null ? [] : [run.rewardRate]))
+				),
+				meanBestArmSelectionRate: mean(
+					runsForScenario.flatMap((run) =>
+						run.bestArmSelectionRate === null ? [] : [run.bestArmSelectionRate]
+					)
+				),
+				meanSampledArmCount: mean(
+					runsForScenario.flatMap((run) =>
+						run.sampledArmCount === null ? [] : [run.sampledArmCount]
+					)
+				),
 				meanResponseTimeMs: mean(
 					runsForScenario.flatMap((run) =>
 						run.meanResponseTimeMs === null ? [] : [run.meanResponseTimeMs]
 					)
 				),
 				epochSummaries: epochs.map((epoch) => createEpochSummary(epoch, choices)),
+				phaseSummaries: phases.map((phase) => createPhaseSummary(phase, choices)),
 				runs: runsForScenario
 			};
 		})

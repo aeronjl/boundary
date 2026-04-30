@@ -1,4 +1,4 @@
-import { asc, desc, eq } from 'drizzle-orm';
+import { asc, desc, eq, inArray } from 'drizzle-orm';
 import {
 	createPolicyScenarioComparison,
 	type PolicyScenarioComparison,
@@ -28,7 +28,7 @@ export async function getAdminPolicyScenarioComparison(): Promise<PolicyScenario
 		.innerJoin(experimentRuns, eq(experimentResponses.runId, experimentRuns.id))
 		.innerJoin(experimentVersions, eq(experimentRuns.experimentVersionId, experimentVersions.id))
 		.innerJoin(experiments, eq(experimentVersions.experimentId, experiments.id))
-		.where(eq(experimentResponses.responseType, 'intertemporal_choice'))
+		.where(inArray(experimentResponses.responseType, ['intertemporal_choice', 'bandit_arm_pull']))
 		.orderBy(desc(experimentRuns.startedAt), asc(experimentResponses.trialIndex));
 	const runsById = new Map<string, PolicyScenarioComparisonRunInput>();
 

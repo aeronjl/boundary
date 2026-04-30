@@ -12,6 +12,7 @@
 		value === null ? '-' : `${(value * 100).toFixed(0)}%`;
 	const formatPoints = (value: number | null) => (value === null ? '-' : value.toFixed(0));
 	const formatMs = (value: number | null) => (value === null ? '-' : `${value.toFixed(0)} ms`);
+	const formatLabel = (value: string) => value.replaceAll('-', ' ');
 </script>
 
 <svelte:head>
@@ -62,7 +63,7 @@
 		</p>
 	{:else}
 		<div class="overflow-x-auto border-t border-gray-200">
-			<table class="w-full min-w-[980px] text-left text-xs">
+			<table class="w-full min-w-[1160px] text-left text-xs">
 				<thead class="text-gray-500">
 					<tr>
 						<th class="py-2 pr-3 font-medium">Scenario</th>
@@ -70,9 +71,12 @@
 						<th class="py-2 pr-3 font-medium">Runs</th>
 						<th class="py-2 pr-3 font-medium">Choices</th>
 						<th class="py-2 pr-3 font-medium">Delayed rate</th>
+						<th class="py-2 pr-3 font-medium">Best-arm rate</th>
+						<th class="py-2 pr-3 font-medium">Reward rate</th>
 						<th class="py-2 pr-3 font-medium">Mean net gain</th>
 						<th class="py-2 pr-3 font-medium">Mean wealth</th>
 						<th class="py-2 pr-3 font-medium">Mean delay</th>
+						<th class="py-2 pr-3 font-medium">Sampled arms</th>
 						<th class="py-2 pr-3 font-medium">Mean RT</th>
 					</tr>
 				</thead>
@@ -87,9 +91,12 @@
 							<td class="py-2 pr-3">{summary.completedRunCount} of {summary.runCount}</td>
 							<td class="py-2 pr-3">{summary.totalChoiceCount}</td>
 							<td class="py-2 pr-3">{formatPercent(summary.meanDelayedChoiceRate)}</td>
+							<td class="py-2 pr-3">{formatPercent(summary.meanBestArmSelectionRate)}</td>
+							<td class="py-2 pr-3">{formatPercent(summary.meanRewardRate)}</td>
 							<td class="py-2 pr-3">{formatPoints(summary.meanNetGain)}</td>
 							<td class="py-2 pr-3">{formatPoints(summary.meanFinalWealth)}</td>
 							<td class="py-2 pr-3">{formatNumber(summary.meanTotalDelaySeconds)} sec</td>
+							<td class="py-2 pr-3">{formatNumber(summary.meanSampledArmCount)}</td>
 							<td class="py-2 pr-3">{formatMs(summary.meanResponseTimeMs)}</td>
 						</tr>
 					{/each}
@@ -101,26 +108,30 @@
 			<div class="border-t border-gray-200 pt-4">
 				<h2 class="font-serif text-xl">{summary.scenarioLabel}</h2>
 				<div class="mt-3 overflow-x-auto">
-					<table class="w-full min-w-[720px] text-left text-xs">
+					<table class="w-full min-w-[920px] text-left text-xs">
 						<thead class="text-gray-500">
 							<tr>
-								<th class="py-2 pr-3 font-medium">Epoch</th>
+								<th class="py-2 pr-3 font-medium">Epoch / phase</th>
 								<th class="py-2 pr-3 font-medium">Choices</th>
 								<th class="py-2 pr-3 font-medium">Delayed rate</th>
+								<th class="py-2 pr-3 font-medium">Best-arm rate</th>
+								<th class="py-2 pr-3 font-medium">Reward rate</th>
 								<th class="py-2 pr-3 font-medium">Later advantage</th>
 								<th class="py-2 pr-3 font-medium">Required premium</th>
 								<th class="py-2 pr-3 font-medium">Mean RT</th>
 							</tr>
 						</thead>
 						<tbody>
-							{#each summary.epochSummaries as epoch (epoch.epoch)}
+							{#each summary.phaseSummaries as phase (phase.phase)}
 								<tr class="border-t border-gray-100">
-									<td class="py-2 pr-3 capitalize">{epoch.epoch}</td>
-									<td class="py-2 pr-3">{epoch.choiceCount}</td>
-									<td class="py-2 pr-3">{formatPercent(epoch.delayedChoiceRate)}</td>
-									<td class="py-2 pr-3">{formatPoints(epoch.meanLaterNetAdvantage)}</td>
-									<td class="py-2 pr-3">{formatPoints(epoch.meanMinimumLaterAdvantage)}</td>
-									<td class="py-2 pr-3">{formatMs(epoch.meanResponseTimeMs)}</td>
+									<td class="py-2 pr-3 capitalize">{formatLabel(phase.phase)}</td>
+									<td class="py-2 pr-3">{phase.choiceCount}</td>
+									<td class="py-2 pr-3">{formatPercent(phase.delayedChoiceRate)}</td>
+									<td class="py-2 pr-3">{formatPercent(phase.bestArmSelectionRate)}</td>
+									<td class="py-2 pr-3">{formatPercent(phase.rewardRate)}</td>
+									<td class="py-2 pr-3">{formatPoints(phase.meanLaterNetAdvantage)}</td>
+									<td class="py-2 pr-3">{formatPoints(phase.meanMinimumLaterAdvantage)}</td>
+									<td class="py-2 pr-3">{formatMs(phase.meanResponseTimeMs)}</td>
 								</tr>
 							{/each}
 						</tbody>
@@ -128,7 +139,7 @@
 				</div>
 
 				<div class="mt-4 overflow-x-auto">
-					<table class="w-full min-w-[880px] text-left text-xs">
+					<table class="w-full min-w-[1120px] text-left text-xs">
 						<thead class="text-gray-500">
 							<tr>
 								<th class="py-2 pr-3 font-medium">Run</th>
@@ -137,6 +148,9 @@
 								<th class="py-2 pr-3 font-medium">Trials</th>
 								<th class="py-2 pr-3 font-medium">Delayed</th>
 								<th class="py-2 pr-3 font-medium">Net gain</th>
+								<th class="py-2 pr-3 font-medium">Reward rate</th>
+								<th class="py-2 pr-3 font-medium">Best-arm rate</th>
+								<th class="py-2 pr-3 font-medium">Sampled</th>
 								<th class="py-2 pr-3 font-medium">Final wealth</th>
 								<th class="py-2 pr-3 font-medium">Delay</th>
 								<th class="py-2 pr-3 font-medium">Mean RT</th>
@@ -157,6 +171,9 @@
 										{run.delayedChoiceCount} ({formatPercent(run.delayedChoiceRate)})
 									</td>
 									<td class="py-2 pr-3">{formatPoints(run.netGain)}</td>
+									<td class="py-2 pr-3">{formatPercent(run.rewardRate)}</td>
+									<td class="py-2 pr-3">{formatPercent(run.bestArmSelectionRate)}</td>
+									<td class="py-2 pr-3">{formatNumber(run.sampledArmCount)}</td>
 									<td class="py-2 pr-3">{formatPoints(run.finalWealth)}</td>
 									<td class="py-2 pr-3">{formatNumber(run.totalDelaySeconds)} sec</td>
 									<td class="py-2 pr-3">{formatMs(run.meanResponseTimeMs)}</td>

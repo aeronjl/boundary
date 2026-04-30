@@ -6,6 +6,7 @@ import {
 	type BanditArmSummary,
 	type BanditConfig,
 	type BanditOutcome,
+	type BanditPolicyChoice,
 	type BanditPullResult,
 	type BanditResult,
 	type BanditRunState
@@ -46,6 +47,10 @@ type BanditPullResponse = {
 type BanditPullScore = {
 	reward: number;
 	probability: number;
+};
+
+type BanditPullSubmissionMetadata = {
+	policyScenario?: (BanditPolicyChoice & { responseTimeMs: number }) | null;
 };
 
 function parseJson<T>(value: string): T {
@@ -208,7 +213,8 @@ export async function submitBanditPull(
 	runId: string,
 	armId: string,
 	timing: TrialSubmissionTiming = {},
-	participantSessionId?: string
+	participantSessionId?: string,
+	submissionMetadata: BanditPullSubmissionMetadata = {}
 ): Promise<BanditPullResult> {
 	const run = await getExperimentRun(runId, banditVersionId, participantSessionId);
 
@@ -273,6 +279,7 @@ export async function submitBanditPull(
 	const createdAt = Date.now();
 	const serverTrialStartedAt = await getTrialStartedAt(runId, trialIndex);
 	const timingMetadata = createTimingMetadata(timing, serverTrialStartedAt, createdAt);
+	const policyScenarioMetadata = submissionMetadata.policyScenario ?? null;
 	const outcome: BanditOutcome = {
 		trialIndex,
 		armId,
@@ -292,7 +299,8 @@ export async function submitBanditPull(
 		},
 		metadata: {
 			armLabel: arm.label,
-			timing: timingMetadata
+			timing: timingMetadata,
+			...(policyScenarioMetadata ? { policyScenario: policyScenarioMetadata } : {})
 		},
 		createdAt
 	});
@@ -306,7 +314,8 @@ export async function submitBanditPull(
 			armLabel: arm.label,
 			reward,
 			totalReward: outcome.totalReward,
-			timing: timingMetadata
+			timing: timingMetadata,
+			...(policyScenarioMetadata ? { policyScenario: policyScenarioMetadata } : {})
 		},
 		createdAt
 	});

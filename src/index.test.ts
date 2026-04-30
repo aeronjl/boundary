@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import type { BanditResult } from '$lib/experiments/bandit';
+import {
+	banditPolicyScenarios,
+	selectBanditPolicyChoice,
+	type BanditArm,
+	type BanditResult
+} from '$lib/experiments/bandit';
 import {
 	bestBanditArmSelectionRate,
 	createBanditInterpretation
@@ -148,6 +153,12 @@ describe('orientation interpretation helpers', () => {
 });
 
 describe('bandit interpretation helpers', () => {
+	const banditArms: BanditArm[] = [
+		{ id: 'arm-1', label: 'A', rewardProbability: 0.25 },
+		{ id: 'arm-2', label: 'B', rewardProbability: 0.72 },
+		{ id: 'arm-3', label: 'C', rewardProbability: 0.4 }
+	];
+
 	it('summarizes reward learning and best-arm use', () => {
 		const result: BanditResult = {
 			runId: 'run-1',
@@ -172,6 +183,71 @@ describe('bandit interpretation helpers', () => {
 		expect(interpretation.references.map((reference) => reference.id)).toEqual(
 			expect.arrayContaining(['steyvers-2009', 'green-myerson-2004', 'owen-2005'])
 		);
+	});
+
+	it('defines explicit bandit policy scenarios', () => {
+		expect(banditPolicyScenarios.map((scenario) => scenario.id)).toEqual([
+			'oracle-best-arm',
+			'round-robin-exploration',
+			'epsilon-greedy',
+			'first-arm-perseveration'
+		]);
+	});
+
+	it('selects bandit arms from policy history', () => {
+		expect(
+			selectBanditPolicyChoice('oracle-best-arm', {
+				arms: banditArms,
+				trialIndex: 0,
+				history: []
+			})
+		).toMatchObject({
+			armId: 'arm-2',
+			knownBestArmId: 'arm-2',
+			phase: 'oracle-exploit'
+		});
+		expect(
+			selectBanditPolicyChoice('round-robin-exploration', {
+				arms: banditArms,
+				trialIndex: 4,
+				history: []
+			})
+		).toMatchObject({
+			armId: 'arm-2',
+			phase: 'uniform-explore'
+		});
+		expect(
+			selectBanditPolicyChoice('epsilon-greedy', {
+				arms: banditArms,
+				trialIndex: 4,
+				history: [
+					{ trialIndex: 0, armId: 'arm-1', reward: 0 },
+					{ trialIndex: 1, armId: 'arm-2', reward: 1 },
+					{ trialIndex: 2, armId: 'arm-3', reward: 0 },
+					{ trialIndex: 3, armId: 'arm-2', reward: 1 }
+				]
+			})
+		).toMatchObject({
+			armId: 'arm-1',
+			empiricalBestArmId: 'arm-2',
+			phase: 'epsilon-explore'
+		});
+		expect(
+			selectBanditPolicyChoice('epsilon-greedy', {
+				arms: banditArms,
+				trialIndex: 5,
+				history: [
+					{ trialIndex: 0, armId: 'arm-1', reward: 0 },
+					{ trialIndex: 1, armId: 'arm-2', reward: 1 },
+					{ trialIndex: 2, armId: 'arm-3', reward: 0 },
+					{ trialIndex: 3, armId: 'arm-2', reward: 1 },
+					{ trialIndex: 4, armId: 'arm-1', reward: 0 }
+				]
+			})
+		).toMatchObject({
+			armId: 'arm-2',
+			phase: 'empirical-exploit'
+		});
 	});
 });
 
@@ -334,16 +410,49 @@ describe('policy scenario comparison helpers', () => {
 							}
 						}
 					]
+				},
+				{
+					runId: 'run-bandit',
+					experimentSlug: 'n-armed-bandit',
+					status: 'completed',
+					startedAt: 4,
+					completedAt: 5,
+					responses: [
+						{
+							trialIndex: 0,
+							score: {
+								reward: 1,
+								probability: 0.8
+							},
+							metadata: {
+								policyScenario: {
+									scenarioId: 'oracle-best-arm',
+									scenarioLabel: 'Oracle best arm',
+									phase: 'oracle-exploit',
+									armId: 'arm-2',
+									armLabel: 'B',
+									knownBestArmId: 'arm-2',
+									knownBestArmLabel: 'B',
+									knownBestArmProbability: 0.8,
+									empiricalBestArmId: null,
+									empiricalBestArmLabel: null,
+									historyPullCount: 0,
+									sampledArmCount: 0,
+									responseTimeMs: 560
+								}
+							}
+						}
+					]
 				}
 			],
 			new Date(0).toISOString()
 		);
 
 		expect(comparison).toMatchObject({
-			scenarioCount: 2,
-			runCount: 2,
-			completedRunCount: 2,
-			choiceCount: 3
+			scenarioCount: 3,
+			runCount: 3,
+			completedRunCount: 3,
+			choiceCount: 4
 		});
 
 		const epochSensitive = comparison.summaries.find(
@@ -372,6 +481,25 @@ describe('policy scenario comparison helpers', () => {
 				})
 			])
 		);
+
+		const oracleBestArm = comparison.summaries.find(
+			(summary) => summary.scenarioId === 'oracle-best-arm'
+		);
+		expect(oracleBestArm).toMatchObject({
+			runCount: 1,
+			totalChoiceCount: 1,
+			meanRewardRate: 1,
+			meanBestArmSelectionRate: 1,
+			meanSampledArmCount: 1
+		});
+		expect(oracleBestArm?.phaseSummaries).toEqual([
+			expect.objectContaining({
+				phase: 'oracle-exploit',
+				choiceCount: 1,
+				rewardRate: 1,
+				bestArmSelectionRate: 1
+			})
+		]);
 	});
 });
 

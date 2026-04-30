@@ -231,14 +231,14 @@ export const adminExperimentDictionary: AdminExperimentDictionaryEntry[] = [
 	{
 		kind: 'event',
 		name: 'policy_scenario_started',
-		source: 'intertemporal-choice',
+		source: 'policy scenarios',
 		description: 'A generated policy scenario started submitting a real run.',
 		fields: ['payload.scenarioId', 'payload.scenarioLabel', 'payload.description']
 	},
 	{
 		kind: 'event',
 		name: 'policy_scenario_completed',
-		source: 'intertemporal-choice',
+		source: 'policy scenarios',
 		description: 'A generated policy scenario completed all choices for a run.',
 		fields: ['payload.scenarioId', 'payload.scenarioLabel']
 	},
@@ -300,6 +300,8 @@ export const adminExperimentDictionary: AdminExperimentDictionaryEntry[] = [
 			'score.reward',
 			'score.probability',
 			'metadata.armLabel',
+			'metadata.policyScenario.scenarioId',
+			'metadata.policyScenario.phase',
 			'metadata.timing.responseTimeMs'
 		]
 	},

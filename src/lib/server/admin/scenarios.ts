@@ -1,9 +1,16 @@
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import {
 	createPolicyScenarioComparison,
+	createPolicyScenarioOutcomeSnapshotInputs,
 	type PolicyScenarioComparison,
+	type PolicyScenarioOutcomeSnapshotInput,
 	type PolicyScenarioComparisonRunInput
 } from '$lib/experiments/policy-scenario-comparison';
+import type {
+	ReferenceComparisonReadinessStatus,
+	ReferenceComparisonState,
+	ReferenceOutcomeTargetEvaluation
+} from '$lib/reference-data/comparison';
 import { db } from '$lib/server/db';
 import {
 	experimentResponses,
@@ -14,6 +21,7 @@ import {
 	policyScenarioBatches
 } from '$lib/server/db/schema';
 import type { JsonValue } from '$lib/server/experiments/records';
+import { getReferenceComparisonContext } from '$lib/server/reference-data/comparisons';
 
 export type AdminPolicyScenarioBatchStatus = 'started' | 'completed' | 'failed';
 
@@ -27,6 +35,62 @@ export type AdminPolicyScenarioBatch = {
 	createdAt: number;
 	updatedAt: number;
 	completedAt: number | null;
+};
+
+export type AdminPolicyScenarioOutcomeSnapshotBlocker = {
+	message: string;
+	count: number;
+};
+
+export type AdminPolicyScenarioOutcomeSnapshotTarget = Pick<
+	ReferenceOutcomeTargetEvaluation,
+	| 'id'
+	| 'metricKey'
+	| 'metricLabel'
+	| 'kind'
+	| 'label'
+	| 'participantFacing'
+	| 'status'
+	| 'blockers'
+> & {
+	currentValue: number | null;
+	comparisonState: ReferenceComparisonState;
+	readinessStatus: ReferenceComparisonReadinessStatus;
+};
+
+export type AdminPolicyScenarioOutcomeSnapshotMetric = {
+	metricKey: string;
+	label: string;
+	currentValue: number | null;
+	comparisonState: ReferenceComparisonState;
+	readinessStatus: ReferenceComparisonReadinessStatus;
+	readinessBlockers: string[];
+	targets: AdminPolicyScenarioOutcomeSnapshotTarget[];
+};
+
+export type AdminPolicyScenarioOutcomeSnapshot = Omit<
+	PolicyScenarioOutcomeSnapshotInput,
+	'metrics'
+> & {
+	metricValues: Record<string, number | null>;
+	targetCount: number;
+	readyTargetCount: number;
+	blockedTargetCount: number;
+	blockers: AdminPolicyScenarioOutcomeSnapshotBlocker[];
+	metrics: AdminPolicyScenarioOutcomeSnapshotMetric[];
+};
+
+export type AdminPolicyScenarioOutcomeSnapshotSummary = {
+	snapshotCount: number;
+	targetCount: number;
+	readyTargetCount: number;
+	blockedTargetCount: number;
+	blockers: AdminPolicyScenarioOutcomeSnapshotBlocker[];
+};
+
+export type AdminPolicyScenarioComparison = PolicyScenarioComparison & {
+	outcomeSnapshots: AdminPolicyScenarioOutcomeSnapshot[];
+	outcomeSnapshotSummary: AdminPolicyScenarioOutcomeSnapshotSummary;
 };
 
 type AdminPolicyScenarioComparisonOptions = {
@@ -54,6 +118,105 @@ function parseJson(value: string | null): unknown {
 
 function stringifyJson(value: JsonValue | undefined): string {
 	return JSON.stringify(value ?? {});
+}
+
+function outcomeSnapshotBlockers(
+	targets: AdminPolicyScenarioOutcomeSnapshotTarget[]
+): AdminPolicyScenarioOutcomeSnapshotBlocker[] {
+	const counts = new Map<string, number>();
+
+	for (const target of targets) {
+		if (target.status !== 'blocked') continue;
+
+		for (const blocker of target.blockers) {
+			counts.set(blocker, (counts.get(blocker) ?? 0) + 1);
+		}
+	}
+
+	return [...counts.entries()]
+		.map(([message, count]) => ({ message, count }))
+		.sort((left, right) => right.count - left.count || left.message.localeCompare(right.message));
+}
+
+function outcomeSnapshotSummary(
+	snapshots: AdminPolicyScenarioOutcomeSnapshot[]
+): AdminPolicyScenarioOutcomeSnapshotSummary {
+	const targets = snapshots.flatMap((snapshot) =>
+		snapshot.metrics.flatMap((metric) => metric.targets)
+	);
+
+	return {
+		snapshotCount: snapshots.length,
+		targetCount: targets.length,
+		readyTargetCount: targets.filter((target) => target.status === 'ready').length,
+		blockedTargetCount: targets.filter((target) => target.status === 'blocked').length,
+		blockers: outcomeSnapshotBlockers(targets)
+	};
+}
+
+async function createOutcomeSnapshot(
+	input: PolicyScenarioOutcomeSnapshotInput
+): Promise<AdminPolicyScenarioOutcomeSnapshot> {
+	const metricKeys = new Set(Object.keys(input.metrics));
+	const context = await getReferenceComparisonContext(input.experimentSlug, input.metrics);
+	const metrics = context.comparisons
+		.filter((comparison) => metricKeys.has(comparison.metricKey))
+		.map((comparison) => {
+			const targets = comparison.outcomeTargets.map((target) => ({
+				id: target.id,
+				metricKey: target.metricKey,
+				metricLabel: target.metricLabel,
+				kind: target.kind,
+				label: target.label,
+				participantFacing: target.participantFacing,
+				status: target.status,
+				blockers: target.blockers,
+				currentValue: comparison.currentValue,
+				comparisonState: comparison.state,
+				readinessStatus: comparison.readinessStatus
+			}));
+
+			return {
+				metricKey: comparison.metricKey,
+				label: comparison.label,
+				currentValue: comparison.currentValue,
+				comparisonState: comparison.state,
+				readinessStatus: comparison.readinessStatus,
+				readinessBlockers: comparison.readinessBlockers,
+				targets
+			};
+		});
+	const targets = metrics.flatMap((metric) => metric.targets);
+
+	return {
+		id: input.id,
+		scenarioId: input.scenarioId,
+		scenarioLabel: input.scenarioLabel,
+		experimentSlug: input.experimentSlug,
+		scope: input.scope,
+		scopeKey: input.scopeKey,
+		scopeLabel: input.scopeLabel,
+		metricValues: input.metrics,
+		targetCount: targets.length,
+		readyTargetCount: targets.filter((target) => target.status === 'ready').length,
+		blockedTargetCount: targets.filter((target) => target.status === 'blocked').length,
+		blockers: outcomeSnapshotBlockers(targets),
+		metrics
+	};
+}
+
+async function withOutcomeSnapshots(
+	comparison: PolicyScenarioComparison
+): Promise<AdminPolicyScenarioComparison> {
+	const outcomeSnapshots = await Promise.all(
+		createPolicyScenarioOutcomeSnapshotInputs(comparison.summaries).map(createOutcomeSnapshot)
+	);
+
+	return {
+		...comparison,
+		outcomeSnapshots,
+		outcomeSnapshotSummary: outcomeSnapshotSummary(outcomeSnapshots)
+	};
 }
 
 function toBatchStatus(value: string): AdminPolicyScenarioBatchStatus {
@@ -191,7 +354,7 @@ export async function updateAdminPolicyScenarioBatchStatus(
 
 export async function getAdminPolicyScenarioComparison({
 	batchId = null
-}: AdminPolicyScenarioComparisonOptions = {}): Promise<PolicyScenarioComparison> {
+}: AdminPolicyScenarioComparisonOptions = {}): Promise<AdminPolicyScenarioComparison> {
 	const batchRunIds = batchId
 		? (
 				await db
@@ -202,7 +365,7 @@ export async function getAdminPolicyScenarioComparison({
 		: null;
 
 	if (batchRunIds && batchRunIds.length === 0) {
-		return createPolicyScenarioComparison([]);
+		return withOutcomeSnapshots(createPolicyScenarioComparison([]));
 	}
 
 	const rows = await db
@@ -247,5 +410,5 @@ export async function getAdminPolicyScenarioComparison({
 		runsById.set(row.run.id, run);
 	}
 
-	return createPolicyScenarioComparison([...runsById.values()]);
+	return withOutcomeSnapshots(createPolicyScenarioComparison([...runsById.values()]));
 }

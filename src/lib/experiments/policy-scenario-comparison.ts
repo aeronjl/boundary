@@ -1,5 +1,11 @@
-import type { IntertemporalEpoch } from './intertemporal';
-import { estimateOrientationThresholdDegrees, summarizeOrientationMagnitudes } from './orientation';
+import { banditExperimentSlug } from './bandit';
+import { intertemporalExperimentSlug, type IntertemporalEpoch } from './intertemporal';
+import { calculateNBackSignalDetectionMetrics, nBackExperimentSlug } from './n-back';
+import {
+	estimateOrientationThresholdDegrees,
+	orientationExperimentSlug,
+	summarizeOrientationMagnitudes
+} from './orientation';
 
 export type PolicyScenarioComparisonResponseInput = {
 	trialIndex: number;
@@ -37,6 +43,8 @@ export type PolicyScenarioPhaseSummary = {
 	rewardRate: number | null;
 	correctCount: number | null;
 	accuracy: number | null;
+	falseAlarmRate: number | null;
+	sensitivityIndex: number | null;
 	matchResponseCount: number | null;
 	matchResponseRate: number | null;
 	clockwiseResponseCount: number | null;
@@ -68,6 +76,8 @@ export type PolicyScenarioRunSummary = {
 	sampledArmCount: number | null;
 	correctCount: number | null;
 	accuracy: number | null;
+	falseAlarmRate: number | null;
+	sensitivityIndex: number | null;
 	matchResponseCount: number | null;
 	matchResponseRate: number | null;
 	clockwiseResponseCount: number | null;
@@ -91,6 +101,8 @@ export type PolicyScenarioSummary = {
 	meanBestArmSelectionRate: number | null;
 	meanSampledArmCount: number | null;
 	meanAccuracy: number | null;
+	meanFalseAlarmRate: number | null;
+	meanSensitivityIndex: number | null;
 	meanMatchResponseRate: number | null;
 	meanClockwiseResponseRate: number | null;
 	meanEstimatedThresholdDegrees: number | null;
@@ -109,6 +121,19 @@ export type PolicyScenarioComparison = {
 	summaries: PolicyScenarioSummary[];
 };
 
+export type PolicyScenarioOutcomeSnapshotScope = 'overall' | 'epoch' | 'phase';
+
+export type PolicyScenarioOutcomeSnapshotInput = {
+	id: string;
+	scenarioId: string;
+	scenarioLabel: string;
+	experimentSlug: string;
+	scope: PolicyScenarioOutcomeSnapshotScope;
+	scopeKey: string;
+	scopeLabel: string;
+	metrics: Record<string, number | null>;
+};
+
 type PolicyScenarioChoice = {
 	scenarioId: string;
 	scenarioLabel: string;
@@ -123,6 +148,7 @@ type PolicyScenarioChoice = {
 	bestArmSelected: boolean | null;
 	armId: string | null;
 	correct: boolean | null;
+	target: boolean | null;
 	matchResponse: boolean | null;
 	clockwiseResponse: boolean | null;
 	magnitudeDegrees: number | null;
@@ -158,6 +184,142 @@ function ratio(numerator: number, denominator: number): number | null {
 	return denominator > 0 ? numerator / denominator : null;
 }
 
+function metricValue(value: number | null): number | null {
+	return value === null || !Number.isFinite(value) ? null : value;
+}
+
+function hasMetricKeys(metrics: Record<string, number | null>): boolean {
+	return Object.keys(metrics).length > 0;
+}
+
+function overallOutcomeMetrics(summary: PolicyScenarioSummary): Record<string, number | null> {
+	if (summary.experimentSlug === intertemporalExperimentSlug) {
+		return {
+			delayedChoiceRate: metricValue(summary.meanDelayedChoiceRate),
+			netGain: metricValue(summary.meanNetGain),
+			totalDelaySeconds: metricValue(summary.meanTotalDelaySeconds)
+		};
+	}
+
+	if (summary.experimentSlug === banditExperimentSlug) {
+		return {
+			rewardRate: metricValue(summary.meanRewardRate),
+			bestArmSelectionRate: metricValue(summary.meanBestArmSelectionRate),
+			sampledArmCount: metricValue(summary.meanSampledArmCount)
+		};
+	}
+
+	if (summary.experimentSlug === nBackExperimentSlug) {
+		return {
+			accuracy: metricValue(summary.meanAccuracy),
+			sensitivityIndex: metricValue(summary.meanSensitivityIndex),
+			falseAlarmRate: metricValue(summary.meanFalseAlarmRate)
+		};
+	}
+
+	if (summary.experimentSlug === orientationExperimentSlug) {
+		return {
+			accuracy: metricValue(summary.meanAccuracy),
+			estimatedThresholdDegrees: metricValue(summary.meanEstimatedThresholdDegrees),
+			meanResponseTimeMs: metricValue(summary.meanResponseTimeMs)
+		};
+	}
+
+	return {};
+}
+
+function epochOutcomeMetrics(summary: PolicyScenarioEpochSummary): Record<string, number | null> {
+	return {
+		delayedChoiceRate: metricValue(summary.delayedChoiceRate)
+	};
+}
+
+function phaseOutcomeMetrics(
+	experimentSlug: string,
+	summary: PolicyScenarioPhaseSummary
+): Record<string, number | null> {
+	if (experimentSlug === banditExperimentSlug) {
+		return {
+			rewardRate: metricValue(summary.rewardRate),
+			bestArmSelectionRate: metricValue(summary.bestArmSelectionRate)
+		};
+	}
+
+	if (experimentSlug === nBackExperimentSlug) {
+		return {
+			accuracy: metricValue(summary.accuracy),
+			sensitivityIndex: metricValue(summary.sensitivityIndex),
+			falseAlarmRate: metricValue(summary.falseAlarmRate)
+		};
+	}
+
+	if (experimentSlug === orientationExperimentSlug) {
+		return {
+			accuracy: metricValue(summary.accuracy),
+			meanResponseTimeMs: metricValue(summary.meanResponseTimeMs)
+		};
+	}
+
+	return {};
+}
+
+export function createPolicyScenarioOutcomeSnapshotInputs(
+	summaries: PolicyScenarioSummary[]
+): PolicyScenarioOutcomeSnapshotInput[] {
+	return summaries.flatMap((summary) => {
+		const overallMetrics = overallOutcomeMetrics(summary);
+		const snapshots: PolicyScenarioOutcomeSnapshotInput[] = hasMetricKeys(overallMetrics)
+			? [
+					{
+						id: `${summary.experimentSlug}:${summary.scenarioId}:overall`,
+						scenarioId: summary.scenarioId,
+						scenarioLabel: summary.scenarioLabel,
+						experimentSlug: summary.experimentSlug,
+						scope: 'overall',
+						scopeKey: 'overall',
+						scopeLabel: 'Overall',
+						metrics: overallMetrics
+					}
+				]
+			: [];
+
+		if (summary.experimentSlug === intertemporalExperimentSlug) {
+			snapshots.push(
+				...summary.epochSummaries
+					.filter((epochSummary) => epochSummary.choiceCount > 0)
+					.map((epochSummary) => ({
+						id: `${summary.experimentSlug}:${summary.scenarioId}:epoch:${epochSummary.epoch}`,
+						scenarioId: summary.scenarioId,
+						scenarioLabel: summary.scenarioLabel,
+						experimentSlug: summary.experimentSlug,
+						scope: 'epoch' as const,
+						scopeKey: epochSummary.epoch,
+						scopeLabel: `${epochSummary.epoch} epoch`,
+						metrics: epochOutcomeMetrics(epochSummary)
+					}))
+			);
+		} else {
+			snapshots.push(
+				...summary.phaseSummaries
+					.filter((phaseSummary) => phaseSummary.choiceCount > 0)
+					.map((phaseSummary) => ({
+						id: `${summary.experimentSlug}:${summary.scenarioId}:phase:${phaseSummary.phase}`,
+						scenarioId: summary.scenarioId,
+						scenarioLabel: summary.scenarioLabel,
+						experimentSlug: summary.experimentSlug,
+						scope: 'phase' as const,
+						scopeKey: phaseSummary.phase,
+						scopeLabel: phaseSummary.phase,
+						metrics: phaseOutcomeMetrics(summary.experimentSlug, phaseSummary)
+					}))
+					.filter((snapshot) => hasMetricKeys(snapshot.metrics))
+			);
+		}
+
+		return snapshots;
+	});
+}
+
 function scenarioChoice(
 	run: PolicyScenarioComparisonRunInput,
 	response: PolicyScenarioComparisonResponseInput
@@ -184,6 +346,12 @@ function scenarioChoice(
 		policyResponse === 'match' ? true : policyResponse === 'no_match' ? false : null;
 	const clockwiseResponse =
 		policyResponse === 'clockwise' ? true : policyResponse === 'counterclockwise' ? false : null;
+	const target =
+		typeof score?.expectedMatch === 'boolean'
+			? score.expectedMatch
+			: typeof policyScenario?.target === 'boolean'
+				? policyScenario.target
+				: null;
 
 	return {
 		scenarioId,
@@ -199,6 +367,7 @@ function scenarioChoice(
 		bestArmSelected: selectedArmId && knownBestArmId ? selectedArmId === knownBestArmId : null,
 		armId: selectedArmId,
 		correct: typeof score?.correct === 'boolean' ? score.correct : null,
+		target,
 		matchResponse,
 		clockwiseResponse,
 		magnitudeDegrees: numberValue(score?.magnitudeDegrees),
@@ -206,6 +375,22 @@ function scenarioChoice(
 		minimumLaterAdvantage: numberValue(policyScenario?.minimumLaterAdvantage),
 		responseTimeMs: numberValue(policyScenario?.responseTimeMs)
 	};
+}
+
+function nBackSignalDetectionMetrics(choices: PolicyScenarioChoice[]) {
+	const signalChoices = choices.filter(
+		(choice) => choice.target !== null && choice.matchResponse !== null
+	);
+
+	if (signalChoices.length === 0) return null;
+
+	return calculateNBackSignalDetectionMetrics({
+		hits: signalChoices.filter((choice) => choice.target && choice.matchResponse).length,
+		misses: signalChoices.filter((choice) => choice.target && !choice.matchResponse).length,
+		falseAlarms: signalChoices.filter((choice) => !choice.target && choice.matchResponse).length,
+		correctRejections: signalChoices.filter((choice) => !choice.target && !choice.matchResponse)
+			.length
+	});
 }
 
 function createRunSummary(
@@ -242,6 +427,7 @@ function createRunSummary(
 	const netValues = choices.flatMap((choice) =>
 		choice.netValue === null ? [] : [choice.netValue]
 	);
+	const signalDetection = nBackSignalDetectionMetrics(choices);
 
 	return {
 		runId: run.runId,
@@ -268,6 +454,8 @@ function createRunSummary(
 		sampledArmCount: sampledArmIds.size > 0 ? sampledArmIds.size : null,
 		correctCount: correctChoices.length > 0 ? correctCount : null,
 		accuracy: ratio(correctCount, correctChoices.length),
+		falseAlarmRate: signalDetection?.falseAlarmRate ?? null,
+		sensitivityIndex: signalDetection?.sensitivityIndex ?? null,
 		matchResponseCount: matchResponseChoices.length > 0 ? matchResponseCount : null,
 		matchResponseRate: ratio(matchResponseCount, matchResponseChoices.length),
 		clockwiseResponseCount: clockwiseResponseChoices.length > 0 ? clockwiseResponseCount : null,
@@ -335,6 +523,7 @@ function createPhaseSummary(
 	const magnitudes = phaseChoices.flatMap((choice) =>
 		choice.magnitudeDegrees === null ? [] : [choice.magnitudeDegrees]
 	);
+	const signalDetection = nBackSignalDetectionMetrics(phaseChoices);
 
 	return {
 		phase,
@@ -347,6 +536,8 @@ function createPhaseSummary(
 		rewardRate: ratio(totalReward, rewards.length),
 		correctCount: correctChoices.length > 0 ? correctCount : null,
 		accuracy: ratio(correctCount, correctChoices.length),
+		falseAlarmRate: signalDetection?.falseAlarmRate ?? null,
+		sensitivityIndex: signalDetection?.sensitivityIndex ?? null,
 		matchResponseCount: matchResponseChoices.length > 0 ? matchResponseCount : null,
 		matchResponseRate: ratio(matchResponseCount, matchResponseChoices.length),
 		clockwiseResponseCount: clockwiseResponseChoices.length > 0 ? clockwiseResponseCount : null,
@@ -435,6 +626,16 @@ export function createPolicyScenarioComparison(
 				),
 				meanAccuracy: mean(
 					runsForScenario.flatMap((run) => (run.accuracy === null ? [] : [run.accuracy]))
+				),
+				meanFalseAlarmRate: mean(
+					runsForScenario.flatMap((run) =>
+						run.falseAlarmRate === null ? [] : [run.falseAlarmRate]
+					)
+				),
+				meanSensitivityIndex: mean(
+					runsForScenario.flatMap((run) =>
+						run.sensitivityIndex === null ? [] : [run.sensitivityIndex]
+					)
 				),
 				meanMatchResponseRate: mean(
 					runsForScenario.flatMap((run) =>

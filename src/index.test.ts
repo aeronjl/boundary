@@ -20,7 +20,10 @@ import {
 	createIntertemporalInterpretation,
 	intertemporalDelayedChoiceRate
 } from '$lib/experiments/intertemporal-interpretation';
-import { createPolicyScenarioComparison } from '$lib/experiments/policy-scenario-comparison';
+import {
+	createPolicyScenarioComparison,
+	createPolicyScenarioOutcomeSnapshotInputs
+} from '$lib/experiments/policy-scenario-comparison';
 import {
 	policyScenarioLaunchCount,
 	policyScenarioLaunchTargets,
@@ -832,6 +835,46 @@ describe('policy scenario comparison helpers', () => {
 					accuracy: 0,
 					clockwiseResponseRate: 1,
 					meanMagnitudeDegrees: 2
+				})
+			])
+		);
+
+		const snapshotInputs = createPolicyScenarioOutcomeSnapshotInputs(comparison.summaries);
+		expect(snapshotInputs).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					id: 'intertemporal-choice:epoch-sensitive:overall',
+					scope: 'overall',
+					metrics: expect.objectContaining({
+						delayedChoiceRate: 0.5,
+						netGain: 330,
+						totalDelaySeconds: 3
+					})
+				}),
+				expect.objectContaining({
+					id: 'intertemporal-choice:epoch-sensitive:epoch:short',
+					scope: 'epoch',
+					scopeKey: 'short',
+					metrics: {
+						delayedChoiceRate: 1
+					}
+				}),
+				expect.objectContaining({
+					id: 'n-back:perfect-responder:overall',
+					scope: 'overall',
+					metrics: expect.objectContaining({
+						accuracy: 1,
+						falseAlarmRate: null,
+						sensitivityIndex: null
+					})
+				}),
+				expect.objectContaining({
+					id: 'orientation-discrimination:threshold-observer:phase:above-threshold',
+					scope: 'phase',
+					metrics: expect.objectContaining({
+						accuracy: 1,
+						meanResponseTimeMs: 754
+					})
 				})
 			])
 		);

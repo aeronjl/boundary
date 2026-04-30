@@ -807,6 +807,7 @@ test('admin can inspect and export ten item personality inventory data', async (
 	await page.getByRole('link', { name: 'Policy scenarios' }).click();
 	await expect(page.getByRole('heading', { name: 'Policy scenarios' })).toBeVisible();
 	await expect(page.getByText('Generated runs')).toBeVisible();
+	await expect(page.getByText('Outcome snapshots')).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Export JSON' })).toBeVisible();
 
 	const scenarioJsonResponse = await page.request.get('/admin/scenarios/export.json');
@@ -814,6 +815,13 @@ test('admin can inspect and export ten item personality inventory data', async (
 	expect(await scenarioJsonResponse.json()).toMatchObject({
 		scenarioCount: expect.any(Number),
 		runCount: expect.any(Number),
+		outcomeSnapshotSummary: {
+			snapshotCount: expect.any(Number),
+			targetCount: expect.any(Number),
+			readyTargetCount: expect.any(Number),
+			blockedTargetCount: expect.any(Number)
+		},
+		outcomeSnapshots: expect.any(Array),
 		selectedBatchId: null,
 		batches: []
 	});
@@ -823,6 +831,13 @@ test('admin can inspect and export ten item personality inventory data', async (
 	expect(await emptyBatchResponse.json()).toMatchObject({
 		scenarioCount: 0,
 		runCount: 0,
+		outcomeSnapshotSummary: {
+			snapshotCount: 0,
+			targetCount: 0,
+			readyTargetCount: 0,
+			blockedTargetCount: 0
+		},
+		outcomeSnapshots: [],
 		selectedBatchId: 'missing',
 		selectedBatch: null
 	});

@@ -44,6 +44,12 @@
 	const formatDegrees = (value: number | null) =>
 		value === null ? '-' : `${value.toFixed(1)} deg`;
 	const formatLabel = (value: string) => value.replaceAll('-', ' ');
+	const formatOutcomeKind = (value: string) => formatLabel(value).replaceAll('_', ' ');
+	const formatReadyCount = (ready: number, total: number) => `${ready}/${total}`;
+	const targetTone = (status: string) =>
+		status === 'ready'
+			? 'border-green-200 bg-green-50 text-green-800'
+			: 'border-amber-200 bg-amber-50 text-amber-800';
 	const batchApiPath = (batchId: string) =>
 		`${resolve('/admin/scenarios/batches')}/${encodeURIComponent(batchId)}`;
 	const scenarioKey = (
@@ -272,7 +278,7 @@
 		</div>
 	{/if}
 
-	<div class="grid grid-cols-2 gap-3 md:grid-cols-5">
+	<div class="grid grid-cols-2 gap-3 md:grid-cols-6">
 		<div class="border-t border-gray-200 py-3">
 			<p class="text-xs text-gray-500">Batches</p>
 			<p class="font-serif text-2xl">{data.batches.length}</p>
@@ -292,6 +298,17 @@
 		<div class="border-t border-gray-200 py-3">
 			<p class="text-xs text-gray-500">Choices</p>
 			<p class="font-serif text-2xl">{data.comparison.choiceCount}</p>
+		</div>
+		<div class="border-t border-gray-200 py-3">
+			<p class="text-xs text-gray-500">Outcome snapshots</p>
+			<p class="font-serif text-2xl">{data.comparison.outcomeSnapshotSummary.snapshotCount}</p>
+			<p class="text-xs text-gray-500">
+				{formatReadyCount(
+					data.comparison.outcomeSnapshotSummary.readyTargetCount,
+					data.comparison.outcomeSnapshotSummary.targetCount
+				)}
+				targets ready
+			</p>
 		</div>
 	</div>
 
@@ -360,6 +377,82 @@
 			No policy scenario runs have been recorded yet.
 		</p>
 	{:else}
+		<div class="border-t border-gray-200 pt-4">
+			<div class="flex flex-col gap-1 md:flex-row md:items-end md:justify-between">
+				<div>
+					<h2 class="font-serif text-2xl">Outcome target snapshots</h2>
+					<p class="text-gray-500">
+						Ready and blocked interpretation targets for each generated policy scope.
+					</p>
+				</div>
+				<p class="text-xs text-gray-500">
+					{formatReadyCount(
+						data.comparison.outcomeSnapshotSummary.readyTargetCount,
+						data.comparison.outcomeSnapshotSummary.targetCount
+					)}
+					targets ready
+				</p>
+			</div>
+
+			<div class="mt-4 overflow-x-auto">
+				<table class="w-full min-w-[1120px] text-left text-xs">
+					<thead class="text-gray-500">
+						<tr>
+							<th class="py-2 pr-3 font-medium">Scenario</th>
+							<th class="py-2 pr-3 font-medium">Scope</th>
+							<th class="py-2 pr-3 font-medium">Experiment</th>
+							<th class="py-2 pr-3 font-medium">Targets</th>
+							<th class="py-2 pr-3 font-medium">Target gates</th>
+							<th class="py-2 pr-3 font-medium">Blockers</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each data.comparison.outcomeSnapshots as snapshot (snapshot.id)}
+							<tr class="border-t border-gray-100 align-top">
+								<td class="py-2 pr-3">
+									<p>{snapshot.scenarioLabel}</p>
+									<p class="font-mono text-[11px] text-gray-500">{snapshot.scenarioId}</p>
+								</td>
+								<td class="py-2 pr-3">
+									<p class="capitalize">{formatLabel(snapshot.scopeLabel)}</p>
+									<p class="font-mono text-[11px] text-gray-500">{snapshot.scope}</p>
+								</td>
+								<td class="py-2 pr-3">{snapshot.experimentSlug}</td>
+								<td class="py-2 pr-3">
+									{snapshot.readyTargetCount} of {snapshot.targetCount}
+								</td>
+								<td class="py-2 pr-3">
+									<div class="flex max-w-xl flex-wrap gap-1">
+										{#each snapshot.metrics as metric (metric.metricKey)}
+											{#each metric.targets as target (target.id)}
+												<span
+													class={`rounded-sm border px-2 py-1 ${targetTone(target.status)}`}
+													title={target.blockers.join(' ')}
+												>
+													{metric.label}: {formatOutcomeKind(target.kind)}
+												</span>
+											{/each}
+										{/each}
+									</div>
+								</td>
+								<td class="py-2 pr-3">
+									{#if snapshot.blockers.length > 0}
+										<div class="grid gap-1">
+											{#each snapshot.blockers.slice(0, 3) as blocker (blocker.message)}
+												<p>{blocker.message} ({blocker.count})</p>
+											{/each}
+										</div>
+									{:else}
+										<span class="text-gray-500">None</span>
+									{/if}
+								</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
+		</div>
+
 		<div class="overflow-x-auto border-t border-gray-200">
 			<table class="w-full min-w-[1500px] text-left text-xs">
 				<thead class="text-gray-500">

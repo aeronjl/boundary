@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { asc, eq } from 'drizzle-orm';
 import {
 	referenceCompatibilities,
@@ -12,6 +13,15 @@ import {
 	type ReferenceMappingDirection,
 	type ReferenceSourceType
 } from '$lib/reference-data/catalog';
+import {
+	parseReferenceImportSummary,
+	type ReferenceImportSummary
+} from '$lib/reference-data/import-summary';
+import {
+	createOpenFmriNBackSummary,
+	openFmriNBackParticipantsSha256,
+	openFmriNBackParticipantsUrl
+} from '$lib/reference-data/openfmri-nback-extractor';
 import { db } from '$lib/server/db';
 import {
 	referenceCohorts,
@@ -20,6 +30,7 @@ import {
 	referenceMetrics,
 	referenceStudies
 } from '$lib/server/db/schema';
+import openFmriNBackSummary from '../../../../static/reference-data/n-back/openfmri-ds000115-summary.json';
 
 export type AdminReferenceExcludedRows = {
 	count: number;
@@ -32,10 +43,21 @@ export type AdminReferenceDatasetImport = {
 	sourceName: string;
 	sourceUrl: string;
 	sourceRevision: string;
+	sourceSha256: string;
 	sourceWarning: string;
 	extractorName: string;
 	extractorVersion: string;
 	reviewNotes: string;
+};
+
+export type AdminReferenceMetricDistribution = {
+	source: string;
+	binning: string;
+	binCount: number | null;
+	sampleSize: number | null;
+	actualBinCount: number;
+	countTotal: number;
+	proportionTotal: number;
 };
 
 export type AdminReferenceMetricImport = {
@@ -44,10 +66,21 @@ export type AdminReferenceMetricImport = {
 	sourceName: string;
 	sourceUrl: string;
 	sourceRevision: string;
+	sourceSha256: string;
 	sampleSize: number | null;
 	sourceColumns: string[];
 	method: string;
 	excludedRows: AdminReferenceExcludedRows[];
+	distribution: AdminReferenceMetricDistribution | null;
+};
+
+export type AdminReferenceArtifactCheck = {
+	status: 'passed' | 'failed' | 'unknown';
+	checkedAt: string;
+	command: string;
+	expectedSha256: string;
+	sourceSha256: string | null;
+	message: string;
 };
 
 export type AdminReferenceMetricMapping = typeof referenceMetricMappings.$inferSelect & {
@@ -64,6 +97,7 @@ export type AdminReferenceDataset = typeof referenceDatasets.$inferSelect & {
 	cohorts: AdminReferenceCohort[];
 	metrics: AdminReferenceMetric[];
 	importMetadata: AdminReferenceDatasetImport | null;
+	artifactCheck: AdminReferenceArtifactCheck | null;
 };
 
 export type AdminSetReferenceDatasetInput = {
@@ -291,6 +325,32 @@ function excludedRowsValue(value: unknown): AdminReferenceExcludedRows[] {
 	});
 }
 
+function metricDistributionValue(value: unknown): AdminReferenceMetricDistribution | null {
+	const distribution = recordValue(value);
+	if (!distribution) return null;
+
+	const bins = Array.isArray(distribution.bins) ? distribution.bins : [];
+	const parsedBins = bins.flatMap((item) => {
+		const record = recordValue(item);
+		const count = numberValue(record?.count);
+		const proportion = numberValue(record?.proportion);
+
+		return count === null || proportion === null ? [] : [{ count, proportion }];
+	});
+
+	if (parsedBins.length === 0) return null;
+
+	return {
+		source: stringValue(distribution.source),
+		binning: stringValue(distribution.binning),
+		binCount: numberValue(distribution.binCount),
+		sampleSize: numberValue(distribution.sampleSize),
+		actualBinCount: parsedBins.length,
+		countTotal: parsedBins.reduce((total, bin) => total + bin.count, 0),
+		proportionTotal: parsedBins.reduce((total, bin) => total + bin.proportion, 0)
+	};
+}
+
 function datasetImportMetadata(metricSummaryJson: string): AdminReferenceDatasetImport | null {
 	const root = parseJsonRecord(metricSummaryJson);
 	const referenceImport = recordValue(root?.referenceImport);
@@ -306,6 +366,7 @@ function datasetImportMetadata(metricSummaryJson: string): AdminReferenceDataset
 		sourceName: stringValue(source.name),
 		sourceUrl: stringValue(source.url),
 		sourceRevision: stringValue(source.revision),
+		sourceSha256: stringValue(source.sha256),
 		sourceWarning: stringValue(source.warning),
 		extractorName: stringValue(extractor.name),
 		extractorVersion: stringValue(extractor.version),
@@ -326,11 +387,98 @@ function metricImportMetadata(metricJson: string): AdminReferenceMetricImport | 
 		sourceName: stringValue(source.name),
 		sourceUrl: stringValue(source.url),
 		sourceRevision: stringValue(source.revision),
+		sourceSha256: stringValue(source.sha256),
 		sampleSize: numberValue(referenceImport.sampleSize),
 		sourceColumns: stringArrayValue(referenceImport.sourceColumns),
 		method: stringValue(referenceImport.method),
-		excludedRows: excludedRowsValue(referenceImport.excludedRows)
+		excludedRows: excludedRowsValue(referenceImport.excludedRows),
+		distribution: metricDistributionValue(referenceImport.distribution)
 	};
+}
+
+const openFmriReferenceDatasetId = 'openfmri-ds000115-nback';
+const referenceExtractorCheckCommand = 'bun run reference:extract:nback --check';
+let openFmriArtifactCheckCache: {
+	expiresAt: number;
+	value: AdminReferenceArtifactCheck;
+} | null = null;
+
+function sha256Hex(value: string): string {
+	return createHash('sha256').update(value, 'utf8').digest('hex');
+}
+
+async function fetchTextWithTimeout(url: string, timeoutMs: number): Promise<string> {
+	const controller = new AbortController();
+	const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+	try {
+		const response = await fetch(url, { signal: controller.signal });
+		if (!response.ok) {
+			throw new Error(`${response.status} ${response.statusText}`);
+		}
+
+		return await response.text();
+	} finally {
+		clearTimeout(timeout);
+	}
+}
+
+function normalizedReferenceSummary(value: ReferenceImportSummary): string {
+	return JSON.stringify(parseReferenceImportSummary(value));
+}
+
+async function openFmriReferenceArtifactCheck(): Promise<AdminReferenceArtifactCheck> {
+	const now = Date.now();
+	if (openFmriArtifactCheckCache && openFmriArtifactCheckCache.expiresAt > now) {
+		return openFmriArtifactCheckCache.value;
+	}
+
+	const checkedAt = new Date(now).toISOString();
+
+	try {
+		const participantsTsv = await fetchTextWithTimeout(openFmriNBackParticipantsUrl, 5000);
+		const sourceSha256 = sha256Hex(participantsTsv);
+
+		if (sourceSha256 !== openFmriNBackParticipantsSha256) {
+			const value: AdminReferenceArtifactCheck = {
+				status: 'failed',
+				checkedAt,
+				command: referenceExtractorCheckCommand,
+				expectedSha256: openFmriNBackParticipantsSha256,
+				sourceSha256,
+				message: 'Source participants.tsv SHA-256 does not match the pinned extractor hash.'
+			};
+			openFmriArtifactCheckCache = { expiresAt: now + 5 * 60 * 1000, value };
+			return value;
+		}
+
+		const generated = createOpenFmriNBackSummary(participantsTsv, sourceSha256);
+		const committed = parseReferenceImportSummary(openFmriNBackSummary);
+		const matches = normalizedReferenceSummary(generated) === normalizedReferenceSummary(committed);
+		const value: AdminReferenceArtifactCheck = {
+			status: matches ? 'passed' : 'failed',
+			checkedAt,
+			command: referenceExtractorCheckCommand,
+			expectedSha256: openFmriNBackParticipantsSha256,
+			sourceSha256,
+			message: matches
+				? 'Committed summary matches the extractor output.'
+				: 'Committed summary differs from the extractor output.'
+		};
+		openFmriArtifactCheckCache = { expiresAt: now + 5 * 60 * 1000, value };
+		return value;
+	} catch (error) {
+		const value: AdminReferenceArtifactCheck = {
+			status: 'unknown',
+			checkedAt,
+			command: referenceExtractorCheckCommand,
+			expectedSha256: openFmriNBackParticipantsSha256,
+			sourceSha256: null,
+			message: `Extractor check unavailable: ${error instanceof Error ? error.message : String(error)}`
+		};
+		openFmriArtifactCheckCache = { expiresAt: now + 60 * 1000, value };
+		return value;
+	}
 }
 
 function hasUsableReferenceStats(metric: typeof referenceMetrics.$inferSelect): boolean {
@@ -385,12 +533,13 @@ export async function listAdminReferenceRegistry(): Promise<{
 	mappingDirections: typeof referenceMappingDirections;
 	sourceTypes: typeof referenceSourceTypes;
 }> {
-	const [studies, datasets, cohorts, metrics, mappings] = await Promise.all([
+	const [studies, datasets, cohorts, metrics, mappings, openFmriArtifactCheck] = await Promise.all([
 		db.select().from(referenceStudies).orderBy(asc(referenceStudies.shortCitation)),
 		db.select().from(referenceDatasets).orderBy(asc(referenceDatasets.experimentSlug)),
 		db.select().from(referenceCohorts).orderBy(asc(referenceCohorts.label)),
 		db.select().from(referenceMetrics).orderBy(asc(referenceMetrics.experimentSlug)),
-		db.select().from(referenceMetricMappings).orderBy(asc(referenceMetricMappings.sourceMetric))
+		db.select().from(referenceMetricMappings).orderBy(asc(referenceMetricMappings.sourceMetric)),
+		openFmriReferenceArtifactCheck()
 	]);
 	const studyById = new Map(studies.map((study) => [study.id, study]));
 	const cohortsByDatasetId = new Map<string, AdminReferenceCohort[]>();
@@ -427,7 +576,8 @@ export async function listAdminReferenceRegistry(): Promise<{
 			study: dataset.referenceStudyId ? (studyById.get(dataset.referenceStudyId) ?? null) : null,
 			cohorts: cohortsByDatasetId.get(dataset.id) ?? [],
 			metrics: metricsByDatasetId.get(dataset.id) ?? [],
-			importMetadata: datasetImportMetadata(dataset.metricSummaryJson)
+			importMetadata: datasetImportMetadata(dataset.metricSummaryJson),
+			artifactCheck: dataset.id === openFmriReferenceDatasetId ? openFmriArtifactCheck : null
 		})),
 		metricContractCount: referenceMetricContracts.length,
 		metricCount: metrics.length,

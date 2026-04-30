@@ -806,6 +806,12 @@ test('admin can inspect and export ten item personality inventory data', async (
 	await expect(page.getByText('Metric contracts', { exact: true })).toBeVisible();
 	await expect(page.getByText('Imported reference summary')).toBeVisible();
 	await expect(page.getByText('Imported n=98 from nback2_nont, nback2_targ')).toBeVisible();
+	await expect(page.getByText(/Extractor check:\s*(passed|failed|unknown)/)).toBeVisible();
+	await expect(page.getByText(/Source SHA-256:\s*75364291e42c/).first()).toBeVisible();
+	await expect(page.getByText('Command: bun run reference:extract:nback --check')).toBeVisible();
+	await expect(
+		page.getByText('Distribution: 10 equal-width bins, n=98, counts sum=98')
+	).toBeVisible();
 
 	const sourceCitation = `Boundary Pilot ${Date.now()}`;
 	const createSourceForm = page.locator('form[aria-label="Add literature source"]');

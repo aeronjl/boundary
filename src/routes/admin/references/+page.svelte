@@ -15,6 +15,8 @@
 	const formatNumberInput = (value: number | null) => (value === null ? '' : String(value));
 	const formatTextInput = (value: string | null) => value ?? '';
 	const formatColumnsInput = (value: string[]) => value.join(', ');
+	const shortHash = (value: string) => (value.length > 12 ? `${value.slice(0, 12)}...` : value);
+	const formatBinning = (value: string) => value.replaceAll('_', '-');
 </script>
 
 <svelte:head>
@@ -159,6 +161,22 @@
 									Extractor: {dataset.importMetadata.extractorName}
 									{dataset.importMetadata.extractorVersion}
 								</p>
+								{#if dataset.importMetadata.sourceSha256}
+									<p class="mt-1">
+										Source SHA-256: <code>{shortHash(dataset.importMetadata.sourceSha256)}</code>
+									</p>
+								{/if}
+								{#if dataset.artifactCheck}
+									<p class="mt-1">
+										Extractor check:
+										<span class="font-medium">{dataset.artifactCheck.status}</span>
+										<span>({formatImportDate(dataset.artifactCheck.checkedAt)})</span>
+									</p>
+									<p class="mt-1">{dataset.artifactCheck.message}</p>
+									<p class="mt-1">
+										Command: <code>{dataset.artifactCheck.command}</code>
+									</p>
+								{/if}
 								{#if dataset.importMetadata.sourceWarning}
 									<p class="mt-1">{dataset.importMetadata.sourceWarning}</p>
 								{/if}
@@ -473,6 +491,23 @@
 													', '
 												)}
 											</p>
+											{#if metric.importMetadata.sourceSha256}
+												<p class="mt-1 text-xs text-gray-500">
+													Source SHA-256: <code
+														>{shortHash(metric.importMetadata.sourceSha256)}</code
+													>
+												</p>
+											{/if}
+											{#if metric.importMetadata.distribution}
+												<p class="mt-1 text-xs text-gray-500">
+													Distribution: {metric.importMetadata.distribution.actualBinCount}
+													{formatBinning(metric.importMetadata.distribution.binning)} bins, n={metric
+														.importMetadata.distribution.sampleSize ?? '-'}, counts sum={metric
+														.importMetadata.distribution.countTotal}
+												</p>
+											{:else}
+												<p class="mt-1 text-xs text-gray-500">Distribution: no imported bins</p>
+											{/if}
 										{/if}
 									</div>
 									<label class="flex flex-col gap-1">

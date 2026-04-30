@@ -22,6 +22,7 @@ import {
 import { parseReferenceImportSummary } from '$lib/reference-data/import-summary';
 import {
 	getLiteratureExtractionExport,
+	literatureExtractionFilePaths,
 	literatureExtractionValidations,
 	literatureExtractions,
 	literatureMetricSummariesForExperiment
@@ -288,11 +289,17 @@ describe('reference data contracts', () => {
 		);
 
 		expect(literatureExtractionValidations).toEqual([]);
+		expect(
+			literatureExtractionFilePaths.some((path) =>
+				path.endsWith('openfmri-ds000115-nback-participants-summary.json')
+			)
+		).toBe(true);
 		expect(exportData.summary).toMatchObject({
 			extractionCount: 1,
 			resultCount: 2,
 			comparisonClaimCount: 2
 		});
+		expect(exportData.extractions[0].schemaVersion).toBe(1);
 		expect(extraction?.comparisonClaims.map((claim) => claim.participantUse)).toEqual([
 			'internal_review',
 			'internal_review'

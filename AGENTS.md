@@ -12,6 +12,7 @@ This is a SvelteKit app. Routes live in `src/routes`, with experiment pages unde
 - `bun run preview`: serve the production build locally.
 - `bun run db:setup`: apply Drizzle migrations and seed local experiment data.
 - `bun run db:generate`: generate SQL migrations after schema changes.
+- `bun run literature:validate`: validate JSON-backed literature extraction files.
 - `bun run check`: run `svelte-check` with the project TypeScript config.
 - `bun run lint`: run Prettier in check mode, then ESLint.
 - `bun run format`: apply Prettier formatting.

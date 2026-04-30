@@ -1,0 +1,155 @@
+{
+	"schemaVersion": 1,
+	"id": "openfmri-ds000115-nback-participants-summary",
+	"source": {
+		"id": "openfmri-ds000115",
+		"shortCitation": "OpenfMRI ds000115",
+		"title": "OpenfMRI ds000115 working-memory task data",
+		"url": "https://openfmri.org/dataset/ds000115/",
+		"doi": null,
+		"publicationYear": null,
+		"sourceType": "dataset"
+	},
+	"study": {
+		"id": "openfmri-ds000115-working-memory-study",
+		"sourceId": "openfmri-ds000115",
+		"title": "OpenfMRI ds000115 working-memory task data",
+		"population": "Schizophrenia, unaffected sibling, control sibling, and healthy control participants from ds000115.",
+		"design": "Open working-memory dataset with behavioural participant summary columns.",
+		"notes": "Candidate imported summary from participants.tsv. Event files are not used because the dataset page warns against relying on them."
+	},
+	"samples": [
+		{
+			"id": "openfmri-ds000115-working-memory-participants",
+			"studyId": "openfmri-ds000115-working-memory-study",
+			"label": "OpenfMRI ds000115 working-memory participants",
+			"population": "Schizophrenia, unaffected sibling, control sibling, and healthy control participants from ds000115.",
+			"groupLabel": "mixed diagnostic and control groups",
+			"sampleSize": 99,
+			"inclusionCriteria": "Participants represented in ds000115_R2.0.0 participants.tsv.",
+			"exclusionCriteria": "Metric-level exclusions apply where behavioural summary columns are missing or invalid.",
+			"notes": "Split diagnostic groups before making cohort-similarity or clinical-context claims."
+		}
+	],
+	"tasks": [
+		{
+			"id": "openfmri-ds000115-nback-task",
+			"studyId": "openfmri-ds000115-working-memory-study",
+			"experimentSlug": "n-back",
+			"label": "2-back working-memory task",
+			"taskVariant": "Letter 2-back behavioural summary columns from participants.tsv.",
+			"notes": "Boundary compatibility review must verify task timing, stimulus type, and load."
+		}
+	],
+	"measures": [
+		{
+			"id": "openfmri-ds000115-nback-accuracy-measure",
+			"taskId": "openfmri-ds000115-nback-task",
+			"experimentSlug": "n-back",
+			"metricKey": "accuracy",
+			"label": "Accuracy",
+			"unit": "proportion",
+			"sourceMetric": "2-back accuracy",
+			"sourceColumns": ["nback2_nont", "nback2_targ"],
+			"transformation": "Subject-level 2-back accuracy is the unweighted mean of nback2_nont and nback2_targ because trial counts are not represented in participants.tsv.",
+			"extractionStatus": "candidate",
+			"comparisonReadiness": "candidate",
+			"notes": "Candidate 2-back accuracy summary derived from participants.tsv target and non-target accuracy columns."
+		},
+		{
+			"id": "openfmri-ds000115-nback-sensitivityIndex-measure",
+			"taskId": "openfmri-ds000115-nback-task",
+			"experimentSlug": "n-back",
+			"metricKey": "sensitivityIndex",
+			"label": "Sensitivity d'",
+			"unit": "count",
+			"sourceMetric": "d4prime",
+			"sourceColumns": ["d4prime"],
+			"transformation": "Summary of d4prime values in participants.tsv after removing missing values and one out-of-range row.",
+			"extractionStatus": "candidate",
+			"comparisonReadiness": "candidate",
+			"notes": "Candidate sensitivity summary from the source d4prime column; validate that d4prime aligns with Boundary's signal-detection definition before public comparisons."
+		}
+	],
+	"results": [
+		{
+			"id": "openfmri-ds000115-nback-accuracy-mixed-result",
+			"measureId": "openfmri-ds000115-nback-accuracy-measure",
+			"sampleId": "openfmri-ds000115-working-memory-participants",
+			"resultType": "distribution",
+			"sampleSize": 98,
+			"mean": 0.8508194948622451,
+			"standardDeviation": 0.1884581684338786,
+			"minimum": 0.1833333335,
+			"maximum": 1,
+			"statisticJson": {
+				"sourceColumns": ["nback2_nont", "nback2_targ"],
+				"excludedRows": [
+					{
+						"count": 1,
+						"reason": "Missing nback2_nont or nback2_targ."
+					}
+				]
+			},
+			"notes": "Candidate 2-back accuracy summary derived from participants.tsv target and non-target accuracy columns."
+		},
+		{
+			"id": "openfmri-ds000115-nback-sensitivityIndex-mixed-result",
+			"measureId": "openfmri-ds000115-nback-sensitivityIndex-measure",
+			"sampleId": "openfmri-ds000115-working-memory-participants",
+			"resultType": "distribution",
+			"sampleSize": 91,
+			"mean": 1.7238351648351649,
+			"standardDeviation": 0.8839955412624644,
+			"minimum": 0,
+			"maximum": 4.257,
+			"statisticJson": {
+				"sourceColumns": ["d4prime"],
+				"excludedRows": [
+					{
+						"count": 7,
+						"reason": "Missing d4prime value."
+					},
+					{
+						"count": 1,
+						"reason": "Out-of-range d4prime value 866 for sub-03."
+					}
+				]
+			},
+			"notes": "Candidate sensitivity summary from the source d4prime column; validate that d4prime aligns with Boundary's signal-detection definition before public comparisons."
+		}
+	],
+	"comparisonClaims": [
+		{
+			"id": "openfmri-ds000115-nback-accuracy-candidate-distribution",
+			"experimentSlug": "n-back",
+			"metricKey": "accuracy",
+			"claimType": "cohort_distribution",
+			"status": "candidate",
+			"resultIds": ["openfmri-ds000115-nback-accuracy-mixed-result"],
+			"citationIds": ["openfmri-ds000115"],
+			"claim": "Boundary n-back accuracy can be compared with the imported 2-back accuracy distribution only after task-variant compatibility is reviewed.",
+			"guardrail": "Do not present this as a diagnosis, ADHD marker, or public percentile until the dataset is validated.",
+			"participantUse": "internal_review"
+		},
+		{
+			"id": "openfmri-ds000115-nback-sensitivity-candidate-distribution",
+			"experimentSlug": "n-back",
+			"metricKey": "sensitivityIndex",
+			"claimType": "cohort_distribution",
+			"status": "candidate",
+			"resultIds": ["openfmri-ds000115-nback-sensitivityIndex-mixed-result"],
+			"citationIds": ["openfmri-ds000115"],
+			"claim": "Boundary n-back d' can be compared with the imported d4prime distribution only after the source metric is aligned with Boundary's signal-detection calculation.",
+			"guardrail": "Use this for internal review and smoke tests, not public cohort-similarity language.",
+			"participantUse": "internal_review"
+		}
+	],
+	"guardrails": [
+		"The OpenfMRI dataset page warns that event files may be inaccurate. This summary uses participants.tsv behavioural columns rather than event TSV reconstruction.",
+		"Imported candidate statistics. Validate task-level construct mapping before using for public cohort comparisons.",
+		"The sample mixes diagnostic and control groups; split cohorts before resemblance claims."
+	],
+	"updatedAt": "2026-04-30",
+	"reviewerNotes": "First structured extraction seed. It preserves candidate status until task compatibility and source metric semantics are reviewed."
+}

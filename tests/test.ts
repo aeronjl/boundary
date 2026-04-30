@@ -767,18 +767,24 @@ test('admin can inspect and export ten item personality inventory data', async (
 	await page.getByRole('link', { name: 'Literature extractions' }).click();
 	await expect(page.getByRole('heading', { name: 'Literature extractions' })).toBeVisible();
 	await expect(page.getByText('openfmri-ds000115-nback-participants-summary')).toBeVisible();
+	await expect(page.getByText('marx-2011-adhd-emotional-nback')).toBeVisible();
 	await expect(page.getByText('2-back accuracy')).toBeVisible();
+	await expect(page.getByRole('cell', { name: 'Adults with ADHD' })).toBeVisible();
 	await expect(page.getByText('candidate comparison claim').first()).toBeVisible();
 
 	const literatureJsonResponse = await page.request.get('/admin/literature/export.json');
 	expect(literatureJsonResponse.status()).toBe(200);
 	const literatureJson = await literatureJsonResponse.json();
 	expect(literatureJson.summary).toMatchObject({
-		extractionCount: 1,
-		resultCount: 2,
-		comparisonClaimCount: 2
+		extractionCount: 2,
+		resultCount: 4,
+		comparisonClaimCount: 3
 	});
-	expect(literatureJson.extractions[0].comparisonClaims[0]).toMatchObject({
+	expect(
+		literatureJson.extractions.find(
+			(extraction: { id: string }) => extraction.id === 'marx-2011-adhd-emotional-nback'
+		).comparisonClaims[0]
+	).toMatchObject({
 		participantUse: 'internal_review'
 	});
 

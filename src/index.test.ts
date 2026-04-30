@@ -283,9 +283,14 @@ describe('reference data contracts', () => {
 	it('exposes structured literature extractions for n-back reference comparisons', () => {
 		const exportData = getLiteratureExtractionExport();
 		const nBackMetrics = literatureMetricSummariesForExperiment('n-back');
-		const accuracy = nBackMetrics.find((metric) => metric.metricKey === 'accuracy');
+		const accuracy = nBackMetrics.find(
+			(metric) => metric.metricKey === 'accuracy' && metric.sourceId === 'openfmri-ds000115'
+		);
 		const extraction = literatureExtractions.find(
 			(candidate) => candidate.id === 'openfmri-ds000115-nback-participants-summary'
+		);
+		const adhdExtraction = literatureExtractions.find(
+			(candidate) => candidate.id === 'marx-2011-adhd-emotional-nback'
 		);
 
 		expect(literatureExtractionValidations).toEqual([]);
@@ -294,16 +299,26 @@ describe('reference data contracts', () => {
 				path.endsWith('openfmri-ds000115-nback-participants-summary.json')
 			)
 		).toBe(true);
+		expect(
+			literatureExtractionFilePaths.some((path) =>
+				path.endsWith('marx-2011-adhd-emotional-nback.json')
+			)
+		).toBe(true);
 		expect(exportData.summary).toMatchObject({
-			extractionCount: 1,
-			resultCount: 2,
-			comparisonClaimCount: 2
+			extractionCount: 2,
+			resultCount: 4,
+			comparisonClaimCount: 3
 		});
 		expect(exportData.extractions[0].schemaVersion).toBe(1);
 		expect(extraction?.comparisonClaims.map((claim) => claim.participantUse)).toEqual([
 			'internal_review',
 			'internal_review'
 		]);
+		expect(adhdExtraction?.comparisonClaims[0]).toMatchObject({
+			id: 'marx-2011-adhd-nback-clinical-context',
+			participantUse: 'internal_review',
+			status: 'candidate'
+		});
 		expect(accuracy).toMatchObject({
 			sourceId: 'openfmri-ds000115',
 			sampleSize: 98,

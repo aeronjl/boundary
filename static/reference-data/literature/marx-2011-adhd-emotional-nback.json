@@ -1,0 +1,129 @@
+{
+	"schemaVersion": 1,
+	"id": "marx-2011-adhd-emotional-nback",
+	"source": {
+		"id": "marx-2011",
+		"shortCitation": "Marx et al., 2011",
+		"title": "Enhanced emotional interference on working memory performance in adults with ADHD",
+		"url": "https://pubmed.ncbi.nlm.nih.gov/21905999/",
+		"doi": "10.3109/15622975.2011.599213",
+		"publicationYear": 2011,
+		"sourceType": "literature"
+	},
+	"study": {
+		"id": "marx-2011-adhd-emotional-nback-study",
+		"sourceId": "marx-2011",
+		"title": "Enhanced emotional interference on working memory performance in adults with ADHD",
+		"population": "Adults with ADHD and matched healthy controls.",
+		"design": "Group comparison using an n-back working-memory task with emotionally salient distractors.",
+		"notes": "PubMed reports lower n-back performance accuracy in ADHD patients relative to controls; indexed abstract records describe 1-back and 2-back conditions."
+	},
+	"samples": [
+		{
+			"id": "marx-2011-adult-adhd",
+			"studyId": "marx-2011-adhd-emotional-nback-study",
+			"label": "Adults with ADHD",
+			"population": "Adults aged 18 to 40 years with ADHD.",
+			"groupLabel": "ADHD",
+			"sampleSize": 39,
+			"inclusionCriteria": "Adult ADHD group reported in indexed abstract records for the emotional n-back study.",
+			"exclusionCriteria": "Not extracted from the abstract-level source.",
+			"notes": "Sample size comes from an indexed conference abstract record for the same emotional n-back study line; verify against the full article before quantitative reuse."
+		},
+		{
+			"id": "marx-2011-healthy-controls",
+			"studyId": "marx-2011-adhd-emotional-nback-study",
+			"label": "Matched healthy controls",
+			"population": "Matched healthy control adults.",
+			"groupLabel": "control",
+			"sampleSize": 40,
+			"inclusionCriteria": "Matched healthy control group reported in indexed abstract records for the emotional n-back study.",
+			"exclusionCriteria": "Not extracted from the abstract-level source.",
+			"notes": "Sample size comes from an indexed conference abstract record for the same emotional n-back study line; verify against the full article before quantitative reuse."
+		}
+	],
+	"tasks": [
+		{
+			"id": "marx-2011-emotional-nback-task",
+			"studyId": "marx-2011-adhd-emotional-nback-study",
+			"experimentSlug": "n-back",
+			"label": "Emotional n-back task",
+			"taskVariant": "1-back and 2-back working-memory task with emotionally salient distractors.",
+			"notes": "Boundary's current n-back task is spatial and non-emotional, so this source is clinical context rather than a direct reference distribution."
+		}
+	],
+	"measures": [
+		{
+			"id": "marx-2011-nback-accuracy-measure",
+			"taskId": "marx-2011-emotional-nback-task",
+			"experimentSlug": "n-back",
+			"metricKey": "accuracy",
+			"label": "N-back performance accuracy",
+			"unit": "proportion",
+			"sourceMetric": "n-back performance accuracy",
+			"sourceColumns": [],
+			"transformation": "Abstract-level extraction only; no numeric effect size or distribution has been extracted.",
+			"extractionStatus": "candidate",
+			"comparisonReadiness": "not_ready",
+			"notes": "PubMed reports lower n-back performance accuracy for ADHD patients than controls, especially under emotionally salient distractors."
+		}
+	],
+	"results": [
+		{
+			"id": "marx-2011-adhd-accuracy-qualitative-result",
+			"measureId": "marx-2011-nback-accuracy-measure",
+			"sampleId": "marx-2011-adult-adhd",
+			"resultType": "descriptive",
+			"sampleSize": 39,
+			"mean": null,
+			"standardDeviation": null,
+			"minimum": null,
+			"maximum": null,
+			"statisticJson": {
+				"direction": "lower accuracy than controls",
+				"sourceLevel": "abstract"
+			},
+			"notes": "Qualitative extraction only; numeric accuracy values and condition-specific effects are not represented."
+		},
+		{
+			"id": "marx-2011-control-accuracy-qualitative-result",
+			"measureId": "marx-2011-nback-accuracy-measure",
+			"sampleId": "marx-2011-healthy-controls",
+			"resultType": "descriptive",
+			"sampleSize": 40,
+			"mean": null,
+			"standardDeviation": null,
+			"minimum": null,
+			"maximum": null,
+			"statisticJson": {
+				"direction": "higher accuracy than ADHD group",
+				"sourceLevel": "abstract"
+			},
+			"notes": "Qualitative extraction only; numeric accuracy values and condition-specific effects are not represented."
+		}
+	],
+	"comparisonClaims": [
+		{
+			"id": "marx-2011-adhd-nback-clinical-context",
+			"experimentSlug": "n-back",
+			"metricKey": "accuracy",
+			"claimType": "group_similarity",
+			"status": "candidate",
+			"resultIds": [
+				"marx-2011-adhd-accuracy-qualitative-result",
+				"marx-2011-control-accuracy-qualitative-result"
+			],
+			"citationIds": ["marx-2011"],
+			"claim": "Adult ADHD studies can show lower n-back accuracy than matched controls under emotionally salient distractor conditions.",
+			"guardrail": "Do not use this source to classify a Boundary participant as ADHD-like; the task variant is emotional, group-level, and not numerically extracted.",
+			"participantUse": "internal_review"
+		}
+	],
+	"guardrails": [
+		"This is abstract-level clinical-context extraction, not a direct Boundary reference distribution.",
+		"The task used emotionally salient distractors, unlike Boundary's current spatial n-back task.",
+		"Do not generate diagnosis, screening, or ADHD-resemblance prompts from this extraction until full-text numeric results and compatibility are reviewed."
+	],
+	"updatedAt": "2026-04-30",
+	"reviewerNotes": "Second extraction seed to exercise clinical group/sample/claim modeling. It deliberately remains internal-review only."
+}

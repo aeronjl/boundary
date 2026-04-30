@@ -41,7 +41,11 @@ type StudyExportStudy = {
 	id: string;
 	completedTasks: number;
 	totalTasks: number;
-	profileInterpretation: { cards: { title: string }[] } | null;
+	profileInterpretation: {
+		cards: { title: string; value: string }[];
+		relatedPrompts: { title: string }[];
+		references: { id: string }[];
+	} | null;
 	integrityFlags: { code: string; label: string }[];
 	qualityFlags: { code: string; label: string }[];
 	needsReview: boolean;
@@ -522,6 +526,9 @@ test('study runner completes the full protocol and exposes analysis', async ({ p
 	await expect(page.getByRole('heading', { name: 'Study complete' })).toBeVisible();
 	await expect(page.getByRole('heading', { name: 'Study profile' })).toBeVisible();
 	await expect(page.getByText('Working-memory contrast')).toBeVisible();
+	await expect(page.getByText('Evidence-backed contexts')).toBeVisible();
+	await expect(page.getByText('2 reviewed')).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Repeat orientation baseline' })).toBeVisible();
 
 	await page.goto('/admin');
 	await page.getByLabel('Admin token').fill('test-admin-token');
@@ -541,6 +548,15 @@ test('study runner completes the full protocol and exposes analysis', async ({ p
 	expect(completedStudy?.profileInterpretation?.cards.map((card) => card.title)).toContain(
 		'Profile coverage'
 	);
+	expect(completedStudy.profileInterpretation?.cards.map((card) => card.title)).toContain(
+		'Evidence-backed contexts'
+	);
+	expect(
+		completedStudy.profileInterpretation?.relatedPrompts.map((prompt) => prompt.title)
+	).toContain('Repeat orientation baseline');
+	expect(
+		completedStudy.profileInterpretation?.references.map((reference) => reference.id)
+	).toContain('farell-pelli-1998-orientation-threshold-method-context');
 
 	await page.getByRole('link', { name: 'Study analysis' }).click();
 	await expect(page.getByRole('heading', { name: 'Study analysis' })).toBeVisible();
@@ -566,6 +582,8 @@ test('study runner completes the full protocol and exposes analysis', async ({ p
 	expect(participantCsv).toContain('"orientation_discrimination_estimated_threshold_degrees"');
 	expect(participantCsv).toContain('"intertemporal_choice_final_wealth"');
 	expect(participantCsv).toContain('"ten_item_personality_inventory_extroversion"');
+	expect(participantCsv).toContain('Evidence-backed contexts: 2 reviewed');
+	expect(participantCsv).toContain('Repeat orientation baseline');
 	expect(participantCsv).toContain('"completed"');
 
 	const completedStudyId = completedStudy.id as string;

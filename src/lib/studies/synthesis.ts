@@ -17,12 +17,21 @@ import {
 	relationshipEvidenceReferencesForExperiment,
 	relatedTaskPromptFromRelationship
 } from '$lib/reference-data/relationships';
+import {
+	participantLiteratureClaimsForExperiment,
+	type ParticipantLiteratureClaim
+} from '$lib/reference-data/literature';
 
 export type StudySynthesisTask = {
 	slug: string;
 	name: string;
 	status: string;
 	resultSummary: unknown;
+};
+
+type StudySynthesisLiteratureClaim = ParticipantLiteratureClaim & {
+	taskName: string;
+	taskSlug: string;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -54,6 +63,40 @@ function completionCard(tasks: StudySynthesisTask[]): InterpretationCard {
 				? 'All protocol tasks are complete, so Boundary can make first-pass cross-task observations.'
 				: 'The profile is incomplete. Finish the remaining study tasks before treating cross-task patterns as stable.',
 		evidenceIds: []
+	};
+}
+
+function completedLiteratureClaims(tasks: StudySynthesisTask[]): StudySynthesisLiteratureClaim[] {
+	return tasks
+		.filter((task) => task.status === 'completed')
+		.flatMap((task) =>
+			participantLiteratureClaimsForExperiment(task.slug).map((claim) => ({
+				...claim,
+				taskName: task.name,
+				taskSlug: task.slug
+			}))
+		);
+}
+
+function evidenceContextCard(
+	tasks: StudySynthesisTask[],
+	claims: StudySynthesisLiteratureClaim[]
+): InterpretationCard | null {
+	const completedTaskCount = tasks.filter((task) => task.status === 'completed').length;
+	if (completedTaskCount === 0) return null;
+
+	const taskNames = [...new Set(claims.map((claim) => claim.taskName))];
+	const evidenceCountLabel = claims.length === 1 ? '1 reviewed' : `${claims.length} reviewed`;
+
+	return {
+		title: 'Evidence-backed contexts',
+		value: claims.length > 0 ? evidenceCountLabel : 'none ready',
+		tone: claims.length > 0 ? 'strong' : 'watch',
+		body:
+			claims.length > 0
+				? `Participant-safe literature context is available for ${taskNames.join(' and ')}. These are guarded anchors for interpreting the completed profile, not diagnostic labels.`
+				: 'No participant-safe literature context is ready for the completed tasks yet, so the profile should stay descriptive.',
+		evidenceIds: claims.map((claim) => claim.id)
 	};
 }
 
@@ -170,10 +213,19 @@ function registryPromptsForStudy(tasks: StudySynthesisTask[]): RelatedTaskPrompt
 	);
 }
 
+function claimEvidenceIdForTask(
+	claims: StudySynthesisLiteratureClaim[],
+	taskSlug: string,
+	fallbackEvidenceId: string
+): string {
+	return claims.find((claim) => claim.taskSlug === taskSlug)?.id ?? fallbackEvidenceId;
+}
+
 function createPrompts(
 	tasks: StudySynthesisTask[],
 	orientation: Record<string, unknown> | null,
-	nBack: Record<string, unknown> | null
+	nBack: Record<string, unknown> | null,
+	literatureClaims: StudySynthesisLiteratureClaim[]
 ): RelatedTaskPrompt[] {
 	const incompleteTask = tasks.find((task) => task.status !== 'completed');
 	const prompts: RelatedTaskPrompt[] = [];
@@ -196,23 +248,37 @@ function createPrompts(
 		(orientationAccuracy === null || orientationAccuracy < 0.65 || orientationThreshold === null)
 	) {
 		prompts.push({
-			title: 'Repeat orientation',
-			body: 'Clarify the perceptual baseline before leaning on cross-task interpretation.',
+			title: 'Repeat orientation baseline',
+			body: 'Clarify the perceptual baseline before leaning on cross-task interpretation; the reviewed orientation methods context is available, but this run did not establish a usable threshold.',
 			href: '/orientation-discrimination',
-			evidenceIds: ['farell-pelli-1998']
+			evidenceIds: [
+				claimEvidenceIdForTask(literatureClaims, 'orientation-discrimination', 'farell-pelli-1998')
+			]
 		});
 	} else if (nBack && nBackSensitivity !== null && nBackSensitivity < 0.8) {
 		prompts.push({
 			title: 'Repeat n-back',
-			body: 'A second run would clarify whether the weak updating signal is stable.',
+			body: 'A second run would clarify whether the weak updating signal is stable before comparing it with the reviewed n-back reference context.',
 			href: '/n-back',
-			evidenceIds: ['meule-2017']
+			evidenceIds: [claimEvidenceIdForTask(literatureClaims, 'n-back', 'meule-2017')]
 		});
 	}
 
 	prompts.push(...registryPromptsForStudy(tasks));
 
 	return uniquePromptsByHref(prompts).slice(0, 2);
+}
+
+function literatureReferencesForClaims(
+	claims: StudySynthesisLiteratureClaim[]
+): EvidenceReference[] {
+	return claims.map((claim) => ({
+		id: claim.id,
+		shortCitation: claim.sourceCitation,
+		title: claim.title,
+		url: claim.sourceUrl,
+		takeaway: `${claim.body} ${claim.caveat}`
+	}));
 }
 
 function uniqueReferences(references: EvidenceReference[]): EvidenceReference[] {
@@ -243,20 +309,23 @@ export function createStudyProfileInterpretation(
 	const nBack = resultFor(tasks, 'n-back');
 	const bandit = resultFor(tasks, 'n-armed-bandit');
 	const tipi = resultFor(tasks, 'ten-item-personality-inventory');
+	const literatureClaims = completedLiteratureClaims(tasks);
 	const optionalCards = [
+		evidenceContextCard(tasks, literatureClaims),
 		perceptualCard(orientation),
 		updatingCard(orientation, nBack),
 		decisionCard(intertemporal, bandit),
 		traitCard(tipi)
 	].filter((card): card is InterpretationCard => card !== null);
 	const cards = [completionCard(tasks), ...optionalCards];
-	const relatedPrompts = createPrompts(tasks, orientation, nBack);
+	const relatedPrompts = createPrompts(tasks, orientation, nBack, literatureClaims);
 	const references = referencesFor(
 		[
 			...orientationEvidenceReferences,
 			...nBackEvidenceReferences,
 			...banditEvidenceReferences,
 			...intertemporalEvidenceReferences,
+			...literatureReferencesForClaims(literatureClaims),
 			...tasks
 				.filter((task) => task.status === 'completed')
 				.flatMap((task) => relationshipEvidenceReferencesForExperiment(task.slug))

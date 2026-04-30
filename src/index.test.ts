@@ -710,10 +710,18 @@ describe('study profile synthesis', () => {
 		]);
 
 		expect(interpretation?.cards.map((card) => card.title)).toContain('Working-memory contrast');
+		expect(interpretation?.cards.map((card) => card.title)).toContain('Evidence-backed contexts');
+		expect(
+			interpretation?.cards.find((card) => card.title === 'Evidence-backed contexts')?.body
+		).toContain('Orientation discrimination');
 		expect(interpretation?.cards.find((card) => card.title === 'Profile coverage')?.tone).toBe(
 			'watch'
 		);
 		expect(interpretation?.relatedPrompts.map((prompt) => prompt.href)).toContain('/study');
+		expect(interpretation?.relatedPrompts.map((prompt) => prompt.title)).toContain('Repeat n-back');
+		expect(interpretation?.references.map((reference) => reference.id)).toContain(
+			'farell-pelli-1998-orientation-threshold-method-context'
+		);
 		expect(interpretation?.disclaimer).toContain('not medical');
 	});
 });

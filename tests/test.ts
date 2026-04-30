@@ -121,6 +121,13 @@ async function completeOrientationRun(page: Page) {
 	await expect(page.getByRole('heading', { name: 'How this compares' })).toBeVisible();
 	await expect(page.getByText('Perceptual accuracy')).toBeVisible();
 	await expect(page.getByRole('heading', { name: 'Reference context' })).toBeVisible();
+	await expect(page.getByText('Reviewed literature comparisons')).toBeVisible();
+	await expect(page.getByText('coarse psychophysical context')).toBeVisible();
+	await expect(
+		page.getByText(
+			'Use this to explain why orientation discrimination can serve as a perceptual baseline'
+		)
+	).toBeVisible();
 }
 
 async function completeNBackRun(page: Page) {
@@ -777,6 +784,7 @@ test('admin can inspect and export ten item personality inventory data', async (
 	await page.getByRole('link', { name: 'Literature extractions' }).click();
 	await expect(page.getByRole('heading', { name: 'Literature extractions' })).toBeVisible();
 	await expect(page.getByText('openfmri-ds000115-nback-participants-summary')).toBeVisible();
+	await expect(page.getByText('farell-pelli-1998-orientation-threshold-methods')).toBeVisible();
 	await expect(page.getByText('marx-2011-adhd-emotional-nback')).toBeVisible();
 	await expect(page.getByRole('heading', { name: 'Claim review queue' })).toBeVisible();
 	await expect(page.getByText('Need evidence')).toBeVisible();
@@ -791,16 +799,24 @@ test('admin can inspect and export ten item personality inventory data', async (
 	await expect(page.getByText('Evidence: blocked').first()).toBeVisible();
 	await expect(page.getByText('candidate comparison claim').first()).toBeVisible();
 	await expect(page.getByRole('button', { name: 'Promote to public' })).toBeVisible();
-	await expect(page.getByRole('button', { name: 'Move to internal review' })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Move to internal review' }).first()).toBeVisible();
 
 	const literatureJsonResponse = await page.request.get('/admin/literature/export.json');
 	expect(literatureJsonResponse.status()).toBe(200);
 	const literatureJson = await literatureJsonResponse.json();
 	expect(literatureJson.summary).toMatchObject({
-		extractionCount: 2,
-		resultCount: 5,
-		comparisonClaimCount: 4,
-		publicReadyClaimCount: 1
+		extractionCount: 3,
+		resultCount: 6,
+		comparisonClaimCount: 5,
+		publicReadyClaimCount: 2
+	});
+	expect(
+		literatureJson.extractions.find(
+			(extraction: { id: string }) =>
+				extraction.id === 'farell-pelli-1998-orientation-threshold-methods'
+		).comparisonClaims[0]
+	).toMatchObject({
+		participantUse: 'public_prompt_ready'
 	});
 	expect(
 		literatureJson.extractions.find(

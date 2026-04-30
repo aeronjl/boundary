@@ -1,0 +1,99 @@
+{
+	"schemaVersion": 1,
+	"id": "farell-pelli-1998-orientation-threshold-methods",
+	"source": {
+		"id": "farell-pelli-1998",
+		"shortCitation": "Farell & Pelli, 1998",
+		"title": "Psychophysical methods, or how to measure a threshold, and why",
+		"url": "https://academic.oup.com/book/9576/chapter/156603220",
+		"doi": "10.1093/acprof:oso/9780198523192.003.0005",
+		"publicationYear": 1998,
+		"sourceType": "literature"
+	},
+	"study": {
+		"id": "farell-pelli-1998-psychophysics-methods-study",
+		"sourceId": "farell-pelli-1998",
+		"title": "Psychophysical methods, or how to measure a threshold, and why",
+		"population": "Psychophysics methods reference rather than a participant cohort.",
+		"design": "Methodological chapter describing threshold estimation with controlled repeated stimuli.",
+		"notes": "Use as task-design and interpretation context for Boundary orientation discrimination, not as a reference distribution."
+	},
+	"samples": [
+		{
+			"id": "farell-pelli-1998-methods-reference",
+			"studyId": "farell-pelli-1998-psychophysics-methods-study",
+			"label": "Psychophysics threshold methods reference",
+			"population": "Methodological literature rather than measured Boundary-comparable participants.",
+			"groupLabel": "methods reference",
+			"sampleSize": null,
+			"inclusionCriteria": "Chapter-level methodological discussion of psychophysical threshold estimation.",
+			"exclusionCriteria": "No participant-level orientation-discrimination distribution is extracted.",
+			"notes": "This sample placeholder lets the literature schema cite a reviewed methods result without implying cohort comparability."
+		}
+	],
+	"tasks": [
+		{
+			"id": "farell-pelli-1998-orientation-threshold-task",
+			"studyId": "farell-pelli-1998-psychophysics-methods-study",
+			"experimentSlug": "orientation-discrimination",
+			"label": "Orientation discrimination threshold measurement",
+			"taskVariant": "Repeated visual discrimination at controlled stimulus levels with threshold estimation.",
+			"notes": "Boundary currently uses a short web task and coarse smallest-tilt summary, not a fitted psychometric threshold."
+		}
+	],
+	"measures": [
+		{
+			"id": "farell-pelli-1998-orientation-threshold-method-measure",
+			"taskId": "farell-pelli-1998-orientation-threshold-task",
+			"experimentSlug": "orientation-discrimination",
+			"metricKey": "estimatedThresholdDegrees",
+			"label": "Estimated orientation threshold",
+			"unit": "degrees",
+			"sourceMetric": "psychophysical threshold",
+			"sourceColumns": [],
+			"transformation": "Methodological extraction only; Boundary reports the smallest tested tilt reaching the criterion rather than fitting a psychometric function.",
+			"extractionStatus": "reviewed",
+			"comparisonReadiness": "reviewed",
+			"notes": "Reviewed for construct context about how to interpret threshold-like orientation summaries."
+		}
+	],
+	"results": [
+		{
+			"id": "farell-pelli-1998-orientation-threshold-method-result",
+			"measureId": "farell-pelli-1998-orientation-threshold-method-measure",
+			"sampleId": "farell-pelli-1998-methods-reference",
+			"resultType": "descriptive",
+			"sampleSize": null,
+			"mean": null,
+			"standardDeviation": null,
+			"minimum": null,
+			"maximum": null,
+			"statisticJson": {
+				"sourceLevel": "methods chapter",
+				"takeaway": "Visual thresholds are most defensible when estimated from repeated task performance at controlled stimulus levels."
+			},
+			"notes": "Descriptive methods extraction only; no participant-level distribution is extracted."
+		}
+	],
+	"comparisonClaims": [
+		{
+			"id": "farell-pelli-1998-orientation-threshold-method-context",
+			"experimentSlug": "orientation-discrimination",
+			"metricKey": "estimatedThresholdDegrees",
+			"claimType": "construct_context",
+			"status": "reviewed",
+			"resultIds": ["farell-pelli-1998-orientation-threshold-method-result"],
+			"citationIds": ["farell-pelli-1998"],
+			"claim": "This run's orientation threshold is best treated as coarse psychophysical context: repeated controlled stimulus levels can estimate visual discrimination, but Boundary's short task is not a fitted laboratory threshold.",
+			"guardrail": "Use this to explain why orientation discrimination can serve as a perceptual baseline; do not present the threshold as clinical, diagnostic, or directly comparable to a laboratory psychometric function.",
+			"participantUse": "public_prompt_ready"
+		}
+	],
+	"guardrails": [
+		"This extraction is methodological context, not an external participant reference distribution.",
+		"Boundary's web task uses a coarse criterion summary and may be affected by display, viewing distance, attention, and input timing.",
+		"Do not use this source to rank participants or make clinical claims."
+	],
+	"updatedAt": "2026-04-30",
+	"reviewerNotes": "Public-ready construct-context seed for orientation discrimination result interpretation. It supports guarded participant copy without implying cohort similarity."
+}

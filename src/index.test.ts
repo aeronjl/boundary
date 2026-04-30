@@ -475,6 +475,9 @@ describe('reference data contracts', () => {
 		const adhdExtraction = literatureExtractions.find(
 			(candidate) => candidate.id === 'marx-2011-adhd-emotional-nback'
 		);
+		const orientationExtraction = literatureExtractions.find(
+			(candidate) => candidate.id === 'farell-pelli-1998-orientation-threshold-methods'
+		);
 
 		expect(literatureExtractionValidations).toEqual([]);
 		expect(
@@ -487,11 +490,16 @@ describe('reference data contracts', () => {
 				path.endsWith('marx-2011-adhd-emotional-nback.json')
 			)
 		).toBe(true);
+		expect(
+			literatureExtractionFilePaths.some((path) =>
+				path.endsWith('farell-pelli-1998-orientation-threshold-methods.json')
+			)
+		).toBe(true);
 		expect(exportData.summary).toMatchObject({
-			extractionCount: 2,
-			resultCount: 5,
-			comparisonClaimCount: 4,
-			publicReadyClaimCount: 1
+			extractionCount: 3,
+			resultCount: 6,
+			comparisonClaimCount: 5,
+			publicReadyClaimCount: 2
 		});
 		expect(exportData.extractions[0].schemaVersion).toBe(1);
 		expect(extraction?.comparisonClaims.map((claim) => claim.participantUse)).toEqual([
@@ -503,6 +511,11 @@ describe('reference data contracts', () => {
 			id: 'marx-2011-adhd-nback-clinical-context',
 			participantUse: 'internal_review',
 			status: 'candidate'
+		});
+		expect(orientationExtraction?.comparisonClaims[0]).toMatchObject({
+			id: 'farell-pelli-1998-orientation-threshold-method-context',
+			participantUse: 'public_prompt_ready',
+			status: 'reviewed'
 		});
 		expect(accuracy).toMatchObject({
 			sourceId: 'openfmri-ds000115',
@@ -523,7 +536,13 @@ describe('reference data contracts', () => {
 		const adhdReviewItem = reviewQueue.find(
 			(item) => item.id === 'marx-2011-adhd-nback-clinical-context'
 		);
+		const orientationReviewItem = reviewQueue.find(
+			(item) => item.id === 'farell-pelli-1998-orientation-threshold-method-context'
+		);
 		const publicClaims = participantLiteratureClaimsForExperiment('n-back');
+		const orientationClaims = participantLiteratureClaimsForExperiment(
+			'orientation-discrimination'
+		);
 
 		expect(publicClaims).toEqual([
 			expect.objectContaining({
@@ -533,6 +552,20 @@ describe('reference data contracts', () => {
 		]);
 		expect(publicClaims[0].body).toContain('healthy-control 2-back accuracy distribution');
 		expect(publicClaims[0].caveat).toContain('not a diagnosis');
+		expect(orientationClaims).toEqual([
+			expect.objectContaining({
+				id: 'farell-pelli-1998-orientation-threshold-method-context',
+				sourceCitation: 'Farell & Pelli, 1998'
+			})
+		]);
+		expect(orientationClaims[0].body).toContain('coarse psychophysical context');
+		expect(orientationClaims[0].caveat).toContain('perceptual baseline');
+		expect(orientationReviewItem).toMatchObject({
+			participantExposure: 'public',
+			reviewState: 'public_ready',
+			evidenceMode: 'construct_context',
+			canPromoteToPublic: false
+		});
 		expect(adhdReviewItem).toMatchObject({
 			participantExposure: 'hidden',
 			reviewState: 'needs_evidence',

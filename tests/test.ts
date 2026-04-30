@@ -527,6 +527,8 @@ test('study runner completes the full protocol and exposes analysis', async ({ p
 	await expect(page.getByRole('heading', { name: 'Study profile' })).toBeVisible();
 	await expect(page.getByText('Working-memory contrast')).toBeVisible();
 	await expect(page.getByText('Evidence-backed contexts')).toBeVisible();
+	await expect(page.getByText('Profile tags')).toBeVisible();
+	await expect(page.getByText('perceptual baseline uncertain')).toBeVisible();
 	await expect(page.getByText('2 reviewed')).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Repeat orientation baseline' })).toBeVisible();
 
@@ -550,6 +552,9 @@ test('study runner completes the full protocol and exposes analysis', async ({ p
 	);
 	expect(completedStudy.profileInterpretation?.cards.map((card) => card.title)).toContain(
 		'Evidence-backed contexts'
+	);
+	expect(completedStudy.profileInterpretation?.cards.map((card) => card.title)).toContain(
+		'Profile tags'
 	);
 	expect(
 		completedStudy.profileInterpretation?.relatedPrompts.map((prompt) => prompt.title)
@@ -583,6 +588,7 @@ test('study runner completes the full protocol and exposes analysis', async ({ p
 	expect(participantCsv).toContain('"intertemporal_choice_final_wealth"');
 	expect(participantCsv).toContain('"ten_item_personality_inventory_extroversion"');
 	expect(participantCsv).toContain('Evidence-backed contexts: 2 reviewed');
+	expect(participantCsv).toContain('Profile tags:');
 	expect(participantCsv).toContain('Repeat orientation baseline');
 	expect(participantCsv).toContain('"completed"');
 

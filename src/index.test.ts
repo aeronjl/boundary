@@ -711,9 +711,13 @@ describe('study profile synthesis', () => {
 
 		expect(interpretation?.cards.map((card) => card.title)).toContain('Working-memory contrast');
 		expect(interpretation?.cards.map((card) => card.title)).toContain('Evidence-backed contexts');
+		expect(interpretation?.cards.map((card) => card.title)).toContain('Profile tags');
 		expect(
 			interpretation?.cards.find((card) => card.title === 'Evidence-backed contexts')?.body
 		).toContain('Orientation discrimination');
+		expect(interpretation?.cards.find((card) => card.title === 'Profile tags')?.body).toContain(
+			'working-memory repeat target'
+		);
 		expect(interpretation?.cards.find((card) => card.title === 'Profile coverage')?.tone).toBe(
 			'watch'
 		);

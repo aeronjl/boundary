@@ -34,6 +34,16 @@ type StudySynthesisLiteratureClaim = ParticipantLiteratureClaim & {
 	taskSlug: string;
 };
 
+type StudyProfileTag = {
+	id: string;
+	label: string;
+	priority: number;
+	tone: InterpretationCard['tone'];
+	summary: string;
+	prompt: RelatedTaskPrompt | null;
+	evidenceIds: string[];
+};
+
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
@@ -194,7 +204,12 @@ function traitCard(tipi: Record<string, unknown> | null): InterpretationCard | n
 }
 
 function uniquePromptsByHref(prompts: RelatedTaskPrompt[]): RelatedTaskPrompt[] {
-	const byHref = new Map(prompts.map((prompt) => [prompt.href, prompt]));
+	const byHref = new Map<RelatedTaskPrompt['href'], RelatedTaskPrompt>();
+	for (const prompt of prompts) {
+		if (!byHref.has(prompt.href)) {
+			byHref.set(prompt.href, prompt);
+		}
+	}
 	return [...byHref.values()];
 }
 
@@ -221,12 +236,153 @@ function claimEvidenceIdForTask(
 	return claims.find((claim) => claim.taskSlug === taskSlug)?.id ?? fallbackEvidenceId;
 }
 
-function createPrompts(
-	tasks: StudySynthesisTask[],
-	orientation: Record<string, unknown> | null,
-	nBack: Record<string, unknown> | null,
+function literatureReferencesForClaims(
+	claims: StudySynthesisLiteratureClaim[]
+): EvidenceReference[] {
+	return claims.map((claim) => ({
+		id: claim.id,
+		shortCitation: claim.sourceCitation,
+		title: claim.title,
+		url: claim.sourceUrl,
+		takeaway: `${claim.body} ${claim.caveat}`
+	}));
+}
+
+function repeatOrientationPrompt(
 	literatureClaims: StudySynthesisLiteratureClaim[]
-): RelatedTaskPrompt[] {
+): RelatedTaskPrompt {
+	return {
+		title: 'Repeat orientation baseline',
+		body: 'Clarify the perceptual baseline before leaning on cross-task interpretation; the reviewed orientation methods context is available, but this run did not establish a usable threshold.',
+		href: '/orientation-discrimination',
+		evidenceIds: [
+			claimEvidenceIdForTask(literatureClaims, 'orientation-discrimination', 'farell-pelli-1998')
+		]
+	};
+}
+
+function repeatNBackPrompt(literatureClaims: StudySynthesisLiteratureClaim[]): RelatedTaskPrompt {
+	return {
+		title: 'Repeat n-back',
+		body: 'A second run would clarify whether the weak updating signal is stable before comparing it with the reviewed n-back reference context.',
+		href: '/n-back',
+		evidenceIds: [claimEvidenceIdForTask(literatureClaims, 'n-back', 'meule-2017')]
+	};
+}
+
+function profileTagsFor({
+	orientation,
+	intertemporal,
+	nBack,
+	bandit,
+	tipi,
+	literatureClaims
+}: {
+	orientation: Record<string, unknown> | null;
+	intertemporal: Record<string, unknown> | null;
+	nBack: Record<string, unknown> | null;
+	bandit: Record<string, unknown> | null;
+	tipi: Record<string, unknown> | null;
+	literatureClaims: StudySynthesisLiteratureClaim[];
+}): StudyProfileTag[] {
+	const tags: StudyProfileTag[] = [];
+	const orientationAccuracy = metric(orientation, 'accuracy');
+	const orientationThreshold = metric(orientation, 'estimatedThresholdDegrees');
+	const nBackSensitivity = metric(nBack, 'sensitivityIndex');
+	const nBackAccuracy = metric(nBack, 'accuracy');
+	const lowNBackSignal =
+		(nBackSensitivity !== null && nBackSensitivity < 0.8) ||
+		(nBackAccuracy !== null && nBackAccuracy < 0.65);
+
+	if (
+		orientation &&
+		(orientationAccuracy === null || orientationAccuracy < 0.65 || orientationThreshold === null)
+	) {
+		const prompt = repeatOrientationPrompt(literatureClaims);
+		tags.push({
+			id: 'perceptual-baseline-uncertain',
+			label: 'perceptual baseline uncertain',
+			priority: 100,
+			tone: 'watch',
+			summary: 'Repeat the visual baseline before leaning on cross-task interpretation.',
+			prompt,
+			evidenceIds: prompt.evidenceIds
+		});
+	} else if (orientation && orientationAccuracy !== null && orientationAccuracy >= 0.75) {
+		tags.push({
+			id: 'perceptual-baseline-usable',
+			label: 'perceptual baseline usable',
+			priority: 30,
+			tone: 'strong',
+			summary: 'The orientation run can anchor comparisons with higher-level task results.',
+			prompt: null,
+			evidenceIds: [
+				claimEvidenceIdForTask(literatureClaims, 'orientation-discrimination', 'farell-pelli-1998')
+			]
+		});
+	}
+
+	if (nBack && lowNBackSignal) {
+		const prompt = repeatNBackPrompt(literatureClaims);
+		tags.push({
+			id: 'working-memory-repeat-target',
+			label: 'working-memory repeat target',
+			priority: 90,
+			tone: 'watch',
+			summary: 'Repeat n-back before comparing the updating signal with reference contexts.',
+			prompt,
+			evidenceIds: prompt.evidenceIds
+		});
+	}
+
+	if (intertemporal && bandit) {
+		tags.push({
+			id: 'decision-axis-complete',
+			label: 'decision axis complete',
+			priority: 20,
+			tone: 'neutral',
+			summary: 'Delay-choice and reward-learning results are both available for later matching.',
+			prompt: null,
+			evidenceIds: ['frederick-2002', 'green-myerson-2004', 'sutton-barto-2018', 'steyvers-2009']
+		});
+	}
+
+	if (tipi) {
+		tags.push({
+			id: 'self-report-context-present',
+			label: 'self-report context present',
+			priority: 10,
+			tone: 'neutral',
+			summary: 'The personality inventory can contextualize task patterns without explaining them.',
+			prompt: null,
+			evidenceIds: []
+		});
+	}
+
+	return tags.sort((a, b) => b.priority - a.priority || a.label.localeCompare(b.label));
+}
+
+function profileTagCard(tags: StudyProfileTag[]): InterpretationCard | null {
+	if (tags.length === 0) return null;
+
+	const relevantTags = tags.slice(0, 2);
+	const tagSummaries = relevantTags.map((tag) => `${tag.label}: ${tag.summary}`).join(' ');
+	const tone = tags.some((tag) => tag.tone === 'watch')
+		? 'watch'
+		: tags.some((tag) => tag.tone === 'strong')
+			? 'strong'
+			: 'neutral';
+
+	return {
+		title: 'Profile tags',
+		value: `${tags.length} active`,
+		tone,
+		body: `${tagSummaries} Tags route repeat prompts and later comparison matching; they are not diagnoses or trait labels.`,
+		evidenceIds: [...new Set(relevantTags.flatMap((tag) => tag.evidenceIds))]
+	};
+}
+
+function createPrompts(tasks: StudySynthesisTask[], tags: StudyProfileTag[]): RelatedTaskPrompt[] {
 	const incompleteTask = tasks.find((task) => task.status !== 'completed');
 	const prompts: RelatedTaskPrompt[] = [];
 
@@ -239,46 +395,10 @@ function createPrompts(
 		});
 	}
 
-	const orientationAccuracy = metric(orientation, 'accuracy');
-	const orientationThreshold = metric(orientation, 'estimatedThresholdDegrees');
-	const nBackSensitivity = metric(nBack, 'sensitivityIndex');
-
-	if (
-		orientation &&
-		(orientationAccuracy === null || orientationAccuracy < 0.65 || orientationThreshold === null)
-	) {
-		prompts.push({
-			title: 'Repeat orientation baseline',
-			body: 'Clarify the perceptual baseline before leaning on cross-task interpretation; the reviewed orientation methods context is available, but this run did not establish a usable threshold.',
-			href: '/orientation-discrimination',
-			evidenceIds: [
-				claimEvidenceIdForTask(literatureClaims, 'orientation-discrimination', 'farell-pelli-1998')
-			]
-		});
-	} else if (nBack && nBackSensitivity !== null && nBackSensitivity < 0.8) {
-		prompts.push({
-			title: 'Repeat n-back',
-			body: 'A second run would clarify whether the weak updating signal is stable before comparing it with the reviewed n-back reference context.',
-			href: '/n-back',
-			evidenceIds: [claimEvidenceIdForTask(literatureClaims, 'n-back', 'meule-2017')]
-		});
-	}
-
+	prompts.push(...tags.flatMap((tag) => (tag.prompt ? [tag.prompt] : [])));
 	prompts.push(...registryPromptsForStudy(tasks));
 
 	return uniquePromptsByHref(prompts).slice(0, 2);
-}
-
-function literatureReferencesForClaims(
-	claims: StudySynthesisLiteratureClaim[]
-): EvidenceReference[] {
-	return claims.map((claim) => ({
-		id: claim.id,
-		shortCitation: claim.sourceCitation,
-		title: claim.title,
-		url: claim.sourceUrl,
-		takeaway: `${claim.body} ${claim.caveat}`
-	}));
 }
 
 function uniqueReferences(references: EvidenceReference[]): EvidenceReference[] {
@@ -310,15 +430,24 @@ export function createStudyProfileInterpretation(
 	const bandit = resultFor(tasks, 'n-armed-bandit');
 	const tipi = resultFor(tasks, 'ten-item-personality-inventory');
 	const literatureClaims = completedLiteratureClaims(tasks);
+	const profileTags = profileTagsFor({
+		orientation,
+		intertemporal,
+		nBack,
+		bandit,
+		tipi,
+		literatureClaims
+	});
 	const optionalCards = [
 		evidenceContextCard(tasks, literatureClaims),
+		profileTagCard(profileTags),
 		perceptualCard(orientation),
 		updatingCard(orientation, nBack),
 		decisionCard(intertemporal, bandit),
 		traitCard(tipi)
 	].filter((card): card is InterpretationCard => card !== null);
 	const cards = [completionCard(tasks), ...optionalCards];
-	const relatedPrompts = createPrompts(tasks, orientation, nBack, literatureClaims);
+	const relatedPrompts = createPrompts(tasks, profileTags);
 	const references = referencesFor(
 		[
 			...orientationEvidenceReferences,

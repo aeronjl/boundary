@@ -584,6 +584,11 @@
 								>
 									<input type="hidden" name="metricId" value={metric.id} />
 									<input type="hidden" name="mappingId" value={metric.mapping?.id ?? ''} />
+									<input
+										type="hidden"
+										name="extractionStatus"
+										value={metric.mapping?.extractionStatus ?? 'candidate'}
+									/>
 									<label class="flex flex-col gap-1">
 										<span class="text-xs font-medium text-gray-500">Reference cohort</span>
 										<select
@@ -630,22 +635,11 @@
 											{/each}
 										</select>
 									</label>
-									<label class="flex flex-col gap-1">
-										<span class="text-xs font-medium text-gray-500">Extraction status</span>
-										<select
-											name="extractionStatus"
-											class="rounded-sm border border-gray-300 px-3 py-2"
-										>
-											{#each data.extractionStatuses as status (status)}
-												<option
-													value={status}
-													selected={(metric.mapping?.extractionStatus ?? 'candidate') === status}
-												>
-													{status}
-												</option>
-											{/each}
-										</select>
-									</label>
+									<div>
+										<p class="text-xs font-medium text-gray-500">Extraction status</p>
+										<p class="mt-2">{metric.mapping?.extractionStatus ?? 'candidate'}</p>
+										<p class="mt-1 text-xs text-gray-500">Use the mapping review action.</p>
+									</div>
 									<label class="flex flex-col gap-1 md:col-span-3">
 										<span class="text-xs font-medium text-gray-500">Transformation</span>
 										<input
@@ -667,6 +661,54 @@
 										<button class="rounded-sm bg-gray-100 px-3 py-2 text-xs"> Save mapping </button>
 									</div>
 								</form>
+								{#if metric.mapping}
+									{#if metric.mapping.extractionStatus === 'reviewed'}
+										<form
+											method="POST"
+											action="?/mappingReview"
+											aria-label={`Revert reference mapping ${metric.label} for ${dataset.name} to candidate`}
+											class="grid gap-3 border-t border-gray-100 pt-3 md:grid-cols-[1fr_auto]"
+										>
+											<input type="hidden" name="mappingId" value={metric.mapping.id} />
+											<input type="hidden" name="extractionStatus" value="candidate" />
+											<input type="hidden" name="notes" value={metric.mapping.notes} />
+											<p class="text-xs text-gray-500">
+												Reviewed mappings are eligible for participant-facing comparisons only while
+												the parent dataset is validated.
+											</p>
+											<div>
+												<button class="rounded-sm border border-gray-300 px-3 py-2 text-xs">
+													Revert mapping to candidate
+												</button>
+											</div>
+										</form>
+									{:else}
+										<form
+											method="POST"
+											action="?/mappingReview"
+											aria-label={`Review reference mapping ${metric.label} for ${dataset.name}`}
+											class="grid gap-3 border-t border-gray-100 pt-3 md:grid-cols-[1fr_auto]"
+										>
+											<input type="hidden" name="mappingId" value={metric.mapping.id} />
+											<input type="hidden" name="extractionStatus" value="reviewed" />
+											<label class="flex flex-col gap-1">
+												<span class="text-xs font-medium text-gray-500">Mapping review note</span>
+												<textarea
+													name="notes"
+													rows="2"
+													required
+													class="rounded-sm border border-gray-300 px-3 py-2"
+													>{metric.mapping.notes}</textarea
+												>
+											</label>
+											<div class="self-end">
+												<button class="rounded-sm bg-black px-3 py-2 text-xs text-white">
+													Mark mapping reviewed
+												</button>
+											</div>
+										</form>
+									{/if}
+								{/if}
 							{/each}
 						</div>
 					{/if}

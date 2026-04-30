@@ -71,7 +71,8 @@ function hasReviewedMapping(reference: MetricReference): boolean {
 		reference.mapping?.extractionStatus === 'reviewed' &&
 		reference.mapping.sourceMetric.trim().length > 0 &&
 		reference.sourceColumns.length > 0 &&
-		reference.mapping.transformation.trim().length > 0
+		reference.mapping.transformation.trim().length > 0 &&
+		reference.mapping.notes.trim().length > 0
 	);
 }
 

@@ -163,6 +163,12 @@ export type AdminSetReferenceMetricMappingInput = {
 	sourceColumns: string | null;
 	transformation: string | null;
 	direction: string;
+	extractionStatus: string | null;
+	notes: string | null;
+};
+
+export type AdminSetReferenceMetricMappingReviewInput = {
+	id: string;
 	extractionStatus: string;
 	notes: string | null;
 };
@@ -525,8 +531,34 @@ function hasReviewedReferenceMapping(
 		mapping?.extractionStatus === 'reviewed' &&
 		trimmed(mapping.sourceMetric).length > 0 &&
 		sourceColumnsValue(mapping.sourceColumnsJson).length > 0 &&
-		trimmed(mapping.transformation).length > 0
+		trimmed(mapping.transformation).length > 0 &&
+		trimmed(mapping.notes).length > 0
 	);
+}
+
+function validateMappingReviewFields(
+	sourceMetric: string,
+	sourceColumns: string[],
+	transformation: string,
+	notes: string
+): AdminReferenceUpdateResult {
+	if (sourceMetric.length === 0) {
+		return { ok: false, status: 400, message: 'Source metric is required before review.' };
+	}
+
+	if (sourceColumns.length === 0) {
+		return { ok: false, status: 400, message: 'Source columns are required before review.' };
+	}
+
+	if (transformation.length === 0) {
+		return { ok: false, status: 400, message: 'Transformation is required before review.' };
+	}
+
+	if (notes.length === 0) {
+		return { ok: false, status: 400, message: 'Mapping review note is required.' };
+	}
+
+	return { ok: true };
 }
 
 async function validateReferenceReview(
@@ -1055,6 +1087,20 @@ export async function setAdminReferenceMetricMapping(
 	}
 
 	const sourceColumns = parseSourceColumnsInput(input.sourceColumns);
+	const sourceMetric = trimmed(input.sourceMetric);
+	const transformation = trimmed(input.transformation);
+	const extractionStatus = parseReferenceExtractionStatus(input.extractionStatus ?? 'candidate');
+	const notes = trimmed(input.notes);
+	if (extractionStatus === 'reviewed') {
+		const reviewValidation = validateMappingReviewFields(
+			sourceMetric,
+			sourceColumns,
+			transformation,
+			notes
+		);
+		if (!reviewValidation.ok) return reviewValidation;
+	}
+
 	const now = Date.now();
 
 	await db
@@ -1063,12 +1109,12 @@ export async function setAdminReferenceMetricMapping(
 			id: trimmed(input.id) || `${metric.id}-mapping`,
 			referenceMetricId: metric.id,
 			referenceCohortId,
-			sourceMetric: trimmed(input.sourceMetric),
+			sourceMetric,
 			sourceColumnsJson: JSON.stringify(sourceColumns),
-			transformation: trimmed(input.transformation),
+			transformation,
 			direction: parseReferenceMappingDirection(input.direction),
-			extractionStatus: parseReferenceExtractionStatus(input.extractionStatus),
-			notes: trimmed(input.notes),
+			extractionStatus,
+			notes,
 			createdAt: now,
 			updatedAt: now
 		})
@@ -1076,15 +1122,50 @@ export async function setAdminReferenceMetricMapping(
 			target: referenceMetricMappings.referenceMetricId,
 			set: {
 				referenceCohortId,
-				sourceMetric: trimmed(input.sourceMetric),
+				sourceMetric,
 				sourceColumnsJson: JSON.stringify(sourceColumns),
-				transformation: trimmed(input.transformation),
+				transformation,
 				direction: parseReferenceMappingDirection(input.direction),
-				extractionStatus: parseReferenceExtractionStatus(input.extractionStatus),
-				notes: trimmed(input.notes),
+				extractionStatus,
+				notes,
 				updatedAt: now
 			}
 		});
+
+	return { ok: true };
+}
+
+export async function setAdminReferenceMetricMappingReviewStatus(
+	input: AdminSetReferenceMetricMappingReviewInput
+): Promise<AdminReferenceUpdateResult> {
+	const [mapping] = await db
+		.select()
+		.from(referenceMetricMappings)
+		.where(eq(referenceMetricMappings.id, input.id));
+
+	if (!mapping) return { ok: false, status: 404, message: 'Reference metric mapping not found.' };
+
+	const extractionStatus = parseReferenceExtractionStatus(input.extractionStatus);
+	const notes = trimmed(input.notes);
+
+	if (extractionStatus === 'reviewed') {
+		const reviewValidation = validateMappingReviewFields(
+			trimmed(mapping.sourceMetric),
+			sourceColumnsValue(mapping.sourceColumnsJson),
+			trimmed(mapping.transformation),
+			notes
+		);
+		if (!reviewValidation.ok) return reviewValidation;
+	}
+
+	await db
+		.update(referenceMetricMappings)
+		.set({
+			extractionStatus,
+			notes: notes.length > 0 ? notes : mapping.notes,
+			updatedAt: Date.now()
+		})
+		.where(eq(referenceMetricMappings.id, input.id));
 
 	return { ok: true };
 }

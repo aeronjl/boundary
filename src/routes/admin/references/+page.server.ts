@@ -8,6 +8,7 @@ import {
 	setAdminReferenceDataset,
 	setAdminReferenceMetric,
 	setAdminReferenceMetricMapping,
+	setAdminReferenceMetricMappingReviewStatus,
 	setAdminReferenceReviewStatus,
 	setAdminReferenceStudy
 } from '$lib/server/admin/references';
@@ -17,6 +18,8 @@ function updateMessage(value: string | null): string {
 	if (value === 'dataset') return 'Reference dataset updated.';
 	if (value === 'metric') return 'Reference metric updated.';
 	if (value === 'mapping') return 'Reference metric mapping updated.';
+	if (value === 'mapping-reviewed') return 'Reference metric mapping reviewed.';
+	if (value === 'mapping-candidate') return 'Reference metric mapping reverted to candidate.';
 	if (value === 'cohort') return 'Reference cohort updated.';
 	if (value === 'cohort-created') return 'Reference cohort added.';
 	if (value === 'study') return 'Reference source updated.';
@@ -314,7 +317,10 @@ export const actions: Actions = {
 			transformation:
 				typeof form.get('transformation') === 'string' ? String(form.get('transformation')) : null,
 			direction: String(form.get('direction') ?? ''),
-			extractionStatus: String(form.get('extractionStatus') ?? ''),
+			extractionStatus:
+				typeof form.get('extractionStatus') === 'string'
+					? String(form.get('extractionStatus'))
+					: null,
 			notes: typeof form.get('notes') === 'string' ? String(form.get('notes')) : null
 		});
 
@@ -323,5 +329,31 @@ export const actions: Actions = {
 		}
 
 		throw redirect(303, '/admin/references?updated=mapping');
+	},
+	mappingReview: async ({ cookies, request }) => {
+		if (!isAdminAuthenticated(cookies)) {
+			throw redirect(303, '/admin');
+		}
+
+		const form = await request.formData();
+		const id = form.get('mappingId');
+
+		if (typeof id !== 'string' || id.length === 0) {
+			return fail(400, { message: 'Reference metric mapping id is required.' });
+		}
+
+		const nextStatus = String(form.get('extractionStatus') ?? '');
+		const result = await setAdminReferenceMetricMappingReviewStatus({
+			id,
+			extractionStatus: nextStatus,
+			notes: typeof form.get('notes') === 'string' ? String(form.get('notes')) : null
+		});
+
+		if (!result.ok) {
+			return fail(result.status, { message: result.message });
+		}
+
+		const updated = nextStatus === 'reviewed' ? 'mapping-reviewed' : 'mapping-candidate';
+		throw redirect(303, `/admin/references?updated=${updated}`);
 	}
 };

@@ -914,15 +914,28 @@ test('admin can inspect and export ten item personality inventory data', async (
 	await mappingForm.getByLabel('Source metric').fill('pilot_accuracy');
 	await mappingForm.getByLabel('Source columns').fill('pilot_nont, pilot_targ');
 	await mappingForm.getByLabel('Direction').selectOption('same');
-	await mappingForm.getByLabel('Extraction status').selectOption('reviewed');
 	await mappingForm
 		.getByLabel('Transformation')
 		.fill('Mean of pilot target and non-target accuracy.');
-	await mappingForm.getByLabel('Mapping notes').fill('Mapping reviewed during smoke test.');
+	await mappingForm.getByLabel('Mapping notes').fill('Mapping candidate details ready for review.');
 	await mappingForm.getByRole('button', { name: 'Save mapping' }).click();
 	await expect(page.getByText('Reference metric mapping updated.')).toBeVisible();
 	await expect(mappingForm.getByLabel('Source metric')).toHaveValue('pilot_accuracy');
 	await expect(mappingForm.getByLabel('Source columns')).toHaveValue('pilot_nont, pilot_targ');
+
+	const mappingReviewForm = page.locator(
+		'form[aria-label="Review reference mapping Accuracy for OpenfMRI ds000115 working-memory task data"]'
+	);
+	await mappingReviewForm
+		.getByLabel('Mapping review note')
+		.fill('Mapping reviewed during smoke test.');
+	await mappingReviewForm.getByRole('button', { name: 'Mark mapping reviewed' }).click();
+	await expect(page.getByText('Reference metric mapping reviewed.')).toBeVisible();
+	await expect(
+		page.locator(
+			'form[aria-label="Revert reference mapping Accuracy for OpenfMRI ds000115 working-memory task data to candidate"]'
+		)
+	).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Export JSON' })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Export CSV' })).toBeVisible();
 

@@ -1,7 +1,22 @@
 <script lang="ts">
+	import { dev } from '$app/environment';
+	import { invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import {
+		policyScenarioLaunchCount,
+		policyScenarioLaunchTargets,
+		type PolicyScenarioLaunchScenario,
+		type PolicyScenarioLaunchTarget
+	} from '$lib/experiments/policy-scenario-launch';
 
 	export let data;
+
+	let launchBusy = false;
+	let launchError = '';
+	let launchMessage = '';
+	let activeScenarioKey = '';
+	let completedLaunchCount = 0;
+	let totalLaunchCount = 0;
 
 	const formatDate = (value: number | null) =>
 		value
@@ -15,6 +30,98 @@
 	const formatDegrees = (value: number | null) =>
 		value === null ? '-' : `${value.toFixed(1)} deg`;
 	const formatLabel = (value: string) => value.replaceAll('-', ' ');
+	const scenarioKey = (
+		target: PolicyScenarioLaunchTarget,
+		scenario: PolicyScenarioLaunchScenario
+	) => `${target.experimentSlug}:${scenario.id}`;
+
+	async function parseJsonResponse<T>(response: Response): Promise<T> {
+		const body = (await response.json().catch(() => null)) as (T & { message?: string }) | null;
+
+		if (!response.ok) {
+			throw new Error(body?.message ?? 'Request failed.');
+		}
+
+		return body as T;
+	}
+
+	async function acceptDevConsent() {
+		const response = await fetch(resolve('/api/consent'), { method: 'POST' });
+
+		if (!response.ok) {
+			const body = (await response.json().catch(() => null)) as { message?: string } | null;
+			throw new Error(body?.message ?? 'Could not record consent.');
+		}
+	}
+
+	async function postScenarioRun(scenario: PolicyScenarioLaunchScenario): Promise<void> {
+		await parseJsonResponse<unknown>(
+			await fetch(scenario.runPath, {
+				method: 'POST'
+			})
+		);
+	}
+
+	async function runSingleScenario(
+		target: PolicyScenarioLaunchTarget,
+		scenario: PolicyScenarioLaunchScenario
+	) {
+		if (launchBusy) return;
+
+		launchBusy = true;
+		launchError = '';
+		completedLaunchCount = 0;
+		totalLaunchCount = 1;
+		activeScenarioKey = scenarioKey(target, scenario);
+		launchMessage = `Running ${scenario.label}.`;
+
+		try {
+			await acceptDevConsent();
+			await postScenarioRun(scenario);
+			completedLaunchCount = 1;
+			launchMessage = `Completed ${scenario.label}.`;
+			await invalidateAll();
+		} catch (error) {
+			launchError = error instanceof Error ? error.message : 'Could not run policy scenario.';
+			launchMessage = '';
+		} finally {
+			launchBusy = false;
+			activeScenarioKey = '';
+		}
+	}
+
+	async function runAllScenarios() {
+		if (launchBusy) return;
+
+		launchBusy = true;
+		launchError = '';
+		completedLaunchCount = 0;
+		totalLaunchCount = policyScenarioLaunchCount;
+		launchMessage = `Running ${policyScenarioLaunchCount} policy scenarios.`;
+
+		try {
+			await acceptDevConsent();
+
+			for (const target of policyScenarioLaunchTargets) {
+				for (const scenario of target.scenarios) {
+					activeScenarioKey = scenarioKey(target, scenario);
+					launchMessage = `Running ${scenario.label} (${completedLaunchCount + 1} of ${policyScenarioLaunchCount}).`;
+					await postScenarioRun(scenario);
+					completedLaunchCount += 1;
+				}
+			}
+
+			activeScenarioKey = '';
+			launchMessage = `Completed ${completedLaunchCount} policy scenario runs.`;
+			await invalidateAll();
+		} catch (error) {
+			launchError =
+				error instanceof Error ? error.message : 'Could not run the policy scenario matrix.';
+		} finally {
+			launchBusy = false;
+			activeScenarioKey = '';
+		}
+	}
 </script>
 
 <svelte:head>
@@ -58,6 +165,66 @@
 			<p class="font-serif text-2xl">{data.comparison.choiceCount}</p>
 		</div>
 	</div>
+
+	{#if dev}
+		<div class="border-t border-gray-200 pt-4">
+			<div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+				<div>
+					<h2 class="font-serif text-2xl">Launch scenarios</h2>
+					<p class="mt-1 max-w-2xl text-gray-500">
+						Run generated profiles from one admin surface and refresh the comparison table.
+					</p>
+				</div>
+				<button
+					class="rounded-sm bg-black px-3 py-2 text-xs text-white disabled:bg-gray-300"
+					disabled={launchBusy}
+					on:click={runAllScenarios}
+				>
+					{launchBusy && totalLaunchCount > 1
+						? `${completedLaunchCount} of ${totalLaunchCount}`
+						: 'Run full matrix'}
+				</button>
+			</div>
+
+			{#if launchError}
+				<p role="alert" class="mt-3 rounded-sm border border-red-200 bg-red-50 p-3 text-red-800">
+					{launchError}
+				</p>
+			{/if}
+
+			{#if launchMessage}
+				<p class="mt-3 text-xs text-gray-500">{launchMessage}</p>
+			{/if}
+
+			<div class="mt-4 grid gap-5 md:grid-cols-2">
+				{#each policyScenarioLaunchTargets as target (target.experimentSlug)}
+					<div class="border-t border-gray-200 pt-3">
+						<div class="flex items-baseline justify-between gap-3">
+							<h3 class="font-serif text-xl">{target.experimentLabel}</h3>
+							<p class="text-xs text-gray-500">{target.scenarios.length} scenarios</p>
+						</div>
+						<div class="mt-3 grid gap-2">
+							{#each target.scenarios as scenario (scenario.id)}
+								<button
+									class="rounded-sm border border-gray-200 p-3 text-left disabled:bg-gray-50 disabled:text-gray-400"
+									disabled={launchBusy}
+									on:click={() => runSingleScenario(target, scenario)}
+								>
+									<span class="block font-medium">{scenario.label}</span>
+									<span class="mt-1 block text-xs text-gray-500">{scenario.description}</span>
+									<span class="mt-3 block text-xs">
+										{activeScenarioKey === scenarioKey(target, scenario)
+											? 'Running...'
+											: 'Run scenario'}
+									</span>
+								</button>
+							{/each}
+						</div>
+					</div>
+				{/each}
+			</div>
+		</div>
+	{/if}
 
 	{#if data.comparison.summaries.length === 0}
 		<p class="border-t border-gray-200 pt-4 text-gray-500">

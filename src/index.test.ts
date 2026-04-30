@@ -21,6 +21,11 @@ import {
 	intertemporalDelayedChoiceRate
 } from '$lib/experiments/intertemporal-interpretation';
 import { createPolicyScenarioComparison } from '$lib/experiments/policy-scenario-comparison';
+import {
+	policyScenarioLaunchCount,
+	policyScenarioLaunchTargets,
+	policyScenarioRunPath
+} from '$lib/experiments/policy-scenario-launch';
 import { referenceMetricContracts } from '$lib/reference-data/catalog';
 import {
 	calculateReferenceZScore,
@@ -499,6 +504,23 @@ describe('intertemporal interpretation helpers', () => {
 });
 
 describe('policy scenario comparison helpers', () => {
+	it('collects launch targets for the admin scenario matrix', () => {
+		expect(policyScenarioLaunchTargets.map((target) => target.experimentSlug)).toEqual([
+			'intertemporal-choice',
+			'n-armed-bandit',
+			'n-back',
+			'orientation-discrimination'
+		]);
+		expect(policyScenarioLaunchCount).toBe(16);
+		expect(policyScenarioRunPath('n-back', 'perfect-responder')).toBe(
+			'/api/experiments/n-back/scenarios/perfect-responder/runs'
+		);
+		expect(policyScenarioRunPath('orientation-discrimination', 'threshold-observer')).toBe(
+			'/api/experiments/orientation-discrimination/scenarios/threshold-observer/runs'
+		);
+		expect(policyScenarioRunPath('n-back', 'missing')).toBeNull();
+	});
+
 	it('groups generated task runs by scenario, epoch, and phase', () => {
 		const comparison = createPolicyScenarioComparison(
 			[

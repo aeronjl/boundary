@@ -1,8 +1,10 @@
 import {
 	referenceDatasetSeeds,
 	referenceMetricContracts,
+	referenceOutcomeTargetsForMetricContract,
 	type ReferenceDatasetSeed,
 	type ReferenceMetricContract,
+	type ReferenceOutcomeTargetContract,
 	type ReferenceMetricUnit
 } from './catalog';
 
@@ -12,6 +14,7 @@ export type ReferenceContextMetric = ReferenceMetricContract & {
 	currentValue: ReferenceMetricValue;
 	hasCandidateDataset: boolean;
 	hasValidatedDataset: boolean;
+	outcomeTargets: ReferenceOutcomeTargetContract[];
 };
 
 export type ReferenceContextSummary = {
@@ -73,7 +76,8 @@ export function createReferenceContext(
 			...contract,
 			currentValue: currentMetrics[contract.metricKey],
 			hasCandidateDataset: datasetsForMetric.some((dataset) => dataset.status === 'candidate'),
-			hasValidatedDataset: datasetsForMetric.some((dataset) => dataset.status === 'validated')
+			hasValidatedDataset: datasetsForMetric.some((dataset) => dataset.status === 'validated'),
+			outcomeTargets: referenceOutcomeTargetsForMetricContract(contract)
 		};
 	});
 

@@ -16,12 +16,37 @@ export type ReferenceMetricUnit =
 	| 'degrees'
 	| 'count';
 export type ReferenceComparisonType = 'distribution' | 'threshold' | 'descriptive';
+export type ReferenceOutcomeTargetKind =
+	| 'reference_percentile'
+	| 'distribution_figure'
+	| 'cohort_similarity'
+	| 'related_task_prompt'
+	| 'descriptive_context';
+export type ReferenceOutcomeTargetRequirement =
+	| 'current_value'
+	| 'ready_reference'
+	| 'distribution_stats'
+	| 'reviewed_public_claim'
+	| 'cross_task_relationship';
 
 export const referenceDatasetStatuses = ['candidate', 'validated', 'rejected'] as const;
 export const referenceCompatibilities = ['compatible', 'partial', 'incompatible'] as const;
 export const referenceExtractionStatuses = ['candidate', 'reviewed', 'blocked'] as const;
 export const referenceMappingDirections = ['same', 'inverted', 'derived'] as const;
 export const referenceSourceTypes = ['literature', 'dataset'] as const;
+
+export type ReferenceOutcomeTargetContract = {
+	id: string;
+	experimentSlug: string;
+	metricKey: string;
+	metricLabel: string;
+	kind: ReferenceOutcomeTargetKind;
+	label: string;
+	participantFacing: boolean;
+	requirements: ReferenceOutcomeTargetRequirement[];
+	guardrail: string;
+	notes: string;
+};
 
 export type ReferenceMetricContract = {
 	experimentSlug: string;
@@ -205,6 +230,99 @@ export const referenceMetricContracts: ReferenceMetricContract[] = [
 		notes: 'A rough exploration marker before fitting explicit exploration-exploitation models.'
 	}
 ];
+
+type OutcomeTargetTemplate = Omit<
+	ReferenceOutcomeTargetContract,
+	'id' | 'experimentSlug' | 'metricKey' | 'metricLabel'
+>;
+
+const distributionOutcomeTargetTemplates: OutcomeTargetTemplate[] = [
+	{
+		kind: 'reference_percentile',
+		label: 'Reference percentile',
+		participantFacing: true,
+		requirements: ['current_value', 'ready_reference', 'distribution_stats'],
+		guardrail:
+			'Describe this as task-specific reference position, not a trait, diagnosis, or classification.',
+		notes: 'Uses reviewed mean and SD to place this run on a compatible reference distribution.'
+	},
+	{
+		kind: 'distribution_figure',
+		label: 'Distribution figure',
+		participantFacing: true,
+		requirements: ['current_value', 'ready_reference', 'distribution_stats'],
+		guardrail:
+			'Show the figure as an approximate or imported reference distribution with source caveats.',
+		notes: 'Supports the visual marker showing this run against the reviewed reference mean.'
+	},
+	{
+		kind: 'cohort_similarity',
+		label: 'Cohort similarity',
+		participantFacing: true,
+		requirements: [
+			'current_value',
+			'ready_reference',
+			'distribution_stats',
+			'reviewed_public_claim'
+		],
+		guardrail:
+			'Use guarded similarity language only after a reviewed public literature claim exists.',
+		notes: 'Enables phrases such as closest reviewed reference while avoiding diagnostic language.'
+	},
+	{
+		kind: 'related_task_prompt',
+		label: 'Task prompt',
+		participantFacing: true,
+		requirements: ['current_value', 'ready_reference', 'cross_task_relationship'],
+		guardrail:
+			'Frame the prompt as task sequencing or broader profiling, not prediction or diagnosis.',
+		notes: 'Connects a ready reference metric to a reviewed cross-task relationship.'
+	}
+];
+
+const descriptiveOutcomeTargetTemplates: OutcomeTargetTemplate[] = [
+	{
+		kind: 'descriptive_context',
+		label: 'Descriptive context',
+		participantFacing: true,
+		requirements: ['current_value'],
+		guardrail:
+			'Keep interpretation within Boundary task behavior until compatible reference data exists.',
+		notes: 'Allows cautious within-task summaries without cohort-similarity claims.'
+	},
+	{
+		kind: 'related_task_prompt',
+		label: 'Task prompt',
+		participantFacing: true,
+		requirements: ['current_value', 'cross_task_relationship'],
+		guardrail:
+			'Frame the prompt as task sequencing or broader profiling, not prediction or diagnosis.',
+		notes: 'Connects this metric to a reviewed cross-task relationship.'
+	}
+];
+
+function outcomeTargetTemplatesFor(
+	comparisonType: ReferenceComparisonType
+): OutcomeTargetTemplate[] {
+	return comparisonType === 'distribution'
+		? distributionOutcomeTargetTemplates
+		: descriptiveOutcomeTargetTemplates;
+}
+
+export function referenceOutcomeTargetsForMetricContract(
+	contract: ReferenceMetricContract
+): ReferenceOutcomeTargetContract[] {
+	return outcomeTargetTemplatesFor(contract.comparisonType).map((target) => ({
+		...target,
+		id: `${contract.experimentSlug}:${contract.metricKey}:${target.kind}`,
+		experimentSlug: contract.experimentSlug,
+		metricKey: contract.metricKey,
+		metricLabel: contract.label
+	}));
+}
+
+export const referenceOutcomeTargetContracts: ReferenceOutcomeTargetContract[] =
+	referenceMetricContracts.flatMap(referenceOutcomeTargetsForMetricContract);
 
 export const referenceStudySeeds: ReferenceStudySeed[] = [
 	{

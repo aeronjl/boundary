@@ -8,7 +8,9 @@ import {
 	createComparisonSummary,
 	createReferenceDistributionFigure,
 	createReferenceInterpretationPrompt,
+	createReferenceOutcomeTargetEvaluations,
 	createReferenceTaskRecommendation,
+	hasReadyReferenceOutcomeTarget,
 	percentileFromZScore,
 	type ReferenceComparison,
 	type ReferenceComparisonDataset,
@@ -249,7 +251,8 @@ function emptyComparison(
 		referenceDistributionBins: reference?.distributionBins ?? [],
 		zScore: null,
 		percentile: null,
-		summary: ''
+		summary: '',
+		outcomeTargets: []
 	};
 
 	return {
@@ -350,7 +353,8 @@ function createMetricComparison(
 		referenceDistributionBins: reference.distributionBins,
 		zScore,
 		percentile,
-		summary: ''
+		summary: '',
+		outcomeTargets: []
 	};
 
 	return {
@@ -461,7 +465,7 @@ export async function getReferenceComparisonContext(
 	const mappingsByMetricId = new Map(
 		mappings.map((mapping) => [mapping.referenceMetricId, mapping])
 	);
-	const comparisons = contracts.map((contract) =>
+	const baseComparisons = contracts.map((contract) =>
 		createMetricComparison(
 			contract,
 			currentMetrics,
@@ -472,24 +476,41 @@ export async function getReferenceComparisonContext(
 			mappingsByMetricId
 		)
 	);
+	const readyRegistryMetricKeys = new Set(
+		baseComparisons
+			.filter((comparison) => comparison.readinessStatus === 'ready')
+			.map((comparison) => `${experimentSlug}:${comparison.metricKey}`)
+	);
+	const literatureClaims = participantLiteratureClaimsForExperiment(experimentSlug, {
+		readyRegistryMetricKeys
+	});
+	const comparisons = baseComparisons.map((comparison) => ({
+		...comparison,
+		outcomeTargets: createReferenceOutcomeTargetEvaluations(
+			experimentSlug,
+			comparison,
+			literatureClaims
+		)
+	}));
 	const prompts = comparisons.flatMap((comparison) => {
+		if (!hasReadyReferenceOutcomeTarget(comparison, 'reference_percentile')) return [];
+
 		const prompt = createReferenceInterpretationPrompt(comparison);
 		return prompt ? [prompt] : [];
 	});
 	const figures = comparisons.flatMap((comparison) => {
+		if (!hasReadyReferenceOutcomeTarget(comparison, 'distribution_figure')) return [];
+
 		const figure = createReferenceDistributionFigure(comparison);
 		return figure ? [figure] : [];
 	});
 	const recommendations = uniqueRecommendations(
 		comparisons.flatMap((comparison) => {
+			if (!hasReadyReferenceOutcomeTarget(comparison, 'related_task_prompt')) return [];
+
 			const recommendation = createReferenceTaskRecommendation(experimentSlug, comparison);
 			return recommendation ? [recommendation] : [];
 		})
-	);
-	const readyRegistryMetricKeys = new Set(
-		comparisons
-			.filter((comparison) => comparison.readinessStatus === 'ready')
-			.map((comparison) => `${experimentSlug}:${comparison.metricKey}`)
 	);
 
 	return {
@@ -498,9 +519,8 @@ export async function getReferenceComparisonContext(
 		figures,
 		prompts,
 		recommendations,
-		literatureClaims: participantLiteratureClaimsForExperiment(experimentSlug, {
-			readyRegistryMetricKeys
-		}),
+		outcomeTargets: comparisons.flatMap((comparison) => comparison.outcomeTargets),
+		literatureClaims,
 		datasets: datasets.map(datasetSummary),
 		candidateDatasetCount: datasets.filter((dataset) => dataset.status === 'candidate').length,
 		validatedDatasetCount: datasets.filter((dataset) => dataset.status === 'validated').length,

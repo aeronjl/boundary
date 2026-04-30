@@ -1,5 +1,10 @@
 import type { ExperimentRoutePath } from '../experiments/interpretation';
-import type { ReferenceMetricUnit } from './catalog';
+import {
+	referenceOutcomeTargetContracts,
+	type ReferenceMetricUnit,
+	type ReferenceOutcomeTargetContract,
+	type ReferenceOutcomeTargetKind
+} from './catalog';
 import type { ParticipantLiteratureClaim } from './literature';
 import { crossTaskRelationshipsForMetric, type CrossTaskRelationshipKind } from './relationships';
 import { formatReferenceValue, type ReferenceMetricValue } from './summary';
@@ -13,6 +18,12 @@ export type ReferenceComparisonState =
 	| 'comparable';
 
 export type ReferenceComparisonReadinessStatus = 'ready' | 'blocked' | 'not_registered';
+export type ReferenceOutcomeTargetStatus = 'ready' | 'blocked';
+
+export type ReferenceOutcomeTargetEvaluation = ReferenceOutcomeTargetContract & {
+	status: ReferenceOutcomeTargetStatus;
+	blockers: string[];
+};
 
 export type ReferenceComparison = {
 	metricKey: string;
@@ -50,6 +61,7 @@ export type ReferenceComparison = {
 	zScore: number | null;
 	percentile: number | null;
 	summary: string;
+	outcomeTargets: ReferenceOutcomeTargetEvaluation[];
 };
 
 export type ReferenceDistributionBin = {
@@ -139,6 +151,7 @@ export type ReferenceComparisonResponse = {
 	figures: ReferenceDistributionFigure[];
 	prompts: ReferenceInterpretationPrompt[];
 	recommendations: ReferenceTaskRecommendation[];
+	outcomeTargets: ReferenceOutcomeTargetEvaluation[];
 	literatureClaims: ParticipantLiteratureClaim[];
 	datasets: ReferenceComparisonDataset[];
 	candidateDatasetCount: number;
@@ -280,6 +293,102 @@ function referenceAnchor(comparison: ReferenceComparison): string {
 	return comparison.referenceSourceCitation
 		? `${cohort} in ${comparison.referenceSourceCitation}`
 		: cohort;
+}
+
+function hasFiniteCurrentValue(comparison: ReferenceComparison): boolean {
+	return comparison.currentValue !== null && Number.isFinite(comparison.currentValue);
+}
+
+function hasDistributionStats(comparison: ReferenceComparison): boolean {
+	return (
+		comparison.referenceMean !== null &&
+		Number.isFinite(comparison.referenceMean) &&
+		comparison.referenceStandardDeviation !== null &&
+		Number.isFinite(comparison.referenceStandardDeviation) &&
+		comparison.referenceStandardDeviation > 0 &&
+		comparison.zScore !== null &&
+		Number.isFinite(comparison.zScore) &&
+		comparison.percentile !== null &&
+		Number.isFinite(comparison.percentile)
+	);
+}
+
+function uniqueBlockers(blockers: string[]): string[] {
+	return [...new Set(blockers)];
+}
+
+function outcomeTargetBlockers(
+	target: ReferenceOutcomeTargetContract,
+	experimentSlug: string,
+	comparison: ReferenceComparison,
+	literatureClaims: ParticipantLiteratureClaim[]
+): string[] {
+	const blockers: string[] = [];
+
+	if (target.requirements.includes('current_value') && !hasFiniteCurrentValue(comparison)) {
+		blockers.push('Current run metric is missing.');
+	}
+
+	if (
+		target.requirements.includes('ready_reference') &&
+		(comparison.state !== 'comparable' || comparison.readinessStatus !== 'ready')
+	) {
+		blockers.push(
+			...(comparison.readinessBlockers.length > 0
+				? comparison.readinessBlockers
+				: ['Ready reference comparison is not available.'])
+		);
+	}
+
+	if (target.requirements.includes('distribution_stats') && !hasDistributionStats(comparison)) {
+		blockers.push('Reference distribution statistics are incomplete.');
+	}
+
+	if (
+		target.requirements.includes('reviewed_public_claim') &&
+		!literatureClaims.some((claim) => claim.metricKey === comparison.metricKey)
+	) {
+		blockers.push('Reviewed public literature claim is missing.');
+	}
+
+	if (
+		target.requirements.includes('cross_task_relationship') &&
+		crossTaskRelationshipsForMetric(experimentSlug, comparison.metricKey).length === 0
+	) {
+		blockers.push('Reviewed cross-task relationship is missing.');
+	}
+
+	return uniqueBlockers(blockers);
+}
+
+export function createReferenceOutcomeTargetEvaluations(
+	experimentSlug: string,
+	comparison: ReferenceComparison,
+	literatureClaims: ParticipantLiteratureClaim[] = []
+): ReferenceOutcomeTargetEvaluation[] {
+	return referenceOutcomeTargetContracts
+		.filter(
+			(target) =>
+				target.experimentSlug === experimentSlug && target.metricKey === comparison.metricKey
+		)
+		.map((target) => {
+			const blockers = outcomeTargetBlockers(target, experimentSlug, comparison, literatureClaims);
+
+			return {
+				...target,
+				status: blockers.length === 0 ? 'ready' : 'blocked',
+				blockers
+			};
+		});
+}
+
+export function hasReadyReferenceOutcomeTarget(
+	comparison: ReferenceComparison,
+	kind: ReferenceOutcomeTargetKind
+): boolean {
+	return comparison.outcomeTargets.some(
+		(target) => target.kind === kind && target.status === 'ready'
+	);
 }
 
 export function createReferenceInterpretationPrompt(

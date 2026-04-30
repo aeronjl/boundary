@@ -4,7 +4,8 @@
 	import {
 		formatPercentile,
 		type ReferenceComparison,
-		type ReferenceComparisonResponse
+		type ReferenceComparisonResponse,
+		type ReferenceOutcomeTargetEvaluation
 	} from '$lib/reference-data/comparison';
 	import {
 		createReferenceContext,
@@ -31,6 +32,11 @@
 	$: comparableCount =
 		serverContext?.comparisons.filter((comparison) => comparison.state === 'comparable').length ??
 		0;
+	$: readyOutcomeTargetCount =
+		serverContext?.outcomeTargets.filter((target) => target.status === 'ready').length ?? 0;
+	$: outcomeTargetCount =
+		serverContext?.outcomeTargets.length ??
+		context.metrics.reduce((total, metric) => total + metric.outcomeTargets.length, 0);
 	$: contextSummary = serverContext?.summary ?? context.summary;
 	$: candidateDatasetCount = serverContext?.candidateDatasetCount ?? context.candidateDatasetCount;
 	$: validatedDatasetCount = serverContext?.validatedDatasetCount ?? context.validatedDatasetCount;
@@ -132,6 +138,25 @@
 		return 'Reviewed source, compatible dataset, usable stats, and reviewed mapping.';
 	}
 
+	function outcomeTargetTone(target: ReferenceOutcomeTargetEvaluation): string {
+		return target.status === 'ready' ? 'bg-green-50 text-green-800' : 'bg-amber-50 text-amber-800';
+	}
+
+	function outcomeTargetsForMetric(
+		metric: ReferenceContextMetric,
+		comparison: ReferenceComparison | undefined
+	): ReferenceOutcomeTargetEvaluation[] {
+		if (comparison) return comparison.outcomeTargets;
+
+		return metric.outcomeTargets.map((target) => ({
+			...target,
+			status: 'blocked' as const,
+			blockers: comparisonPending
+				? ['Checking reviewed references.']
+				: ['Server comparison has not been checked yet.']
+		}));
+	}
+
 	function sourceCohortLabel(comparison: ReferenceComparison | undefined): string {
 		if (!comparison) return '-';
 
@@ -207,7 +232,7 @@
 		<p class="mt-2 text-xs text-gray-500">{comparisonError}</p>
 	{/if}
 
-	<div class="mt-3 grid gap-3 border-t border-gray-200 pt-3 md:grid-cols-3">
+	<div class="mt-3 grid gap-3 border-t border-gray-200 pt-3 md:grid-cols-4">
 		<div class="border-l-2 border-gray-300 py-1 pl-3">
 			<p class="text-xs text-gray-500">Registry status</p>
 			<p class="font-serif text-xl">
@@ -223,6 +248,19 @@
 			<p class="font-serif text-xl">{context.contracts.length} metrics</p>
 			<p class="mt-1 text-gray-600">
 				Only these metrics are eligible for later cohort similarity or percentile displays.
+			</p>
+		</div>
+		<div class="border-l-2 border-gray-300 py-1 pl-3">
+			<p class="text-xs text-gray-500">Outcome targets</p>
+			<p class="font-serif text-xl">
+				{#if comparisonPending && !serverContext}
+					checking
+				{:else}
+					{readyOutcomeTargetCount}/{outcomeTargetCount} ready
+				{/if}
+			</p>
+			<p class="mt-1 text-gray-600">
+				Targets explicitly gate percentile, cohort-similarity, figure, and next-task copy.
 			</p>
 		</div>
 		<div class="border-l-2 border-gray-300 py-1 pl-3">
@@ -394,6 +432,7 @@
 						<th class="py-2 pr-3 font-medium">Readiness</th>
 						<th class="py-2 pr-3 font-medium">Source and cohort</th>
 						<th class="py-2 pr-3 font-medium">Mapping</th>
+						<th class="py-2 pr-3 font-medium">Outcome targets</th>
 						<th class="py-2 pr-3 font-medium">Comparison</th>
 						<th class="py-2 pr-3 font-medium">Constraint</th>
 					</tr>
@@ -419,6 +458,15 @@
 								{#if comparison?.mappingTransformation}
 									<p class="mt-1 text-gray-600">{comparison.mappingTransformation}</p>
 								{/if}
+							</td>
+							<td class="py-2 pr-3">
+								<div class="flex flex-wrap gap-1">
+									{#each outcomeTargetsForMetric(metric, comparison) as target (target.id)}
+										<span class="rounded-sm px-2 py-1 {outcomeTargetTone(target)}">
+											{target.label}: {target.status}
+										</span>
+									{/each}
+								</div>
 							</td>
 							<td class="py-2 pr-3 text-gray-600">{comparisonLabel(comparison)}</td>
 							<td class="py-2 pr-3 text-gray-600">{metric.notes}</td>

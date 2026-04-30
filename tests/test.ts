@@ -896,6 +896,7 @@ test('admin can inspect and export ten item personality inventory data', async (
 		page.getByText('OpenfMRI ds000115 n-back schizophrenia participants').first()
 	).toBeVisible();
 	await expect(page.getByText('Metric contracts', { exact: true })).toBeVisible();
+	await expect(page.getByText('Outcome targets', { exact: true })).toBeVisible();
 	await expect(page.getByRole('heading', { name: 'Comparison readiness' })).toBeVisible();
 	await expect(page.getByRole('heading', { name: 'Readiness queue' })).toBeVisible();
 	await expect(page.getByText('Ready metrics')).toBeVisible();
@@ -1038,6 +1039,9 @@ test('admin can inspect and export ten item personality inventory data', async (
 	const referenceJsonResponse = await page.request.get('/admin/references/export.json');
 	expect(referenceJsonResponse.status()).toBe(200);
 	const referenceJson = await referenceJsonResponse.json();
+	expect(referenceJson.outcomeTargetContractCount).toBeGreaterThan(
+		referenceJson.metricContractCount
+	);
 	expect(referenceJson.readiness).toMatchObject({
 		totalMetricCount: expect.any(Number),
 		readyMetricCount: expect.any(Number),
@@ -1136,6 +1140,28 @@ test('admin can inspect and export ten item personality inventory data', async (
 		referenceMaximum: 1
 	});
 	expect(importedAccuracyComparison.zScore).toBeCloseTo(-0.11, 2);
+	expect(importedAccuracyComparison.outcomeTargets).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				kind: 'cohort_similarity',
+				status: 'ready',
+				blockers: []
+			}),
+			expect.objectContaining({
+				kind: 'related_task_prompt',
+				status: 'ready'
+			})
+		])
+	);
+	expect(importedReferenceContext.outcomeTargets).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				metricKey: 'accuracy',
+				kind: 'reference_percentile',
+				status: 'ready'
+			})
+		])
+	);
 	expect(importedReferenceContext.figures).toEqual(
 		expect.arrayContaining([
 			expect.objectContaining({

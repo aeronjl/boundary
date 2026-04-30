@@ -48,7 +48,7 @@
 		</p>
 	{/if}
 
-	<div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+	<div class="grid grid-cols-2 gap-3 md:grid-cols-5">
 		<div class="border-t border-gray-200 py-3">
 			<p class="text-xs text-gray-500">Studies</p>
 			<p class="font-serif text-2xl">{data.studies.length}</p>
@@ -64,6 +64,10 @@
 		<div class="border-t border-gray-200 py-3">
 			<p class="text-xs text-gray-500">Metric contracts</p>
 			<p class="font-serif text-2xl">{data.metricContractCount}</p>
+		</div>
+		<div class="border-t border-gray-200 py-3">
+			<p class="text-xs text-gray-500">Outcome targets</p>
+			<p class="font-serif text-2xl">{data.outcomeTargetContractCount}</p>
 		</div>
 	</div>
 

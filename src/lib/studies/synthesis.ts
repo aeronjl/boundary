@@ -17,7 +17,11 @@ import {
 	relationshipEvidenceReferencesForExperiment,
 	relatedTaskPromptFromRelationship
 } from '$lib/reference-data/relationships';
-import { formatPercentile, type ReferenceComparison } from '$lib/reference-data/comparison';
+import {
+	formatPercentile,
+	hasReadyReferenceOutcomeTarget,
+	type ReferenceComparison
+} from '$lib/reference-data/comparison';
 import {
 	participantLiteratureClaimsForExperiment,
 	type ParticipantLiteratureClaim
@@ -161,7 +165,8 @@ function studyReferenceMatches(
 				comparison.readinessStatus !== 'ready' ||
 				comparison.zScore === null ||
 				comparison.percentile === null ||
-				comparison.referenceMean === null
+				comparison.referenceMean === null ||
+				!hasReadyReferenceOutcomeTarget(comparison, 'cohort_similarity')
 			) {
 				return [];
 			}

@@ -26,12 +26,16 @@ import {
 	policyScenarioLaunchTargets,
 	policyScenarioRunPath
 } from '$lib/experiments/policy-scenario-launch';
-import { referenceMetricContracts } from '$lib/reference-data/catalog';
+import {
+	referenceMetricContracts,
+	referenceOutcomeTargetContracts
+} from '$lib/reference-data/catalog';
 import {
 	calculateReferenceZScore,
 	createComparisonSummary,
 	createReferenceDistributionFigure,
 	createReferenceInterpretationPrompt,
+	createReferenceOutcomeTargetEvaluations,
 	createReferenceTaskRecommendation,
 	formatPercentile,
 	percentileFromZScore,
@@ -843,6 +847,7 @@ describe('reference data contracts', () => {
 		});
 
 		expect(referenceMetricContracts.length).toBeGreaterThanOrEqual(10);
+		expect(referenceOutcomeTargetContracts.length).toBeGreaterThan(referenceMetricContracts.length);
 		expect(context.metrics.map((metric) => metric.metricKey)).toEqual([
 			'rewardRate',
 			'bestArmSelectionRate',
@@ -850,6 +855,16 @@ describe('reference data contracts', () => {
 		]);
 		expect(context.summary).toContain('no external reference dataset');
 		expect(context.metrics[0].currentValue).toBe(0.55);
+		expect(context.metrics[0].outcomeTargets.map((target) => target.kind)).toEqual([
+			'reference_percentile',
+			'distribution_figure',
+			'cohort_similarity',
+			'related_task_prompt'
+		]);
+		expect(context.metrics[2].outcomeTargets.map((target) => target.kind)).toEqual([
+			'descriptive_context',
+			'related_task_prompt'
+		]);
 	});
 
 	it('marks candidate datasets separately from validated comparisons', () => {
@@ -974,8 +989,24 @@ describe('reference data contracts', () => {
 			referenceDistributionBins: [],
 			zScore,
 			percentile,
-			summary: ''
+			summary: '',
+			outcomeTargets: []
 		};
+		const outcomeTargets = createReferenceOutcomeTargetEvaluations(
+			'n-back',
+			comparison,
+			participantLiteratureClaimsForExperiment('n-back')
+		);
+		const sensitivityOutcomeTargets = createReferenceOutcomeTargetEvaluations(
+			'n-back',
+			{
+				...comparison,
+				metricKey: 'sensitivityIndex',
+				label: "Sensitivity d'",
+				outcomeTargets: []
+			},
+			participantLiteratureClaimsForExperiment('n-back')
+		);
 		const figure = createReferenceDistributionFigure(comparison);
 		const importedFigure = createReferenceDistributionFigure({
 			...comparison,
@@ -1007,6 +1038,20 @@ describe('reference data contracts', () => {
 		expect(importedFigure?.bins[2]).toMatchObject({ count: 48, proportion: 0.48 });
 		expect(prompt?.body).toContain('around the 84th percentile');
 		expect(prompt?.caveat).toContain('not a diagnosis');
+		expect(outcomeTargets.find((target) => target.kind === 'reference_percentile')).toMatchObject({
+			status: 'ready',
+			blockers: []
+		});
+		expect(outcomeTargets.find((target) => target.kind === 'cohort_similarity')).toMatchObject({
+			status: 'ready',
+			blockers: []
+		});
+		expect(
+			sensitivityOutcomeTargets.find((target) => target.kind === 'cohort_similarity')
+		).toMatchObject({
+			status: 'blocked',
+			blockers: expect.arrayContaining(['Reviewed public literature claim is missing.'])
+		});
 		expect(relationships[0]?.id).toBe('n-back-to-orientation-perceptual-control');
 		expect(relationships[0]?.sources.map((source) => source.evidenceId)).toContain('meule-2017');
 		expect(recommendation?.href).toBe('/orientation-discrimination');
@@ -1384,9 +1429,15 @@ describe('study profile synthesis', () => {
 			zScore: -0.4,
 			percentile: 0.34,
 			summary: 'This run is near the reviewed reference fixture.',
+			outcomeTargets: [],
 			taskName: 'n-back',
 			taskSlug: 'n-back'
 		};
+		referenceComparison.outcomeTargets = createReferenceOutcomeTargetEvaluations(
+			'n-back',
+			referenceComparison,
+			participantLiteratureClaimsForExperiment('n-back')
+		);
 		const interpretation = createStudyProfileInterpretation(tasks, {
 			referenceComparisons: [referenceComparison]
 		});

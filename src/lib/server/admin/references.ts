@@ -6,6 +6,7 @@ import {
 	referenceExtractionStatuses,
 	referenceMappingDirections,
 	referenceMetricContracts,
+	referenceOutcomeTargetContracts,
 	referenceSourceTypes,
 	type ReferenceCompatibility,
 	type ReferenceDatasetStatus,
@@ -781,6 +782,7 @@ export async function listAdminReferenceRegistry(): Promise<{
 	datasets: AdminReferenceDataset[];
 	readiness: AdminReferenceReadiness;
 	metricContractCount: number;
+	outcomeTargetContractCount: number;
 	metricCount: number;
 	datasetStatuses: typeof referenceDatasetStatuses;
 	compatibilities: typeof referenceCompatibilities;
@@ -848,6 +850,7 @@ export async function listAdminReferenceRegistry(): Promise<{
 		datasets: adminDatasets,
 		readiness: buildAdminReferenceReadiness(adminDatasets),
 		metricContractCount: referenceMetricContracts.length,
+		outcomeTargetContractCount: referenceOutcomeTargetContracts.length,
 		metricCount: metrics.length,
 		datasetStatuses: referenceDatasetStatuses,
 		compatibilities: referenceCompatibilities,

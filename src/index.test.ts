@@ -35,6 +35,7 @@ import {
 	participantLiteratureClaimsForExperimentFrom,
 	validateLiteratureExtractions
 } from '$lib/reference-data/literature-schema';
+import { createOpenFmriNBackSummary } from '$lib/reference-data/openfmri-nback-extractor';
 import { crossTaskRelationshipsForMetric } from '$lib/reference-data/relationships';
 import { createReferenceContext } from '$lib/reference-data/summary';
 import { calculateNBackSignalDetectionMetrics, type NBackResult } from '$lib/experiments/n-back';
@@ -317,6 +318,40 @@ describe('reference data contracts', () => {
 		expect(accuracy?.sourceColumns).toEqual(['nback2_nont', 'nback2_targ']);
 		expect(accuracy?.distribution?.bins).toHaveLength(10);
 		expect(accuracy?.distribution?.bins.reduce((total, bin) => total + bin.count, 0)).toBe(98);
+	});
+
+	it('extracts OpenfMRI n-back summaries from participants.tsv columns', () => {
+		const summary = createOpenFmriNBackSummary(
+			[
+				'participant_id\tnback2_nont\tnback2_targ\td4prime',
+				'sub-01\t0.6\t0.8\t1',
+				'sub-02\t0.8\t1\t2',
+				'sub-03\t1\t1\t866',
+				'sub-04\tn/a\t0.5\tn/a'
+			].join('\n'),
+			'test-sha'
+		);
+		const accuracy = summary.metrics.find((metric) => metric.metricKey === 'accuracy');
+		const sensitivity = summary.metrics.find((metric) => metric.metricKey === 'sensitivityIndex');
+
+		expect(summary.dataset.sampleSize).toBe(4);
+		expect(accuracy).toMatchObject({
+			sampleSize: 3,
+			mean: 0.8666666666666667,
+			minimum: 0.7,
+			maximum: 1
+		});
+		expect(accuracy?.excludedRows).toEqual([
+			{ count: 1, reason: 'Missing nback2_nont or nback2_targ.' }
+		]);
+		expect(sensitivity).toMatchObject({
+			sampleSize: 2,
+			mean: 1.5,
+			minimum: 1,
+			maximum: 2
+		});
+		expect(sensitivity?.distribution?.bins[0].count).toBe(1);
+		expect(sensitivity?.distribution?.bins[9].count).toBe(1);
 	});
 
 	it('exposes structured literature extractions for n-back reference comparisons', () => {

@@ -41,12 +41,7 @@
 			"maximum": 1,
 			"sourceColumns": ["nback2_nont", "nback2_targ"],
 			"method": "Subject-level 2-back accuracy is the unweighted mean of nback2_nont and nback2_targ because trial counts are not represented in participants.tsv.",
-			"excludedRows": [
-				{
-					"count": 1,
-					"reason": "Missing nback2_nont or nback2_targ."
-				}
-			],
+			"excludedRows": [{ "count": 1, "reason": "Missing nback2_nont or nback2_targ." }],
 			"distribution": {
 				"source": "participant_values",
 				"binning": "equal_width",
@@ -141,14 +136,8 @@
 			"sourceColumns": ["d4prime"],
 			"method": "Summary of d4prime values in participants.tsv after removing missing values and one out-of-range row.",
 			"excludedRows": [
-				{
-					"count": 7,
-					"reason": "Missing d4prime value."
-				},
-				{
-					"count": 1,
-					"reason": "Out-of-range d4prime value 866 for sub-03."
-				}
+				{ "count": 7, "reason": "Missing d4prime value." },
+				{ "count": 1, "reason": "Out-of-range d4prime value 866 for sub-03." }
 			],
 			"distribution": {
 				"source": "participant_values",

@@ -73,6 +73,13 @@ ds000115 n-back candidate summary lives at:
 static/reference-data/n-back/openfmri-ds000115-summary.json
 ```
 
+Regenerate the summary from the source `participants.tsv` with hash verification:
+
+```sh
+bun run reference:extract:nback --check
+bun run reference:extract:nback --write
+```
+
 Import it into the configured database with:
 
 ```sh

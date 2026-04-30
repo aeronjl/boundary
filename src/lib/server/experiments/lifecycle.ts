@@ -1,10 +1,10 @@
-import { dev } from '$app/environment';
 import type { Cookies } from '@sveltejs/kit';
 import { and, eq } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { experimentRuns, experimentVersions, participantSessions } from '$lib/server/db/schema';
 
 export const participantCookieName = 'boundary_participant';
+const isDevelopmentRuntime = process.env.NODE_ENV !== 'production';
 
 export type ExperimentRun = typeof experimentRuns.$inferSelect;
 export type ExperimentVersion = typeof experimentVersions.$inferSelect;
@@ -25,7 +25,7 @@ export function getOrCreateParticipantSessionId(cookies: Cookies): string {
 			path: '/',
 			httpOnly: true,
 			sameSite: 'lax',
-			secure: !dev,
+			secure: !isDevelopmentRuntime,
 			maxAge: 60 * 60 * 24 * 365
 		});
 	}

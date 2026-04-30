@@ -11,6 +11,9 @@ import {
 	type LiteratureClaimPromotionContext,
 	type StructuredLiteratureExtraction
 } from './literature-schema';
+import farellPelliOrientationThresholdMethods from '../../../static/reference-data/literature/farell-pelli-1998-orientation-threshold-methods.json';
+import marxAdhdEmotionalNBack from '../../../static/reference-data/literature/marx-2011-adhd-emotional-nback.json';
+import openfmriNBackParticipantsSummary from '../../../static/reference-data/literature/openfmri-ds000115-nback-participants-summary.json';
 
 export type {
 	LiteratureClaimParticipantExposure,
@@ -35,13 +38,14 @@ export type {
 	StructuredLiteratureExtraction
 } from './literature-schema';
 
-const extractionFiles = import.meta.glob<unknown>(
-	'../../../static/reference-data/literature/*.json',
-	{
-		eager: true,
-		import: 'default'
-	}
-);
+const extractionFiles: Record<string, unknown> = {
+	'../../../static/reference-data/literature/farell-pelli-1998-orientation-threshold-methods.json':
+		farellPelliOrientationThresholdMethods,
+	'../../../static/reference-data/literature/marx-2011-adhd-emotional-nback.json':
+		marxAdhdEmotionalNBack,
+	'../../../static/reference-data/literature/openfmri-ds000115-nback-participants-summary.json':
+		openfmriNBackParticipantsSummary
+};
 
 export const literatureExtractionFilePaths = Object.keys(extractionFiles).sort();
 

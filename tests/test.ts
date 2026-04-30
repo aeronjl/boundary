@@ -775,8 +775,11 @@ test('admin can inspect and export ten item personality inventory data', async (
 	await expect(page.getByRole('cell', { name: 'Adults with ADHD', exact: true })).toBeVisible();
 	await expect(page.getByText('Resolve blocker(s) before public promotion.').first()).toBeVisible();
 	await expect(
-		page.getByText('Add numeric mean and standard deviation evidence for participant comparison.')
+		page.getByText(
+			'Add numeric mean and standard deviation evidence or validate a ready registry comparison for participant comparison.'
+		)
 	).toBeVisible();
+	await expect(page.getByText('Evidence: blocked').first()).toBeVisible();
 	await expect(page.getByText('candidate comparison claim').first()).toBeVisible();
 
 	const literatureJsonResponse = await page.request.get('/admin/literature/export.json');

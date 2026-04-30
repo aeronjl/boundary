@@ -6,10 +6,18 @@ import {
 	literatureParticipantUses,
 	parseLiteratureExtraction,
 	validateLiteratureExtractions,
+	type LiteratureClaimPromotionContext,
 	type LiteratureComparisonClaimStatus,
 	type LiteratureParticipantUse,
 	type StructuredLiteratureExtraction
 } from '../src/lib/reference-data/literature-schema';
+import { referenceComparisonBlockers } from '../src/lib/reference-data/readiness';
+import { closeDatabase, db } from '../src/lib/server/db';
+import {
+	referenceDatasets,
+	referenceMetricMappings,
+	referenceMetrics
+} from '../src/lib/server/db/schema';
 
 const usage = `Usage: bun run literature:promote <claim-id> [options]
 
@@ -28,6 +36,53 @@ type LoadedExtraction = {
 	fileName: string;
 	extraction: StructuredLiteratureExtraction;
 };
+
+function sourceColumnsValue(value: string): string[] {
+	try {
+		const parsed = JSON.parse(value) as unknown;
+		return Array.isArray(parsed)
+			? parsed.filter((item): item is string => typeof item === 'string')
+			: [];
+	} catch {
+		return [];
+	}
+}
+
+async function readyRegistryMetricKeys(): Promise<Set<string>> {
+	const [datasets, metrics, mappings] = await Promise.all([
+		db.select().from(referenceDatasets),
+		db.select().from(referenceMetrics),
+		db.select().from(referenceMetricMappings)
+	]);
+	const datasetById = new Map(datasets.map((dataset) => [dataset.id, dataset]));
+	const mappingByMetricId = new Map(
+		mappings.map((mapping) => [mapping.referenceMetricId, mapping])
+	);
+	const readyMetricKeys = new Set<string>();
+
+	for (const metric of metrics) {
+		const dataset = datasetById.get(metric.referenceDatasetId);
+		if (!dataset) continue;
+
+		const mapping = mappingByMetricId.get(metric.id);
+		const blockers = referenceComparisonBlockers({
+			dataset,
+			metric,
+			mapping: mapping
+				? {
+						...mapping,
+						sourceColumns: sourceColumnsValue(mapping.sourceColumnsJson)
+					}
+				: null
+		});
+
+		if (blockers.length === 0) {
+			readyMetricKeys.add(`${metric.experimentSlug}:${metric.metricKey}`);
+		}
+	}
+
+	return readyMetricKeys;
+}
 
 const args = process.argv.slice(2);
 
@@ -103,7 +158,14 @@ if (!currentClaim) {
 	throw new Error(`No comparison claim found for ${claimId}.`);
 }
 
-const promotionBlockers = literatureClaimPromotionBlockersFor(target.extraction, currentClaim);
+const promotionContext: LiteratureClaimPromotionContext = {
+	readyRegistryMetricKeys: await readyRegistryMetricKeys()
+};
+const promotionBlockers = literatureClaimPromotionBlockersFor(
+	target.extraction,
+	currentClaim,
+	promotionContext
+);
 
 console.log(`Claim: ${claimId}`);
 console.log(`File: ${target.fileName}`);
@@ -115,6 +177,7 @@ if (participantUse === 'public_prompt_ready' && promotionBlockers.length > 0) {
 	for (const blocker of promotionBlockers) {
 		console.error(`- ${blocker}`);
 	}
+	await closeDatabase();
 	process.exit(1);
 }
 
@@ -128,20 +191,23 @@ const updatedExtraction: StructuredLiteratureExtraction = {
 const updatedExtractions = loadedExtractions.map((loaded) =>
 	loaded === target ? updatedExtraction : loaded.extraction
 );
-const validationIssues = validateLiteratureExtractions(updatedExtractions);
+const validationIssues = validateLiteratureExtractions(updatedExtractions, promotionContext);
 
 if (validationIssues.length > 0) {
 	console.error('\nLiterature extraction validation failed after the requested change:');
 	for (const issue of validationIssues) {
 		console.error(`- ${issue.extractionId} ${issue.code}: ${issue.message}`);
 	}
+	await closeDatabase();
 	process.exit(1);
 }
 
 if (!write) {
 	console.log('\nDry run only. Add --write to update the JSON file.');
+	await closeDatabase();
 	process.exit(0);
 }
 
 await writeFile(target.filePath, `${JSON.stringify(updatedExtraction, null, '\t')}\n`);
 console.log(`Updated ${target.fileName}. Run bun run format and bun run literature:validate next.`);
+await closeDatabase();

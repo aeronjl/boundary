@@ -94,7 +94,7 @@
 				</p>
 			</div>
 			<div class="text-xs text-gray-500">
-				<p>Promote locally with source-controlled JSON edits.</p>
+				<p>Promote locally after the queue shows no blockers.</p>
 				<code class="mt-1 block rounded-sm bg-gray-100 p-2 break-words">
 					bun run literature:promote &lt;claim-id&gt; --status reviewed --participant-use
 					public_prompt_ready --write
@@ -139,6 +139,10 @@
 							</td>
 							<td class="py-2 pr-3">
 								<p>{item.resultCount} result(s), {item.numericResultCount} numeric</p>
+								<p class="mt-1 text-gray-500">Evidence: {formatLabel(item.evidenceMode)}</p>
+								<p class="mt-1 font-mono text-[11px] text-gray-500">
+									{item.registryEvidenceKey}: {formatLabel(item.registryEvidenceStatus)}
+								</p>
 								<p class="mt-1 text-gray-500">
 									{formatColumns(item.measureLabels)}
 								</p>

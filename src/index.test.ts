@@ -527,10 +527,12 @@ describe('reference data contracts', () => {
 		expect(adhdReviewItem).toMatchObject({
 			participantExposure: 'hidden',
 			reviewState: 'needs_evidence',
+			evidenceMode: 'blocked',
+			registryEvidenceStatus: 'not_applicable',
 			canPromoteToPublic: false
 		});
 		expect(adhdReviewItem?.promotionBlockers).toContain(
-			'Add numeric mean and standard deviation evidence for participant comparison.'
+			'Add numeric mean and standard deviation evidence or validate a ready registry comparison for participant comparison.'
 		);
 		expect(openFmriExtraction).toBeTruthy();
 		expect(adhdExtraction).toBeTruthy();
@@ -551,6 +553,40 @@ describe('reference data contracts', () => {
 		expect(participantLiteratureClaimsForExperimentFrom([unsafeAdhdExtraction], 'n-back')).toEqual(
 			[]
 		);
+
+		const registryBackedExtraction = {
+			...openFmriExtraction,
+			comparisonClaims: openFmriExtraction.comparisonClaims.map((claim) =>
+				claim.metricKey === 'accuracy'
+					? {
+							...claim,
+							status: 'reviewed' as const,
+							participantUse: 'public_prompt_ready' as const
+						}
+					: claim
+			)
+		};
+		const registryContext = { readyRegistryMetricKeys: new Set(['n-back:accuracy']) };
+		const registryClaims = participantLiteratureClaimsForExperimentFrom(
+			[registryBackedExtraction],
+			'n-back',
+			registryContext
+		);
+		const registryBackedReviewItem = literatureClaimReviewQueueFrom(
+			[registryBackedExtraction],
+			registryContext
+		).find((item) => item.id === 'openfmri-ds000115-nback-accuracy-candidate-distribution');
+
+		expect(registryClaims.map((claim) => claim.id)).toContain(
+			'openfmri-ds000115-nback-accuracy-candidate-distribution'
+		);
+		expect(registryBackedReviewItem).toMatchObject({
+			evidenceMode: 'registry',
+			hasReadyRegistryEvidence: true,
+			registryEvidenceStatus: 'ready',
+			participantExposure: 'public',
+			reviewState: 'public_ready'
+		});
 
 		const reviewedDistributionExtraction = {
 			...openFmriExtraction,

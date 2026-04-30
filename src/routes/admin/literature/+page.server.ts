@@ -1,6 +1,6 @@
 import { redirect } from '@sveltejs/kit';
-import { getLiteratureExtractionExport } from '$lib/reference-data/literature';
 import { isAdminAuthenticated } from '$lib/server/admin/auth';
+import { getAdminLiteratureExtractionExport } from '$lib/server/admin/literature';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ cookies }) => {
@@ -8,5 +8,5 @@ export const load: PageServerLoad = async ({ cookies }) => {
 		throw redirect(303, '/admin');
 	}
 
-	return getLiteratureExtractionExport();
+	return getAdminLiteratureExtractionExport();
 };

@@ -213,12 +213,20 @@ export type LiteratureClaimReviewQueueItem = {
 	citationIds: string[];
 	resultCount: number;
 	numericResultCount: number;
+	evidenceMode: 'registry' | 'structured_numeric' | 'construct_context' | 'blocked';
+	registryEvidenceKey: string;
+	registryEvidenceStatus: 'ready' | 'blocked' | 'not_applicable';
+	hasReadyRegistryEvidence: boolean;
 	sampleLabels: string[];
 	measureLabels: string[];
 	promotionBlockers: string[];
 	canPromoteToPublic: boolean;
 	nextAction: string;
 	promotionCommand: string;
+};
+
+export type LiteratureClaimPromotionContext = {
+	readyRegistryMetricKeys?: ReadonlySet<string>;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -451,7 +459,8 @@ export function parseLiteratureExtraction(
 }
 
 export function summarizeLiteratureExtractions(
-	extractions: StructuredLiteratureExtraction[]
+	extractions: StructuredLiteratureExtraction[],
+	context: LiteratureClaimPromotionContext = {}
 ): LiteratureExtractionSummary {
 	const sourceIds = new Set(extractions.map((extraction) => extraction.source.id));
 
@@ -479,7 +488,7 @@ export function summarizeLiteratureExtractions(
 					(claim) =>
 						claim.status === 'reviewed' &&
 						claim.participantUse === 'public_prompt_ready' &&
-						literatureClaimPromotionBlockersFor(extraction, claim).length === 0
+						literatureClaimPromotionBlockersFor(extraction, claim, context).length === 0
 				).length,
 			0
 		),
@@ -509,18 +518,55 @@ function resultHasDistributionStats(result: LiteratureResult): boolean {
 	return result.mean !== null && result.standardDeviation !== null;
 }
 
+function literatureClaimRegistryEvidenceKey(claim: LiteratureComparisonClaim): string {
+	return `${claim.experimentSlug}:${claim.metricKey}`;
+}
+
+function literatureClaimHasReadyRegistryEvidence(
+	claim: LiteratureComparisonClaim,
+	context: LiteratureClaimPromotionContext
+): boolean {
+	return (
+		claim.claimType === 'cohort_distribution' &&
+		(context.readyRegistryMetricKeys?.has(literatureClaimRegistryEvidenceKey(claim)) ?? false)
+	);
+}
+
+function literatureClaimRegistryEvidenceStatus(
+	claim: LiteratureComparisonClaim,
+	hasReadyRegistryEvidence: boolean
+): LiteratureClaimReviewQueueItem['registryEvidenceStatus'] {
+	if (claim.claimType !== 'cohort_distribution') return 'not_applicable';
+	return hasReadyRegistryEvidence ? 'ready' : 'blocked';
+}
+
+function literatureClaimEvidenceMode(
+	claim: LiteratureComparisonClaim,
+	hasReadyRegistryEvidence: boolean,
+	hasStructuredNumericEvidence: boolean
+): LiteratureClaimReviewQueueItem['evidenceMode'] {
+	if (claim.claimType === 'construct_context') return 'construct_context';
+	if (hasReadyRegistryEvidence) return 'registry';
+	if (hasStructuredNumericEvidence) return 'structured_numeric';
+	return 'blocked';
+}
+
 export function literatureClaimPromotionBlockersFor(
 	extraction: StructuredLiteratureExtraction,
-	claim: LiteratureComparisonClaim
+	claim: LiteratureComparisonClaim,
+	context: LiteratureClaimPromotionContext = {}
 ): string[] {
 	const blockers: string[] = [];
 	const resultById = new Map(extraction.results.map((result) => [result.id, result]));
 	const measureById = new Map(extraction.measures.map((measure) => [measure.id, measure]));
 	const referencedResults: LiteratureResult[] = [];
 	const referencedMeasures: LiteratureMeasure[] = [];
+	const hasReadyRegistryEvidence = literatureClaimHasReadyRegistryEvidence(claim, context);
 
-	if (claim.resultIds.length === 0) {
-		blockers.push('Add at least one result citation before public use.');
+	if (claim.resultIds.length === 0 && !hasReadyRegistryEvidence) {
+		blockers.push(
+			'Add at least one result citation or ready registry comparison before public use.'
+		);
 	}
 
 	if (claim.citationIds.length === 0) {
@@ -555,30 +601,36 @@ export function literatureClaimPromotionBlockersFor(
 		}
 	}
 
-	for (const measure of uniqueStrings(referencedMeasures.map((measure) => measure.id))
-		.map((id) => measureById.get(id))
-		.filter((measure): measure is LiteratureMeasure => measure !== undefined)) {
-		if (measure.extractionStatus !== 'reviewed') {
-			blockers.push(`Review extraction status for ${measure.label}.`);
-		}
+	if (!hasReadyRegistryEvidence) {
+		for (const measure of uniqueStrings(referencedMeasures.map((measure) => measure.id))
+			.map((id) => measureById.get(id))
+			.filter((measure): measure is LiteratureMeasure => measure !== undefined)) {
+			if (measure.extractionStatus !== 'reviewed') {
+				blockers.push(`Review extraction status for ${measure.label}.`);
+			}
 
-		if (measure.comparisonReadiness !== 'reviewed') {
-			blockers.push(`Review comparison readiness for ${measure.label}.`);
+			if (measure.comparisonReadiness !== 'reviewed') {
+				blockers.push(`Review comparison readiness for ${measure.label}.`);
+			}
 		}
 	}
 
 	if (
 		claim.claimType !== 'construct_context' &&
-		!referencedResults.some(resultHasDistributionStats)
+		!referencedResults.some(resultHasDistributionStats) &&
+		!hasReadyRegistryEvidence
 	) {
-		blockers.push('Add numeric mean and standard deviation evidence for participant comparison.');
+		blockers.push(
+			'Add numeric mean and standard deviation evidence or validate a ready registry comparison for participant comparison.'
+		);
 	}
 
 	return uniqueStrings(blockers);
 }
 
 export function validateLiteratureExtraction(
-	extraction: StructuredLiteratureExtraction
+	extraction: StructuredLiteratureExtraction,
+	context: LiteratureClaimPromotionContext = {}
 ): LiteratureExtractionValidationIssue[] {
 	const issues: LiteratureExtractionValidationIssue[] = [];
 	const contractKeys = new Set(
@@ -673,7 +725,7 @@ export function validateLiteratureExtraction(
 		}
 
 		if (claim.participantUse === 'public_prompt_ready') {
-			for (const blocker of literatureClaimPromotionBlockersFor(extraction, claim)) {
+			for (const blocker of literatureClaimPromotionBlockersFor(extraction, claim, context)) {
 				issues.push({
 					extractionId: extraction.id,
 					code: 'public_claim_not_ready',
@@ -695,11 +747,14 @@ export function validateLiteratureExtraction(
 }
 
 export function validateLiteratureExtractions(
-	extractions: StructuredLiteratureExtraction[]
+	extractions: StructuredLiteratureExtraction[],
+	context: LiteratureClaimPromotionContext = {}
 ): LiteratureExtractionValidationIssue[] {
 	const duplicateIds = new Set<string>();
 	const seenIds = new Set<string>();
-	const issues = extractions.flatMap((extraction) => validateLiteratureExtraction(extraction));
+	const issues = extractions.flatMap((extraction) =>
+		validateLiteratureExtraction(extraction, context)
+	);
 
 	for (const extraction of extractions) {
 		if (seenIds.has(extraction.id)) duplicateIds.add(extraction.id);
@@ -815,7 +870,8 @@ function literatureClaimNextAction(
 
 export function participantLiteratureClaimsForExperimentFrom(
 	extractions: StructuredLiteratureExtraction[],
-	experimentSlug: string
+	experimentSlug: string,
+	context: LiteratureClaimPromotionContext = {}
 ): ParticipantLiteratureClaim[] {
 	return literatureExtractionsForExperimentFrom(extractions, experimentSlug).flatMap((extraction) =>
 		extraction.comparisonClaims.flatMap((claim) => {
@@ -823,7 +879,7 @@ export function participantLiteratureClaimsForExperimentFrom(
 				claim.experimentSlug !== experimentSlug ||
 				claim.status !== 'reviewed' ||
 				claim.participantUse !== 'public_prompt_ready' ||
-				literatureClaimPromotionBlockersFor(extraction, claim).length > 0
+				literatureClaimPromotionBlockersFor(extraction, claim, context).length > 0
 			) {
 				return [];
 			}
@@ -847,7 +903,8 @@ export function participantLiteratureClaimsForExperimentFrom(
 }
 
 export function literatureClaimReviewQueueFrom(
-	extractions: StructuredLiteratureExtraction[]
+	extractions: StructuredLiteratureExtraction[],
+	context: LiteratureClaimPromotionContext = {}
 ): LiteratureClaimReviewQueueItem[] {
 	return extractions.flatMap((extraction) => {
 		const resultById = new Map(extraction.results.map((result) => [result.id, result]));
@@ -864,9 +921,12 @@ export function literatureClaimReviewQueueFrom(
 			const samples = results
 				.map((result) => sampleById.get(result.sampleId))
 				.filter((sample): sample is LiteratureSample => sample !== undefined);
-			const promotionBlockers = literatureClaimPromotionBlockersFor(extraction, claim);
+			const hasReadyRegistryEvidence = literatureClaimHasReadyRegistryEvidence(claim, context);
+			const hasStructuredNumericEvidence = results.some(resultHasDistributionStats);
+			const promotionBlockers = literatureClaimPromotionBlockersFor(extraction, claim, context);
 			const participantExposure = literatureClaimParticipantExposure(claim, promotionBlockers);
 			const reviewState = literatureClaimReviewState(participantExposure, promotionBlockers);
+			const registryEvidenceKey = literatureClaimRegistryEvidenceKey(claim);
 
 			return {
 				id: claim.id,
@@ -886,6 +946,17 @@ export function literatureClaimReviewQueueFrom(
 				citationIds: claim.citationIds,
 				resultCount: results.length,
 				numericResultCount: results.filter(resultHasDistributionStats).length,
+				evidenceMode: literatureClaimEvidenceMode(
+					claim,
+					hasReadyRegistryEvidence,
+					hasStructuredNumericEvidence
+				),
+				registryEvidenceKey,
+				registryEvidenceStatus: literatureClaimRegistryEvidenceStatus(
+					claim,
+					hasReadyRegistryEvidence
+				),
+				hasReadyRegistryEvidence,
 				sampleLabels: uniqueStrings(samples.map((sample) => sample.label)),
 				measureLabels: uniqueStrings(measures.map((measure) => measure.label)),
 				promotionBlockers,
@@ -897,14 +968,17 @@ export function literatureClaimReviewQueueFrom(
 	});
 }
 
-export function getLiteratureExtractionExportFor(extractions: StructuredLiteratureExtraction[]) {
-	const validations = validateLiteratureExtractions(extractions);
+export function getLiteratureExtractionExportFor(
+	extractions: StructuredLiteratureExtraction[],
+	context: LiteratureClaimPromotionContext = {}
+) {
+	const validations = validateLiteratureExtractions(extractions, context);
 
 	return {
 		schemaVersion: 1,
-		summary: summarizeLiteratureExtractions(extractions),
+		summary: summarizeLiteratureExtractions(extractions, context),
 		validations,
-		reviewQueue: literatureClaimReviewQueueFrom(extractions),
+		reviewQueue: literatureClaimReviewQueueFrom(extractions, context),
 		extractions
 	};
 }
@@ -916,7 +990,8 @@ function csvCell(value: unknown): string {
 }
 
 export function getLiteratureExtractionCsvFor(
-	extractions: StructuredLiteratureExtraction[]
+	extractions: StructuredLiteratureExtraction[],
+	context: LiteratureClaimPromotionContext = {}
 ): string {
 	const headers = [
 		'extraction_id',
@@ -934,9 +1009,15 @@ export function getLiteratureExtractionCsvFor(
 		'result_standard_deviation',
 		'claim_id',
 		'claim_status',
-		'participant_use'
+		'participant_use',
+		'evidence_mode',
+		'registry_evidence_status',
+		'promotion_blockers'
 	];
 	const rows = [headers.map(csvCell).join(',')];
+	const reviewItemByClaimId = new Map(
+		literatureClaimReviewQueueFrom(extractions, context).map((item) => [item.id, item])
+	);
 
 	for (const extraction of extractions) {
 		const sampleById = new Map(extraction.samples.map((sample) => [sample.id, sample]));
@@ -951,6 +1032,7 @@ export function getLiteratureExtractionCsvFor(
 					: (extraction.comparisonClaims.find((candidate) =>
 							candidate.resultIds.includes(result.id)
 						) ?? null);
+			const reviewItem = claim ? reviewItemByClaimId.get(claim.id) : null;
 
 			rows.push(
 				[
@@ -969,7 +1051,10 @@ export function getLiteratureExtractionCsvFor(
 					result.standardDeviation,
 					claim?.id,
 					claim?.status,
-					claim?.participantUse
+					claim?.participantUse,
+					reviewItem?.evidenceMode,
+					reviewItem?.registryEvidenceStatus,
+					reviewItem?.promotionBlockers.join(' ')
 				]
 					.map(csvCell)
 					.join(',')

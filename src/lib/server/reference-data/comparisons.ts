@@ -486,6 +486,11 @@ export async function getReferenceComparisonContext(
 			return recommendation ? [recommendation] : [];
 		})
 	);
+	const readyRegistryMetricKeys = new Set(
+		comparisons
+			.filter((comparison) => comparison.readinessStatus === 'ready')
+			.map((comparison) => `${experimentSlug}:${comparison.metricKey}`)
+	);
 
 	return {
 		experimentSlug,
@@ -493,7 +498,9 @@ export async function getReferenceComparisonContext(
 		figures,
 		prompts,
 		recommendations,
-		literatureClaims: participantLiteratureClaimsForExperiment(experimentSlug),
+		literatureClaims: participantLiteratureClaimsForExperiment(experimentSlug, {
+			readyRegistryMetricKeys
+		}),
 		datasets: datasets.map(datasetSummary),
 		candidateDatasetCount: datasets.filter((dataset) => dataset.status === 'candidate').length,
 		validatedDatasetCount: datasets.filter((dataset) => dataset.status === 'validated').length,

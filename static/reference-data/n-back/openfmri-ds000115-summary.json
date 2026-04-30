@@ -47,6 +47,85 @@
 					"reason": "Missing nback2_nont or nback2_targ."
 				}
 			],
+			"distribution": {
+				"source": "participant_values",
+				"binning": "equal_width",
+				"binCount": 10,
+				"sampleSize": 98,
+				"bins": [
+					{
+						"index": 0,
+						"xStart": 0.1833333335,
+						"xEnd": 0.26500000015,
+						"count": 1,
+						"proportion": 0.01020408163265306
+					},
+					{
+						"index": 1,
+						"xStart": 0.26500000015,
+						"xEnd": 0.3466666668,
+						"count": 2,
+						"proportion": 0.02040816326530612
+					},
+					{
+						"index": 2,
+						"xStart": 0.3466666668,
+						"xEnd": 0.42833333345,
+						"count": 3,
+						"proportion": 0.030612244897959183
+					},
+					{
+						"index": 3,
+						"xStart": 0.42833333345,
+						"xEnd": 0.5100000001,
+						"count": 2,
+						"proportion": 0.02040816326530612
+					},
+					{
+						"index": 4,
+						"xStart": 0.5100000001,
+						"xEnd": 0.59166666675,
+						"count": 4,
+						"proportion": 0.04081632653061224
+					},
+					{
+						"index": 5,
+						"xStart": 0.59166666675,
+						"xEnd": 0.6733333334,
+						"count": 4,
+						"proportion": 0.04081632653061224
+					},
+					{
+						"index": 6,
+						"xStart": 0.6733333334,
+						"xEnd": 0.75500000005,
+						"count": 3,
+						"proportion": 0.030612244897959183
+					},
+					{
+						"index": 7,
+						"xStart": 0.75500000005,
+						"xEnd": 0.8366666667,
+						"count": 9,
+						"proportion": 0.09183673469387756
+					},
+					{
+						"index": 8,
+						"xStart": 0.8366666667,
+						"xEnd": 0.91833333335,
+						"count": 23,
+						"proportion": 0.23469387755102042
+					},
+					{
+						"index": 9,
+						"xStart": 0.91833333335,
+						"xEnd": 1,
+						"count": 47,
+						"proportion": 0.47959183673469385
+					}
+				],
+				"notes": "Equal-width bins computed from subject-level 2-back accuracy values in participants.tsv."
+			},
 			"notes": "Candidate 2-back accuracy summary derived from participants.tsv target and non-target accuracy columns."
 		},
 		{
@@ -71,6 +150,85 @@
 					"reason": "Out-of-range d4prime value 866 for sub-03."
 				}
 			],
+			"distribution": {
+				"source": "participant_values",
+				"binning": "equal_width",
+				"binCount": 10,
+				"sampleSize": 91,
+				"bins": [
+					{
+						"index": 0,
+						"xStart": 0,
+						"xEnd": 0.42569999999999997,
+						"count": 4,
+						"proportion": 0.04395604395604396
+					},
+					{
+						"index": 1,
+						"xStart": 0.42569999999999997,
+						"xEnd": 0.8513999999999999,
+						"count": 7,
+						"proportion": 0.07692307692307693
+					},
+					{
+						"index": 2,
+						"xStart": 0.8513999999999999,
+						"xEnd": 1.2771,
+						"count": 21,
+						"proportion": 0.23076923076923078
+					},
+					{
+						"index": 3,
+						"xStart": 1.2771,
+						"xEnd": 1.7027999999999999,
+						"count": 18,
+						"proportion": 0.1978021978021978
+					},
+					{
+						"index": 4,
+						"xStart": 1.7027999999999999,
+						"xEnd": 2.1285,
+						"count": 15,
+						"proportion": 0.16483516483516483
+					},
+					{
+						"index": 5,
+						"xStart": 2.1285,
+						"xEnd": 2.5542,
+						"count": 10,
+						"proportion": 0.10989010989010989
+					},
+					{
+						"index": 6,
+						"xStart": 2.5542,
+						"xEnd": 2.9798999999999998,
+						"count": 7,
+						"proportion": 0.07692307692307693
+					},
+					{
+						"index": 7,
+						"xStart": 2.9798999999999998,
+						"xEnd": 3.4055999999999997,
+						"count": 3,
+						"proportion": 0.03296703296703297
+					},
+					{
+						"index": 8,
+						"xStart": 3.4055999999999997,
+						"xEnd": 3.8312999999999997,
+						"count": 5,
+						"proportion": 0.054945054945054944
+					},
+					{
+						"index": 9,
+						"xStart": 3.8312999999999997,
+						"xEnd": 4.257,
+						"count": 1,
+						"proportion": 0.01098901098901099
+					}
+				],
+				"notes": "Equal-width bins computed from d4prime values in participants.tsv after excluding missing values and the out-of-range sub-03 value."
+			},
 			"notes": "Candidate sensitivity summary from the source d4prime column; validate that d4prime aligns with Boundary's signal-detection definition before public comparisons."
 		}
 	]

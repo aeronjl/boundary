@@ -4,7 +4,6 @@
 	import {
 		formatPercentile,
 		type ReferenceComparison,
-		type ReferenceDistributionFigure,
 		type ReferenceComparisonResponse
 	} from '$lib/reference-data/comparison';
 	import {
@@ -118,17 +117,6 @@
 		return [source, cohort, mapping].filter(Boolean).join(' | ') || '-';
 	}
 
-	function binX(
-		bin: ReferenceDistributionFigure['bins'][number],
-		figure: ReferenceDistributionFigure
-	) {
-		return (bin.index / figure.bins.length) * 100;
-	}
-
-	function binWidth(figure: ReferenceDistributionFigure) {
-		return Math.max(1, 100 / figure.bins.length - 0.5);
-	}
-
 	function formatZScore(value: number) {
 		return `${value >= 0 ? '+' : ''}${value.toFixed(2)} SD`;
 	}
@@ -216,6 +204,11 @@
 								<p class="font-medium">{figure.title}</p>
 								<p class="mt-1 text-gray-600">{figure.description}</p>
 								<p class="mt-1 text-xs text-gray-500">{figure.caveat}</p>
+								{#if figure.source === 'imported_bins' && figure.sampleSize}
+									<p class="mt-1 text-xs text-gray-500">
+										Imported binned distribution, n={figure.sampleSize}.
+									</p>
+								{/if}
 								{#if figure.sourceCitation && figure.sourceUrl}
 									<!-- eslint-disable svelte/no-navigation-without-resolve -->
 									<a
@@ -244,8 +237,8 @@
 												class="text-gray-300"
 												fill="currentColor"
 												height={bin.height * 42}
-												width={binWidth(figure)}
-												x={binX(bin, figure)}
+												width={Math.max(0.8, bin.width * 100 - 0.5)}
+												x={bin.xPosition * 100}
 												y={48 - bin.height * 42}
 											/>
 										{/each}

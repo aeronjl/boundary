@@ -41,6 +41,23 @@ export type ReferenceImportExcludedRows = {
 	reason: string;
 };
 
+export type ReferenceImportDistributionBin = {
+	index: number;
+	xStart: number;
+	xEnd: number;
+	count: number;
+	proportion: number;
+};
+
+export type ReferenceImportDistribution = {
+	source: 'participant_values';
+	binning: 'equal_width';
+	binCount: number;
+	sampleSize: number;
+	bins: ReferenceImportDistributionBin[];
+	notes: string;
+};
+
 export type ReferenceImportMetric = {
 	metricKey: string;
 	label: string;
@@ -54,6 +71,7 @@ export type ReferenceImportMetric = {
 	sourceColumns: string[];
 	method: string;
 	excludedRows: ReferenceImportExcludedRows[];
+	distribution: ReferenceImportDistribution | null;
 	notes: string;
 };
 
@@ -89,6 +107,7 @@ export type ReferenceImportMetricMetadata = {
 		sourceColumns: string[];
 		method: string;
 		excludedRows: ReferenceImportExcludedRows[];
+		distribution: ReferenceImportDistribution | null;
 	};
 };
 
@@ -142,6 +161,86 @@ function parseExcludedRows(value: unknown, path: string): ReferenceImportExclude
 			reason: requiredString(record.reason, `${path}[${index}].reason`)
 		};
 	});
+}
+
+function parseDistributionBin(value: unknown, path: string): ReferenceImportDistributionBin {
+	const record = requiredRecord(value, path);
+	const index = requiredInteger(record.index, `${path}.index`);
+	const xStart = requiredNumber(record.xStart, `${path}.xStart`);
+	const xEnd = requiredNumber(record.xEnd, `${path}.xEnd`);
+	const count = requiredInteger(record.count, `${path}.count`);
+	const proportion = requiredNumber(record.proportion, `${path}.proportion`);
+
+	if (xEnd <= xStart) throw new Error(`${path}.xEnd must be greater than xStart.`);
+	if (count < 0) throw new Error(`${path}.count cannot be negative.`);
+	if (proportion < 0 || proportion > 1) throw new Error(`${path}.proportion must be 0-1.`);
+
+	return { index, xStart, xEnd, count, proportion };
+}
+
+function parseDistribution(
+	value: unknown,
+	path: string,
+	metricSampleSize: number
+): ReferenceImportDistribution | null {
+	if (value === undefined || value === null) return null;
+
+	const record = requiredRecord(value, path);
+	const source = requiredString(record.source, `${path}.source`);
+	const binning = requiredString(record.binning, `${path}.binning`);
+	const binCount = requiredInteger(record.binCount, `${path}.binCount`);
+	const sampleSize = requiredInteger(record.sampleSize, `${path}.sampleSize`);
+
+	if (binCount <= 0) throw new Error(`${path}.binCount must be positive.`);
+	if (sampleSize <= 0) throw new Error(`${path}.sampleSize must be positive.`);
+
+	if (source !== 'participant_values') {
+		throw new Error(`${path}.source must be participant_values.`);
+	}
+
+	if (binning !== 'equal_width') {
+		throw new Error(`${path}.binning must be equal_width.`);
+	}
+
+	if (sampleSize !== metricSampleSize) {
+		throw new Error(`${path}.sampleSize must match metric sampleSize.`);
+	}
+
+	if (!Array.isArray(record.bins)) throw new Error(`${path}.bins must be an array.`);
+	if (record.bins.length !== binCount) {
+		throw new Error(`${path}.bins length must match binCount.`);
+	}
+
+	const bins = record.bins.map((bin, index) => {
+		const parsed = parseDistributionBin(bin, `${path}.bins[${index}]`);
+		if (parsed.index !== index) throw new Error(`${path}.bins[${index}].index must be ${index}.`);
+		return parsed;
+	});
+	const countTotal = bins.reduce((total, bin) => total + bin.count, 0);
+	const proportionTotal = bins.reduce((total, bin) => total + bin.proportion, 0);
+
+	if (countTotal !== sampleSize) {
+		throw new Error(`${path}.bins counts must sum to sampleSize.`);
+	}
+
+	if (Math.abs(proportionTotal - 1) > 1e-8) {
+		throw new Error(`${path}.bins proportions must sum to 1.`);
+	}
+
+	for (let index = 1; index < bins.length; index++) {
+		if (Math.abs(bins[index].xStart - bins[index - 1].xEnd) > 1e-10) {
+			throw new Error(`${path}.bins must be contiguous.`);
+		}
+	}
+
+	return {
+		source,
+		binning,
+		binCount,
+		sampleSize,
+		bins,
+		notes: requiredString(record.notes, `${path}.notes`)
+	};
 }
 
 function parseReferenceMetricUnit(value: unknown, path: string): ReferenceMetricUnit {
@@ -225,6 +324,7 @@ function parseMetric(value: unknown, index: number): ReferenceImportMetric {
 	const path = `metrics[${index}]`;
 	const metric = requiredRecord(value, path);
 	const standardDeviation = requiredNumber(metric.standardDeviation, `${path}.standardDeviation`);
+	const sampleSize = requiredInteger(metric.sampleSize, `${path}.sampleSize`);
 
 	if (standardDeviation < 0) {
 		throw new Error(`${path}.standardDeviation cannot be negative.`);
@@ -235,7 +335,7 @@ function parseMetric(value: unknown, index: number): ReferenceImportMetric {
 		label: requiredString(metric.label, `${path}.label`),
 		unit: parseReferenceMetricUnit(metric.unit, `${path}.unit`),
 		comparisonType: parseComparisonType(metric.comparisonType, `${path}.comparisonType`),
-		sampleSize: requiredInteger(metric.sampleSize, `${path}.sampleSize`),
+		sampleSize,
 		mean: requiredNumber(metric.mean, `${path}.mean`),
 		standardDeviation,
 		minimum: requiredNumber(metric.minimum, `${path}.minimum`),
@@ -243,6 +343,7 @@ function parseMetric(value: unknown, index: number): ReferenceImportMetric {
 		sourceColumns: requiredStringArray(metric.sourceColumns, `${path}.sourceColumns`),
 		method: requiredString(metric.method, `${path}.method`),
 		excludedRows: parseExcludedRows(metric.excludedRows, `${path}.excludedRows`),
+		distribution: parseDistribution(metric.distribution, `${path}.distribution`, sampleSize),
 		notes: requiredString(metric.notes, `${path}.notes`)
 	};
 }
@@ -299,7 +400,8 @@ export function createMetricImportMetadata(
 			sampleSize: metric.sampleSize,
 			sourceColumns: metric.sourceColumns,
 			method: metric.method,
-			excludedRows: metric.excludedRows
+			excludedRows: metric.excludedRows,
+			distribution: metric.distribution
 		}
 	};
 }

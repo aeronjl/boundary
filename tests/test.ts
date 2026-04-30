@@ -959,6 +959,8 @@ test('admin can inspect and export ten item personality inventory data', async (
 				sourceCitation,
 				currentValue: 0.83,
 				referenceMean: 0.8508194948622451,
+				source: 'imported_bins',
+				sampleSize: 98,
 				bins: expect.any(Array)
 			})
 		])
@@ -966,8 +968,14 @@ test('admin can inspect and export ten item personality inventory data', async (
 	const importedAccuracyFigure = importedReferenceContext.figures.find(
 		(figure: { metricKey: string }) => figure.metricKey === 'accuracy'
 	);
-	expect(importedAccuracyFigure.bins).toHaveLength(17);
-	expect(importedAccuracyFigure.caveat).toContain('summary statistics');
+	expect(importedAccuracyFigure.bins).toHaveLength(10);
+	expect(
+		importedAccuracyFigure.bins.reduce(
+			(total: number, bin: { count: number | null }) => total + (bin.count ?? 0),
+			0
+		)
+	).toBe(98);
+	expect(importedAccuracyFigure.caveat).toContain('binned participant-level');
 	expect(importedReferenceContext.literatureClaims).toEqual([]);
 	expect(importedReferenceContext.prompts).toEqual(
 		expect.arrayContaining([
@@ -1040,8 +1048,11 @@ test('admin can inspect and export ten item personality inventory data', async (
 	expect(accuracyFigure).toMatchObject({
 		metricKey: 'accuracy',
 		referenceMean: 0.72,
-		currentValue: 0.83
+		currentValue: 0.83,
+		source: 'imported_bins',
+		sampleSize: 98
 	});
+	expect(accuracyFigure.bins).toHaveLength(10);
 	expect(accuracyFigure.currentMarkerPosition).toBeGreaterThan(accuracyFigure.meanMarkerPosition);
 
 	await page.getByRole('button', { name: 'Revert to candidate' }).click();

@@ -31,19 +31,35 @@ export type ReferenceComparison = {
 	referenceStandardDeviation: number | null;
 	referenceMinimum: number | null;
 	referenceMaximum: number | null;
+	referenceDistributionSampleSize: number | null;
+	referenceDistributionBins: ReferenceDistributionBin[];
 	zScore: number | null;
 	percentile: number | null;
 	summary: string;
+};
+
+export type ReferenceDistributionBin = {
+	index: number;
+	xStart: number;
+	xEnd: number;
+	count: number;
+	proportion: number;
 };
 
 export type ReferenceDistributionFigureBin = {
 	index: number;
 	xStart: number;
 	xEnd: number;
+	xPosition: number;
+	width: number;
 	label: string;
+	count: number | null;
+	proportion: number | null;
 	density: number;
 	height: number;
 };
+
+export type ReferenceDistributionFigureSource = 'imported_bins' | 'normal_approximation';
 
 export type ReferenceDistributionFigure = {
 	id: string;
@@ -56,6 +72,8 @@ export type ReferenceDistributionFigure = {
 	sourceCitation: string | null;
 	sourceUrl: string | null;
 	cohortLabel: string | null;
+	source: ReferenceDistributionFigureSource;
+	sampleSize: number | null;
 	currentValue: number;
 	referenceMean: number;
 	referenceStandardDeviation: number;
@@ -146,6 +164,14 @@ function normalDensity(value: number, mean: number, standardDeviation: number): 
 
 function clamp01(value: number): number {
 	return Math.min(1, Math.max(0, value));
+}
+
+function normalizedBinPosition(xStart: number, rangeMinimum: number, span: number): number {
+	return clamp01((xStart - rangeMinimum) / span);
+}
+
+function normalizedBinWidth(xStart: number, xEnd: number, span: number): number {
+	return clamp01((xEnd - xStart) / span);
 }
 
 function percentileSuffix(rank: number): string {
@@ -333,35 +359,57 @@ export function createReferenceDistributionFigure(
 		comparison.referenceMaximum !== null && Number.isFinite(comparison.referenceMaximum)
 			? comparison.referenceMaximum
 			: referenceMean + referenceStandardDeviation * 3;
+	const importedBins = comparison.referenceDistributionBins.filter(
+		(bin) =>
+			Number.isFinite(bin.xStart) &&
+			Number.isFinite(bin.xEnd) &&
+			bin.xEnd > bin.xStart &&
+			Number.isFinite(bin.proportion) &&
+			bin.proportion >= 0
+	);
+	const hasImportedBins = importedBins.length > 0;
 	const rangeMinimum = Math.min(
 		distributionMinimum,
 		currentValue,
-		referenceMean - referenceStandardDeviation * 3
+		referenceMean - referenceStandardDeviation * 3,
+		...(hasImportedBins ? importedBins.map((bin) => bin.xStart) : [])
 	);
 	const rangeMaximum = Math.max(
 		distributionMaximum,
 		currentValue,
-		referenceMean + referenceStandardDeviation * 3
+		referenceMean + referenceStandardDeviation * 3,
+		...(hasImportedBins ? importedBins.map((bin) => bin.xEnd) : [])
 	);
 	const span = rangeMaximum - rangeMinimum;
 
 	if (!Number.isFinite(span) || span <= 0) return null;
 
-	const bins = Array.from({ length: binCount }, (_, index) => {
-		const xStart = rangeMinimum + (span * index) / binCount;
-		const xEnd = rangeMinimum + (span * (index + 1)) / binCount;
-		const midpoint = (xStart + xEnd) / 2;
-		const density = normalDensity(midpoint, referenceMean, referenceStandardDeviation);
+	const source: ReferenceDistributionFigureSource = hasImportedBins
+		? 'imported_bins'
+		: 'normal_approximation';
+	const bins =
+		source === 'imported_bins'
+			? importedBins.map((bin) => ({
+					...bin,
+					label: `${formatReferenceValue(bin.xStart, comparison.unit)} to ${formatReferenceValue(bin.xEnd, comparison.unit)}`,
+					density: bin.proportion
+				}))
+			: Array.from({ length: binCount }, (_, index) => {
+					const xStart = rangeMinimum + (span * index) / binCount;
+					const xEnd = rangeMinimum + (span * (index + 1)) / binCount;
+					const midpoint = (xStart + xEnd) / 2;
+					const density = normalDensity(midpoint, referenceMean, referenceStandardDeviation);
 
-		return {
-			index,
-			xStart,
-			xEnd,
-			label: `${formatReferenceValue(xStart, comparison.unit)} to ${formatReferenceValue(xEnd, comparison.unit)}`,
-			density,
-			height: 0
-		};
-	});
+					return {
+						index,
+						xStart,
+						xEnd,
+						count: null,
+						proportion: null,
+						label: `${formatReferenceValue(xStart, comparison.unit)} to ${formatReferenceValue(xEnd, comparison.unit)}`,
+						density
+					};
+				});
 	const maxDensity = Math.max(...bins.map((bin) => bin.density));
 
 	if (!Number.isFinite(maxDensity) || maxDensity <= 0) return null;
@@ -379,10 +427,17 @@ export function createReferenceDistributionFigure(
 		title: `${comparison.label} reference distribution`,
 		description: `This run is ${direction} ${cohort}, around the ${formatPercentile(percentile)} for the validated reference distribution.`,
 		caveat:
-			'This figure is an approximate normal curve from reviewed summary statistics, not a raw participant-level histogram.',
+			source === 'imported_bins'
+				? 'This figure uses imported binned participant-level metric values from the reviewed reference artifact.'
+				: 'This figure is an approximate normal curve from reviewed summary statistics, not a raw participant-level histogram.',
 		sourceCitation: comparison.referenceSourceCitation,
 		sourceUrl: comparison.referenceSourceUrl,
 		cohortLabel: comparison.referenceCohortLabel,
+		source,
+		sampleSize: hasImportedBins
+			? (comparison.referenceDistributionSampleSize ??
+				importedBins.reduce((total, bin) => total + bin.count, 0))
+			: null,
 		currentValue,
 		referenceMean,
 		referenceStandardDeviation,
@@ -394,6 +449,8 @@ export function createReferenceDistributionFigure(
 		meanMarkerPosition,
 		bins: bins.map((bin) => ({
 			...bin,
+			xPosition: normalizedBinPosition(bin.xStart, rangeMinimum, span),
+			width: normalizedBinWidth(bin.xStart, bin.xEnd, span),
 			height: bin.density / maxDensity
 		}))
 	};

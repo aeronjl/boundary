@@ -258,11 +258,22 @@ describe('reference data contracts', () => {
 			referenceStandardDeviation: 0.11,
 			referenceMinimum: 0.4,
 			referenceMaximum: 0.95,
+			referenceDistributionSampleSize: null,
+			referenceDistributionBins: [],
 			zScore,
 			percentile,
 			summary: ''
 		};
 		const figure = createReferenceDistributionFigure(comparison);
+		const importedFigure = createReferenceDistributionFigure({
+			...comparison,
+			referenceDistributionSampleSize: 98,
+			referenceDistributionBins: [
+				{ index: 0, xStart: 0.4, xEnd: 0.6, count: 20, proportion: 0.2 },
+				{ index: 1, xStart: 0.6, xEnd: 0.8, count: 30, proportion: 0.3 },
+				{ index: 2, xStart: 0.8, xEnd: 1, count: 48, proportion: 0.48 }
+			]
+		});
 		const prompt = createReferenceInterpretationPrompt(comparison);
 		const recommendation = createReferenceTaskRecommendation('n-back', comparison);
 		const relationships = crossTaskRelationshipsForMetric('n-back', 'accuracy');
@@ -273,10 +284,15 @@ describe('reference data contracts', () => {
 			referenceMean: 0.72,
 			currentValue: 0.83
 		});
+		expect(figure?.source).toBe('normal_approximation');
 		expect(figure?.bins).toHaveLength(17);
 		expect(figure?.currentMarkerPosition).toBeGreaterThan(figure?.meanMarkerPosition ?? 0);
 		expect(figure?.description).toContain('84th percentile');
 		expect(figure?.caveat).toContain('summary statistics');
+		expect(importedFigure?.source).toBe('imported_bins');
+		expect(importedFigure?.sampleSize).toBe(98);
+		expect(importedFigure?.bins).toHaveLength(3);
+		expect(importedFigure?.bins[2]).toMatchObject({ count: 48, proportion: 0.48 });
 		expect(prompt?.body).toContain('around the 84th percentile');
 		expect(prompt?.caveat).toContain('not a diagnosis');
 		expect(relationships[0]?.id).toBe('n-back-to-orientation-perceptual-control');
@@ -299,6 +315,8 @@ describe('reference data contracts', () => {
 		expect(accuracy?.sampleSize).toBe(98);
 		expect(accuracy?.mean).toBeCloseTo(0.8508);
 		expect(accuracy?.sourceColumns).toEqual(['nback2_nont', 'nback2_targ']);
+		expect(accuracy?.distribution?.bins).toHaveLength(10);
+		expect(accuracy?.distribution?.bins.reduce((total, bin) => total + bin.count, 0)).toBe(98);
 	});
 
 	it('exposes structured literature extractions for n-back reference comparisons', () => {

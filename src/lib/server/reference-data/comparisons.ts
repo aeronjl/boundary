@@ -12,6 +12,7 @@ import {
 	percentileFromZScore,
 	type ReferenceComparison,
 	type ReferenceComparisonDataset,
+	type ReferenceDistributionBin,
 	type ReferenceComparisonResponse,
 	type ReferenceComparisonState
 } from '$lib/reference-data/comparison';
@@ -39,6 +40,8 @@ type MetricReference = {
 	cohort: ReferenceCohortRow | null;
 	mapping: ReferenceMetricMappingRow | null;
 	sourceColumns: string[];
+	distributionSampleSize: number | null;
+	distributionBins: ReferenceDistributionBin[];
 };
 
 const comparableDatasetCompatibilities = new Set(['compatible', 'partial']);
@@ -74,6 +77,66 @@ function sourceColumnsValue(value: string): string[] {
 	}
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function numberValue(value: unknown): number | null {
+	return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function metricDistributionValue(value: string): {
+	sampleSize: number | null;
+	bins: ReferenceDistributionBin[];
+} {
+	try {
+		const parsed = JSON.parse(value) as unknown;
+		const root = isRecord(parsed) ? parsed : null;
+		const referenceImport = isRecord(root?.referenceImport) ? root.referenceImport : null;
+		const distribution = isRecord(referenceImport?.distribution)
+			? referenceImport.distribution
+			: null;
+		const bins = Array.isArray(distribution?.bins) ? distribution.bins : [];
+
+		return {
+			sampleSize: numberValue(distribution?.sampleSize),
+			bins: bins.flatMap((bin, index) => {
+				if (!isRecord(bin)) return [];
+
+				const xStart = numberValue(bin.xStart);
+				const xEnd = numberValue(bin.xEnd);
+				const count = numberValue(bin.count);
+				const proportion = numberValue(bin.proportion);
+
+				if (
+					xStart === null ||
+					xEnd === null ||
+					xEnd <= xStart ||
+					count === null ||
+					count < 0 ||
+					!Number.isInteger(count) ||
+					proportion === null ||
+					proportion < 0
+				) {
+					return [];
+				}
+
+				return [
+					{
+						index,
+						xStart,
+						xEnd,
+						count,
+						proportion
+					}
+				];
+			})
+		};
+	} catch {
+		return { sampleSize: null, bins: [] };
+	}
+}
+
 function metricReferences(
 	contract: ReferenceMetricContract,
 	metrics: ReferenceMetricRow[],
@@ -94,6 +157,7 @@ function metricReferences(
 				cohort?.referenceStudyId || dataset?.referenceStudyId
 					? (studiesById.get(cohort?.referenceStudyId ?? dataset?.referenceStudyId ?? '') ?? null)
 					: null;
+			const distribution = metricDistributionValue(metric.metricJson);
 
 			return dataset
 				? [
@@ -103,7 +167,9 @@ function metricReferences(
 							study,
 							cohort,
 							mapping,
-							sourceColumns: mapping ? sourceColumnsValue(mapping.sourceColumnsJson) : []
+							sourceColumns: mapping ? sourceColumnsValue(mapping.sourceColumnsJson) : [],
+							distributionSampleSize: distribution.sampleSize,
+							distributionBins: distribution.bins
 						}
 					]
 				: [];
@@ -144,6 +210,8 @@ function emptyComparison(
 		referenceStandardDeviation: reference?.metric.standardDeviation ?? null,
 		referenceMinimum: reference?.metric.minimum ?? null,
 		referenceMaximum: reference?.metric.maximum ?? null,
+		referenceDistributionSampleSize: reference?.distributionSampleSize ?? null,
+		referenceDistributionBins: reference?.distributionBins ?? [],
 		zScore: null,
 		percentile: null,
 		summary: ''
@@ -219,6 +287,8 @@ function createMetricComparison(
 		referenceStandardDeviation: reference.metric.standardDeviation,
 		referenceMinimum: reference.metric.minimum,
 		referenceMaximum: reference.metric.maximum,
+		referenceDistributionSampleSize: reference.distributionSampleSize,
+		referenceDistributionBins: reference.distributionBins,
 		zScore,
 		percentile,
 		summary: ''

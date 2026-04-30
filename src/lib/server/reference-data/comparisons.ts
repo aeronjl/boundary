@@ -20,7 +20,8 @@ import { participantLiteratureClaimsForExperiment } from '$lib/reference-data/li
 import {
 	hasComparableReferenceDataset,
 	hasUsableReferenceStats,
-	isReferenceComparisonReady
+	isReferenceComparisonReady,
+	referenceComparisonBlockers
 } from '$lib/reference-data/readiness';
 import { db } from '$lib/server/db';
 import {
@@ -57,12 +58,7 @@ function hasReadyReference(reference: MetricReference): boolean {
 	return isReferenceComparisonReady({
 		dataset: reference.dataset,
 		metric: reference.metric,
-		mapping: reference.mapping
-			? {
-					...reference.mapping,
-					sourceColumns: reference.sourceColumns
-				}
-			: null
+		mapping: mappingReadinessValue(reference)
 	});
 }
 
@@ -176,8 +172,40 @@ function metricReferences(
 		});
 }
 
+function mappingReadinessValue(reference: MetricReference) {
+	return reference.mapping
+		? {
+				...reference.mapping,
+				sourceColumns: reference.sourceColumns
+			}
+		: null;
+}
+
 function selectMetricReference(references: MetricReference[]): MetricReference | null {
 	return references.find(hasReadyReference) ?? null;
+}
+
+function referenceReadiness(reference: MetricReference | null): {
+	readinessStatus: ReferenceComparison['readinessStatus'];
+	readinessBlockers: string[];
+} {
+	if (!reference) {
+		return {
+			readinessStatus: 'not_registered',
+			readinessBlockers: ['No reference metric is registered.']
+		};
+	}
+
+	const readinessBlockers = referenceComparisonBlockers({
+		dataset: reference.dataset,
+		metric: reference.metric,
+		mapping: mappingReadinessValue(reference)
+	});
+
+	return {
+		readinessStatus: readinessBlockers.length === 0 ? 'ready' : 'blocked',
+		readinessBlockers
+	};
 }
 
 function emptyComparison(
@@ -186,22 +214,33 @@ function emptyComparison(
 	state: ReferenceComparisonState,
 	reference: MetricReference | null
 ): ReferenceComparison {
+	const readiness = referenceReadiness(reference);
 	const comparison = {
 		metricKey: contract.metricKey,
 		label: contract.label,
 		unit: contract.unit,
 		currentValue,
 		state,
+		...readiness,
 		datasetName: reference?.dataset.name ?? null,
+		datasetUrl: reference?.dataset.url ?? null,
 		datasetStatus: reference?.dataset.status ?? null,
 		datasetCompatibility: reference?.dataset.compatibility ?? null,
+		datasetSampleSize: reference?.dataset.sampleSize ?? null,
+		datasetPopulation: reference?.dataset.population ?? null,
+		datasetTaskVariant: reference?.dataset.taskVariant ?? null,
 		referenceSourceCitation: reference?.study?.shortCitation ?? null,
 		referenceSourceUrl: reference?.study?.url ?? null,
 		referenceCohortLabel: reference?.cohort?.label ?? null,
 		referenceCohortSampleSize: reference?.cohort?.sampleSize ?? null,
+		referenceCohortPopulation: reference?.cohort?.population ?? null,
+		referenceCohortGroupLabel: reference?.cohort?.groupLabel ?? null,
 		mappingSourceMetric: reference?.mapping?.sourceMetric ?? null,
 		mappingSourceColumns: reference?.sourceColumns ?? [],
+		mappingTransformation: reference?.mapping?.transformation ?? null,
+		mappingDirection: reference?.mapping?.direction ?? null,
 		mappingExtractionStatus: reference?.mapping?.extractionStatus ?? null,
+		mappingReviewNotes: reference?.mapping?.notes ?? null,
 		referenceMean: reference?.metric.mean ?? null,
 		referenceStandardDeviation: reference?.metric.standardDeviation ?? null,
 		referenceMinimum: reference?.metric.minimum ?? null,
@@ -276,22 +315,33 @@ function createMetricComparison(
 		reference.metric.standardDeviation
 	);
 	const percentile = percentileFromZScore(zScore);
+	const readiness = referenceReadiness(reference);
 	const comparison = {
 		metricKey: contract.metricKey,
 		label: contract.label,
 		unit: contract.unit,
 		currentValue,
 		state: 'comparable' as const,
+		...readiness,
 		datasetName: reference.dataset.name,
+		datasetUrl: reference.dataset.url,
 		datasetStatus: reference.dataset.status,
 		datasetCompatibility: reference.dataset.compatibility,
+		datasetSampleSize: reference.dataset.sampleSize,
+		datasetPopulation: reference.dataset.population,
+		datasetTaskVariant: reference.dataset.taskVariant,
 		referenceSourceCitation: reference.study?.shortCitation ?? null,
 		referenceSourceUrl: reference.study?.url ?? null,
 		referenceCohortLabel: reference.cohort?.label ?? null,
 		referenceCohortSampleSize: reference.cohort?.sampleSize ?? null,
+		referenceCohortPopulation: reference.cohort?.population ?? null,
+		referenceCohortGroupLabel: reference.cohort?.groupLabel ?? null,
 		mappingSourceMetric: reference.mapping?.sourceMetric ?? null,
 		mappingSourceColumns: reference.sourceColumns,
+		mappingTransformation: reference.mapping?.transformation ?? null,
+		mappingDirection: reference.mapping?.direction ?? null,
 		mappingExtractionStatus: reference.mapping?.extractionStatus ?? null,
+		mappingReviewNotes: reference.mapping?.notes ?? null,
 		referenceMean: reference.metric.mean,
 		referenceStandardDeviation: reference.metric.standardDeviation,
 		referenceMinimum: reference.metric.minimum,

@@ -136,6 +136,7 @@ async function completeNBackRun(page: Page) {
 	await expect(page.getByRole('heading', { name: 'How this compares' })).toBeVisible();
 	await expect(page.getByText('Signal sensitivity')).toBeVisible();
 	await expect(page.getByRole('heading', { name: 'Reference context' })).toBeVisible();
+	await expect(page.getByText('Not public ready').first()).toBeVisible();
 }
 
 test('index page has expected h1', async ({ page }) => {
@@ -1017,10 +1018,19 @@ test('admin can inspect and export ten item personality inventory data', async (
 	);
 	expect(importedAccuracyComparison).toMatchObject({
 		state: 'comparable',
+		readinessStatus: 'ready',
+		readinessBlockers: [],
+		datasetUrl: 'https://openfmri.org/dataset/ds000115/',
+		datasetSampleSize: 42,
+		datasetTaskVariant: 'Letter 2-back behavioural summary columns from participants.tsv.',
 		referenceSourceCitation: sourceCitation,
 		referenceCohortLabel: cohortLabel,
+		referenceCohortSampleSize: 12,
+		referenceCohortGroupLabel: 'healthy controls',
 		mappingSourceMetric: 'pilot_accuracy',
 		mappingSourceColumns: ['pilot_nont', 'pilot_targ'],
+		mappingTransformation: 'Mean of pilot target and non-target accuracy.',
+		mappingDirection: 'same',
 		mappingExtractionStatus: 'reviewed',
 		referenceMean: 0.8508194948622451,
 		referenceStandardDeviation: 0.1884581684338786,
@@ -1160,6 +1170,8 @@ test('admin can inspect and export ten item personality inventory data', async (
 	);
 	expect(revertedAccuracyComparison).toMatchObject({
 		state: 'candidate_only',
+		readinessStatus: 'blocked',
+		readinessBlockers: expect.arrayContaining(['Dataset is candidate.']),
 		zScore: null
 	});
 	expect(revertedReferenceContext.figures).toEqual([]);

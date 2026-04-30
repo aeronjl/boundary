@@ -84,37 +84,75 @@
 		}
 	}
 
-	function referenceDataLabel(
-		comparison: ReferenceComparison | undefined,
-		metric: ReferenceContextMetric
-	): string {
-		if (comparison?.datasetStatus) {
-			return `${comparison.datasetStatus}, ${comparison.datasetCompatibility ?? 'unknown'} compatibility`;
-		}
-
-		if (metric.hasValidatedDataset) return 'validated';
-		if (metric.hasCandidateDataset) return 'candidate';
-		return 'none';
-	}
-
 	function comparisonLabel(comparison: ReferenceComparison | undefined): string {
 		if (comparison) return comparison.summary;
 		if (comparisonPending) return 'checking validated references';
 		return 'not checked';
 	}
 
-	function provenanceLabel(comparison: ReferenceComparison | undefined): string {
+	function readinessLabel(
+		comparison: ReferenceComparison | undefined,
+		metric: ReferenceContextMetric
+	): string {
+		if (!comparison) {
+			if (comparisonPending) return 'Checking';
+			if (metric.hasValidatedDataset || metric.hasCandidateDataset) return 'Not checked';
+			return 'No reference';
+		}
+
+		if (comparison.readinessStatus === 'ready') return 'Ready';
+		if (comparison.readinessStatus === 'not_registered') return 'No reference';
+		return 'Not public ready';
+	}
+
+	function readinessTone(comparison: ReferenceComparison | undefined): string {
+		if (comparison?.readinessStatus === 'ready') return 'bg-green-50 text-green-800';
+		return 'bg-amber-50 text-amber-800';
+	}
+
+	function readinessDetails(comparison: ReferenceComparison | undefined): string {
+		if (!comparison) return comparisonPending ? 'Checking reviewed references.' : '';
+		if (comparison.readinessBlockers.length > 0) return comparison.readinessBlockers.join(' ');
+		return 'Reviewed source, compatible dataset, usable stats, and reviewed mapping.';
+	}
+
+	function sourceCohortLabel(comparison: ReferenceComparison | undefined): string {
 		if (!comparison) return '-';
 
-		const source = comparison.referenceSourceCitation;
+		const source = comparison.referenceSourceCitation ?? comparison.datasetName;
 		const cohort = comparison.referenceCohortLabel
 			? `${comparison.referenceCohortLabel}${comparison.referenceCohortSampleSize ? `, n=${comparison.referenceCohortSampleSize}` : ''}`
 			: '';
-		const mapping = comparison.mappingSourceMetric
-			? `${comparison.mappingSourceMetric}${comparison.mappingExtractionStatus ? ` (${comparison.mappingExtractionStatus})` : ''}`
-			: '';
 
-		return [source, cohort, mapping].filter(Boolean).join(' | ') || '-';
+		return [source, cohort].filter(Boolean).join(' | ') || '-';
+	}
+
+	function sourceCohortDetails(comparison: ReferenceComparison | undefined): string {
+		if (!comparison) return '';
+
+		return [
+			comparison.datasetName && comparison.referenceSourceCitation
+				? `Dataset: ${comparison.datasetName}.`
+				: '',
+			comparison.datasetSampleSize ? `Dataset n=${comparison.datasetSampleSize}.` : '',
+			comparison.datasetTaskVariant ? `Task: ${comparison.datasetTaskVariant}.` : '',
+			comparison.referenceCohortGroupLabel ? `Group: ${comparison.referenceCohortGroupLabel}.` : '',
+			comparison.referenceCohortPopulation || comparison.datasetPopulation || ''
+		]
+			.filter(Boolean)
+			.join(' ');
+	}
+
+	function mappingLabel(comparison: ReferenceComparison | undefined): string {
+		if (!comparison?.mappingSourceMetric) return 'No reviewed mapping';
+
+		const columns =
+			comparison.mappingSourceColumns.length > 0
+				? ` from ${comparison.mappingSourceColumns.join(', ')}`
+				: '';
+		const direction = comparison.mappingDirection ? `, ${comparison.mappingDirection}` : '';
+
+		return `${comparison.mappingSourceMetric}${columns}${direction}`;
 	}
 
 	function formatZScore(value: number) {
@@ -165,13 +203,14 @@
 
 	{#if context.metrics.length > 0}
 		<div class="mt-4 overflow-x-auto">
-			<table class="w-full min-w-[820px] text-left text-xs">
+			<table class="w-full min-w-[1000px] text-left text-xs">
 				<thead class="text-gray-500">
 					<tr>
 						<th class="py-2 pr-3 font-medium">Metric</th>
 						<th class="py-2 pr-3 font-medium">This run</th>
-						<th class="py-2 pr-3 font-medium">Reference data</th>
-						<th class="py-2 pr-3 font-medium">Provenance</th>
+						<th class="py-2 pr-3 font-medium">Readiness</th>
+						<th class="py-2 pr-3 font-medium">Source and cohort</th>
+						<th class="py-2 pr-3 font-medium">Mapping</th>
 						<th class="py-2 pr-3 font-medium">Comparison</th>
 						<th class="py-2 pr-3 font-medium">Constraint</th>
 					</tr>
@@ -182,8 +221,22 @@
 						<tr class="border-t border-gray-100">
 							<td class="py-2 pr-3">{metric.label}</td>
 							<td class="py-2 pr-3">{formatReferenceValue(metric.currentValue, metric.unit)}</td>
-							<td class="py-2 pr-3">{referenceDataLabel(comparison, metric)}</td>
-							<td class="py-2 pr-3 text-gray-600">{provenanceLabel(comparison)}</td>
+							<td class="py-2 pr-3">
+								<span class="rounded-sm px-2 py-1 {readinessTone(comparison)}">
+									{readinessLabel(comparison, metric)}
+								</span>
+								<p class="mt-1 text-gray-600">{readinessDetails(comparison)}</p>
+							</td>
+							<td class="py-2 pr-3">
+								<p>{sourceCohortLabel(comparison)}</p>
+								<p class="mt-1 text-gray-600">{sourceCohortDetails(comparison)}</p>
+							</td>
+							<td class="py-2 pr-3">
+								<p>{mappingLabel(comparison)}</p>
+								{#if comparison?.mappingTransformation}
+									<p class="mt-1 text-gray-600">{comparison.mappingTransformation}</p>
+								{/if}
+							</td>
 							<td class="py-2 pr-3 text-gray-600">{comparisonLabel(comparison)}</td>
 							<td class="py-2 pr-3 text-gray-600">{metric.notes}</td>
 						</tr>

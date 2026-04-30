@@ -12,22 +12,35 @@ export type ReferenceComparisonState =
 	| 'missing_current_value'
 	| 'comparable';
 
+export type ReferenceComparisonReadinessStatus = 'ready' | 'blocked' | 'not_registered';
+
 export type ReferenceComparison = {
 	metricKey: string;
 	label: string;
 	unit: ReferenceMetricUnit;
 	currentValue: number | null;
 	state: ReferenceComparisonState;
+	readinessStatus: ReferenceComparisonReadinessStatus;
+	readinessBlockers: string[];
 	datasetName: string | null;
+	datasetUrl: string | null;
 	datasetStatus: string | null;
 	datasetCompatibility: string | null;
+	datasetSampleSize: number | null;
+	datasetPopulation: string | null;
+	datasetTaskVariant: string | null;
 	referenceSourceCitation: string | null;
 	referenceSourceUrl: string | null;
 	referenceCohortLabel: string | null;
 	referenceCohortSampleSize: number | null;
+	referenceCohortPopulation: string | null;
+	referenceCohortGroupLabel: string | null;
 	mappingSourceMetric: string | null;
 	mappingSourceColumns: string[];
+	mappingTransformation: string | null;
+	mappingDirection: string | null;
 	mappingExtractionStatus: string | null;
+	mappingReviewNotes: string | null;
 	referenceMean: number | null;
 	referenceStandardDeviation: number | null;
 	referenceMinimum: number | null;

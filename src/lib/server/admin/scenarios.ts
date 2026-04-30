@@ -32,7 +32,8 @@ export async function getAdminPolicyScenarioComparison(): Promise<PolicyScenario
 			inArray(experimentResponses.responseType, [
 				'intertemporal_choice',
 				'bandit_arm_pull',
-				'n_back_response'
+				'n_back_response',
+				'orientation_discrimination'
 			])
 		)
 		.orderBy(desc(experimentRuns.startedAt), asc(experimentResponses.trialIndex));

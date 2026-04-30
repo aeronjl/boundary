@@ -9,6 +9,7 @@ import {
 	type OrientationDirection,
 	type OrientationMagnitudeObservation,
 	type OrientationOutcome,
+	type OrientationPolicyChoice,
 	type OrientationResult,
 	type OrientationRunState,
 	type OrientationSubmitResult,
@@ -54,6 +55,10 @@ type OrientationScore = {
 	correctDirection: OrientationDirection;
 	angleDegrees: number;
 	magnitudeDegrees: number;
+};
+
+type OrientationResponseSubmissionMetadata = {
+	policyScenario?: (OrientationPolicyChoice & { responseTimeMs: number }) | null;
 };
 
 function parseJson<T>(value: string): T {
@@ -282,7 +287,8 @@ export async function submitOrientationResponse(
 	trialId: string,
 	response: OrientationDirection,
 	timing: TrialSubmissionTiming = {},
-	participantSessionId?: string
+	participantSessionId?: string,
+	submissionMetadata: OrientationResponseSubmissionMetadata = {}
 ): Promise<OrientationSubmitResult> {
 	const run = await getExperimentRun(runId, orientationVersionId, participantSessionId);
 
@@ -341,6 +347,7 @@ export async function submitOrientationResponse(
 	const createdAt = Date.now();
 	const serverTrialStartedAt = await getTrialStartedAt(runId, trialIndex);
 	const timingMetadata = createTimingMetadata(timing, serverTrialStartedAt, createdAt);
+	const policyScenarioMetadata = submissionMetadata.policyScenario ?? null;
 	const outcome: OrientationOutcome = {
 		trialIndex,
 		trialId,
@@ -367,7 +374,8 @@ export async function submitOrientationResponse(
 		},
 		metadata: {
 			stimulusSizePx: context.config.stimulusSizePx,
-			timing: timingMetadata
+			timing: timingMetadata,
+			...(policyScenarioMetadata ? { policyScenario: policyScenarioMetadata } : {})
 		},
 		createdAt
 	});
@@ -383,7 +391,8 @@ export async function submitOrientationResponse(
 			correctDirection,
 			angleDegrees: trial.angleDegrees,
 			magnitudeDegrees: trial.magnitudeDegrees,
-			timing: timingMetadata
+			timing: timingMetadata,
+			...(policyScenarioMetadata ? { policyScenario: policyScenarioMetadata } : {})
 		},
 		createdAt
 	});

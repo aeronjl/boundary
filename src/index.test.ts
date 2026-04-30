@@ -67,8 +67,11 @@ import {
 import { createNBackInterpretation } from '$lib/experiments/n-back-interpretation';
 import {
 	estimateOrientationThresholdDegrees,
+	orientationPolicyScenarios,
+	selectOrientationPolicyChoice,
 	summarizeOrientationMagnitudes,
-	type OrientationResult
+	type OrientationResult,
+	type OrientationTrial
 } from '$lib/experiments/orientation';
 import { createOrientationInterpretation } from '$lib/experiments/orientation-interpretation';
 import { createStudyProfileInterpretation } from '$lib/studies/synthesis';
@@ -209,6 +212,90 @@ describe('orientation interpretation helpers', () => {
 			{ magnitudeDegrees: 4, totalTrials: 2, correctCount: 2, accuracy: 1 }
 		]);
 		expect(estimateOrientationThresholdDegrees(summaries)).toBe(4);
+	});
+
+	it('defines explicit orientation policy scenarios', () => {
+		expect(orientationPolicyScenarios.map((scenario) => scenario.id)).toEqual([
+			'perfect-observer',
+			'clockwise-bias',
+			'counterclockwise-bias',
+			'threshold-observer'
+		]);
+	});
+
+	it('selects orientation responses by direction and magnitude', () => {
+		const smallCounterclockwiseTrial: OrientationTrial = {
+			id: 'orientation-2-counterclockwise-1',
+			angleDegrees: -2,
+			magnitudeDegrees: 2
+		};
+		const largeCounterclockwiseTrial: OrientationTrial = {
+			id: 'orientation-12-counterclockwise-1',
+			angleDegrees: -12,
+			magnitudeDegrees: 12
+		};
+		const clockwiseTrial: OrientationTrial = {
+			id: 'orientation-8-clockwise-1',
+			angleDegrees: 8,
+			magnitudeDegrees: 8
+		};
+		const history = [
+			{ trialIndex: 0, angleDegrees: 8, response: 'clockwise' as const, correct: true },
+			{
+				trialIndex: 1,
+				angleDegrees: -2,
+				response: 'counterclockwise' as const,
+				correct: true
+			}
+		];
+
+		expect(
+			selectOrientationPolicyChoice('perfect-observer', {
+				trial: smallCounterclockwiseTrial,
+				trialIndex: 2,
+				history
+			})
+		).toMatchObject({
+			response: 'counterclockwise',
+			phase: 'veridical',
+			priorAccuracy: 1
+		});
+		expect(
+			selectOrientationPolicyChoice('clockwise-bias', {
+				trial: smallCounterclockwiseTrial,
+				trialIndex: 0,
+				history: []
+			}).response
+		).toBe('clockwise');
+		expect(
+			selectOrientationPolicyChoice('counterclockwise-bias', {
+				trial: clockwiseTrial,
+				trialIndex: 0,
+				history: []
+			}).response
+		).toBe('counterclockwise');
+		expect(
+			selectOrientationPolicyChoice('threshold-observer', {
+				trial: smallCounterclockwiseTrial,
+				trialIndex: 0,
+				history: []
+			})
+		).toMatchObject({
+			response: 'clockwise',
+			phase: 'subthreshold-clockwise-guess',
+			thresholdDegrees: 8
+		});
+		expect(
+			selectOrientationPolicyChoice('threshold-observer', {
+				trial: largeCounterclockwiseTrial,
+				trialIndex: 1,
+				history: []
+			})
+		).toMatchObject({
+			response: 'counterclockwise',
+			phase: 'above-threshold',
+			thresholdDegrees: 8
+		});
 	});
 
 	it('creates cautious interpretation cards for orientation results', () => {
@@ -559,16 +646,77 @@ describe('policy scenario comparison helpers', () => {
 							}
 						}
 					]
+				},
+				{
+					runId: 'run-orientation',
+					experimentSlug: 'orientation-discrimination',
+					status: 'completed',
+					startedAt: 8,
+					completedAt: 9,
+					responses: [
+						{
+							trialIndex: 0,
+							score: {
+								correct: false,
+								correctDirection: 'counterclockwise',
+								angleDegrees: -2,
+								magnitudeDegrees: 2
+							},
+							metadata: {
+								policyScenario: {
+									scenarioId: 'threshold-observer',
+									scenarioLabel: 'Threshold observer',
+									trialIndex: 0,
+									trialId: 'orientation-2-counterclockwise-1',
+									response: 'clockwise',
+									phase: 'subthreshold-clockwise-guess',
+									angleDegrees: -2,
+									magnitudeDegrees: 2,
+									correctDirection: 'counterclockwise',
+									thresholdDegrees: 8,
+									historyResponseCount: 0,
+									priorAccuracy: null,
+									responseTimeMs: 920
+								}
+							}
+						},
+						{
+							trialIndex: 1,
+							score: {
+								correct: true,
+								correctDirection: 'clockwise',
+								angleDegrees: 8,
+								magnitudeDegrees: 8
+							},
+							metadata: {
+								policyScenario: {
+									scenarioId: 'threshold-observer',
+									scenarioLabel: 'Threshold observer',
+									trialIndex: 1,
+									trialId: 'orientation-8-clockwise-1',
+									response: 'clockwise',
+									phase: 'above-threshold',
+									angleDegrees: 8,
+									magnitudeDegrees: 8,
+									correctDirection: 'clockwise',
+									thresholdDegrees: 8,
+									historyResponseCount: 1,
+									priorAccuracy: 0,
+									responseTimeMs: 754
+								}
+							}
+						}
+					]
 				}
 			],
 			new Date(0).toISOString()
 		);
 
 		expect(comparison).toMatchObject({
-			scenarioCount: 4,
-			runCount: 4,
-			completedRunCount: 4,
-			choiceCount: 5
+			scenarioCount: 5,
+			runCount: 5,
+			completedRunCount: 5,
+			choiceCount: 7
 		});
 
 		const epochSensitive = comparison.summaries.find(
@@ -634,6 +782,33 @@ describe('policy scenario comparison helpers', () => {
 				matchResponseRate: 1
 			})
 		]);
+
+		const thresholdObserver = comparison.summaries.find(
+			(summary) => summary.scenarioId === 'threshold-observer'
+		);
+		expect(thresholdObserver).toMatchObject({
+			runCount: 1,
+			totalChoiceCount: 2,
+			meanAccuracy: 0.5,
+			meanClockwiseResponseRate: 1,
+			meanEstimatedThresholdDegrees: 8
+		});
+		expect(thresholdObserver?.phaseSummaries).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					phase: 'above-threshold',
+					accuracy: 1,
+					clockwiseResponseRate: 1,
+					meanMagnitudeDegrees: 8
+				}),
+				expect.objectContaining({
+					phase: 'subthreshold-clockwise-guess',
+					accuracy: 0,
+					clockwiseResponseRate: 1,
+					meanMagnitudeDegrees: 2
+				})
+			])
+		);
 	});
 });
 

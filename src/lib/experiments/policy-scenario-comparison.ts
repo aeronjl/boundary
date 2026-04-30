@@ -1,4 +1,5 @@
 import type { IntertemporalEpoch } from './intertemporal';
+import { estimateOrientationThresholdDegrees, summarizeOrientationMagnitudes } from './orientation';
 
 export type PolicyScenarioComparisonResponseInput = {
 	trialIndex: number;
@@ -38,6 +39,9 @@ export type PolicyScenarioPhaseSummary = {
 	accuracy: number | null;
 	matchResponseCount: number | null;
 	matchResponseRate: number | null;
+	clockwiseResponseCount: number | null;
+	clockwiseResponseRate: number | null;
+	meanMagnitudeDegrees: number | null;
 	meanLaterNetAdvantage: number | null;
 	meanMinimumLaterAdvantage: number | null;
 	meanResponseTimeMs: number | null;
@@ -66,6 +70,9 @@ export type PolicyScenarioRunSummary = {
 	accuracy: number | null;
 	matchResponseCount: number | null;
 	matchResponseRate: number | null;
+	clockwiseResponseCount: number | null;
+	clockwiseResponseRate: number | null;
+	estimatedThresholdDegrees: number | null;
 	meanResponseTimeMs: number | null;
 };
 
@@ -85,6 +92,8 @@ export type PolicyScenarioSummary = {
 	meanSampledArmCount: number | null;
 	meanAccuracy: number | null;
 	meanMatchResponseRate: number | null;
+	meanClockwiseResponseRate: number | null;
+	meanEstimatedThresholdDegrees: number | null;
 	meanResponseTimeMs: number | null;
 	epochSummaries: PolicyScenarioEpochSummary[];
 	phaseSummaries: PolicyScenarioPhaseSummary[];
@@ -115,6 +124,8 @@ type PolicyScenarioChoice = {
 	armId: string | null;
 	correct: boolean | null;
 	matchResponse: boolean | null;
+	clockwiseResponse: boolean | null;
+	magnitudeDegrees: number | null;
 	laterNetAdvantage: number | null;
 	minimumLaterAdvantage: number | null;
 	responseTimeMs: number | null;
@@ -171,6 +182,8 @@ function scenarioChoice(
 	const policyResponse = stringValue(policyScenario?.response);
 	const matchResponse =
 		policyResponse === 'match' ? true : policyResponse === 'no_match' ? false : null;
+	const clockwiseResponse =
+		policyResponse === 'clockwise' ? true : policyResponse === 'counterclockwise' ? false : null;
 
 	return {
 		scenarioId,
@@ -187,6 +200,8 @@ function scenarioChoice(
 		armId: selectedArmId,
 		correct: typeof score?.correct === 'boolean' ? score.correct : null,
 		matchResponse,
+		clockwiseResponse,
+		magnitudeDegrees: numberValue(score?.magnitudeDegrees),
 		laterNetAdvantage: numberValue(policyScenario?.laterNetAdvantage),
 		minimumLaterAdvantage: numberValue(policyScenario?.minimumLaterAdvantage),
 		responseTimeMs: numberValue(policyScenario?.responseTimeMs)
@@ -212,6 +227,15 @@ function createRunSummary(
 	const correctCount = correctChoices.filter((choice) => choice.correct).length;
 	const matchResponseChoices = choices.filter((choice) => choice.matchResponse !== null);
 	const matchResponseCount = matchResponseChoices.filter((choice) => choice.matchResponse).length;
+	const clockwiseResponseChoices = choices.filter((choice) => choice.clockwiseResponse !== null);
+	const clockwiseResponseCount = clockwiseResponseChoices.filter(
+		(choice) => choice.clockwiseResponse
+	).length;
+	const magnitudeObservations = choices.flatMap((choice) =>
+		choice.magnitudeDegrees === null || choice.correct === null
+			? []
+			: [{ magnitudeDegrees: choice.magnitudeDegrees, correct: choice.correct }]
+	);
 	const responseTimes = choices.flatMap((choice) =>
 		choice.responseTimeMs === null ? [] : [choice.responseTimeMs]
 	);
@@ -246,6 +270,12 @@ function createRunSummary(
 		accuracy: ratio(correctCount, correctChoices.length),
 		matchResponseCount: matchResponseChoices.length > 0 ? matchResponseCount : null,
 		matchResponseRate: ratio(matchResponseCount, matchResponseChoices.length),
+		clockwiseResponseCount: clockwiseResponseChoices.length > 0 ? clockwiseResponseCount : null,
+		clockwiseResponseRate: ratio(clockwiseResponseCount, clockwiseResponseChoices.length),
+		estimatedThresholdDegrees:
+			magnitudeObservations.length > 0
+				? estimateOrientationThresholdDegrees(summarizeOrientationMagnitudes(magnitudeObservations))
+				: null,
 		meanResponseTimeMs: mean(responseTimes)
 	};
 }
@@ -296,6 +326,15 @@ function createPhaseSummary(
 	const correctCount = correctChoices.filter((choice) => choice.correct).length;
 	const matchResponseChoices = phaseChoices.filter((choice) => choice.matchResponse !== null);
 	const matchResponseCount = matchResponseChoices.filter((choice) => choice.matchResponse).length;
+	const clockwiseResponseChoices = phaseChoices.filter(
+		(choice) => choice.clockwiseResponse !== null
+	);
+	const clockwiseResponseCount = clockwiseResponseChoices.filter(
+		(choice) => choice.clockwiseResponse
+	).length;
+	const magnitudes = phaseChoices.flatMap((choice) =>
+		choice.magnitudeDegrees === null ? [] : [choice.magnitudeDegrees]
+	);
 
 	return {
 		phase,
@@ -310,6 +349,9 @@ function createPhaseSummary(
 		accuracy: ratio(correctCount, correctChoices.length),
 		matchResponseCount: matchResponseChoices.length > 0 ? matchResponseCount : null,
 		matchResponseRate: ratio(matchResponseCount, matchResponseChoices.length),
+		clockwiseResponseCount: clockwiseResponseChoices.length > 0 ? clockwiseResponseCount : null,
+		clockwiseResponseRate: ratio(clockwiseResponseCount, clockwiseResponseChoices.length),
+		meanMagnitudeDegrees: mean(magnitudes),
 		meanLaterNetAdvantage: mean(
 			phaseChoices.flatMap((choice) =>
 				choice.laterNetAdvantage === null ? [] : [choice.laterNetAdvantage]
@@ -397,6 +439,16 @@ export function createPolicyScenarioComparison(
 				meanMatchResponseRate: mean(
 					runsForScenario.flatMap((run) =>
 						run.matchResponseRate === null ? [] : [run.matchResponseRate]
+					)
+				),
+				meanClockwiseResponseRate: mean(
+					runsForScenario.flatMap((run) =>
+						run.clockwiseResponseRate === null ? [] : [run.clockwiseResponseRate]
+					)
+				),
+				meanEstimatedThresholdDegrees: mean(
+					runsForScenario.flatMap((run) =>
+						run.estimatedThresholdDegrees === null ? [] : [run.estimatedThresholdDegrees]
 					)
 				),
 				meanResponseTimeMs: mean(

@@ -334,6 +334,8 @@ export const adminExperimentDictionary: AdminExperimentDictionaryEntry[] = [
 			'score.correctDirection',
 			'score.angleDegrees',
 			'score.magnitudeDegrees',
+			'metadata.policyScenario.scenarioId',
+			'metadata.policyScenario.phase',
 			'metadata.timing.responseTimeMs'
 		]
 	},

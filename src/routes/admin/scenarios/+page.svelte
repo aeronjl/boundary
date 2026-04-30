@@ -12,6 +12,8 @@
 		value === null ? '-' : `${(value * 100).toFixed(0)}%`;
 	const formatPoints = (value: number | null) => (value === null ? '-' : value.toFixed(0));
 	const formatMs = (value: number | null) => (value === null ? '-' : `${value.toFixed(0)} ms`);
+	const formatDegrees = (value: number | null) =>
+		value === null ? '-' : `${value.toFixed(1)} deg`;
 	const formatLabel = (value: string) => value.replaceAll('-', ' ');
 </script>
 
@@ -63,7 +65,7 @@
 		</p>
 	{:else}
 		<div class="overflow-x-auto border-t border-gray-200">
-			<table class="w-full min-w-[1320px] text-left text-xs">
+			<table class="w-full min-w-[1500px] text-left text-xs">
 				<thead class="text-gray-500">
 					<tr>
 						<th class="py-2 pr-3 font-medium">Scenario</th>
@@ -72,6 +74,8 @@
 						<th class="py-2 pr-3 font-medium">Choices</th>
 						<th class="py-2 pr-3 font-medium">Accuracy</th>
 						<th class="py-2 pr-3 font-medium">Match rate</th>
+						<th class="py-2 pr-3 font-medium">Clockwise rate</th>
+						<th class="py-2 pr-3 font-medium">Threshold</th>
 						<th class="py-2 pr-3 font-medium">Delayed rate</th>
 						<th class="py-2 pr-3 font-medium">Best-arm rate</th>
 						<th class="py-2 pr-3 font-medium">Reward rate</th>
@@ -94,6 +98,8 @@
 							<td class="py-2 pr-3">{summary.totalChoiceCount}</td>
 							<td class="py-2 pr-3">{formatPercent(summary.meanAccuracy)}</td>
 							<td class="py-2 pr-3">{formatPercent(summary.meanMatchResponseRate)}</td>
+							<td class="py-2 pr-3">{formatPercent(summary.meanClockwiseResponseRate)}</td>
+							<td class="py-2 pr-3">{formatDegrees(summary.meanEstimatedThresholdDegrees)}</td>
 							<td class="py-2 pr-3">{formatPercent(summary.meanDelayedChoiceRate)}</td>
 							<td class="py-2 pr-3">{formatPercent(summary.meanBestArmSelectionRate)}</td>
 							<td class="py-2 pr-3">{formatPercent(summary.meanRewardRate)}</td>
@@ -112,13 +118,15 @@
 			<div class="border-t border-gray-200 pt-4">
 				<h2 class="font-serif text-xl">{summary.scenarioLabel}</h2>
 				<div class="mt-3 overflow-x-auto">
-					<table class="w-full min-w-[1080px] text-left text-xs">
+					<table class="w-full min-w-[1240px] text-left text-xs">
 						<thead class="text-gray-500">
 							<tr>
 								<th class="py-2 pr-3 font-medium">Epoch / phase</th>
 								<th class="py-2 pr-3 font-medium">Choices</th>
 								<th class="py-2 pr-3 font-medium">Accuracy</th>
 								<th class="py-2 pr-3 font-medium">Match rate</th>
+								<th class="py-2 pr-3 font-medium">Clockwise rate</th>
+								<th class="py-2 pr-3 font-medium">Mean tilt</th>
 								<th class="py-2 pr-3 font-medium">Delayed rate</th>
 								<th class="py-2 pr-3 font-medium">Best-arm rate</th>
 								<th class="py-2 pr-3 font-medium">Reward rate</th>
@@ -138,6 +146,11 @@
 									<td class="py-2 pr-3">
 										{formatPercent(phase.matchResponseRate)} ({phase.matchResponseCount ?? '-'})
 									</td>
+									<td class="py-2 pr-3">
+										{formatPercent(phase.clockwiseResponseRate)} ({phase.clockwiseResponseCount ??
+											'-'})
+									</td>
+									<td class="py-2 pr-3">{formatDegrees(phase.meanMagnitudeDegrees)}</td>
 									<td class="py-2 pr-3">{formatPercent(phase.delayedChoiceRate)}</td>
 									<td class="py-2 pr-3">{formatPercent(phase.bestArmSelectionRate)}</td>
 									<td class="py-2 pr-3">{formatPercent(phase.rewardRate)}</td>
@@ -151,7 +164,7 @@
 				</div>
 
 				<div class="mt-4 overflow-x-auto">
-					<table class="w-full min-w-[1280px] text-left text-xs">
+					<table class="w-full min-w-[1440px] text-left text-xs">
 						<thead class="text-gray-500">
 							<tr>
 								<th class="py-2 pr-3 font-medium">Run</th>
@@ -160,6 +173,8 @@
 								<th class="py-2 pr-3 font-medium">Trials</th>
 								<th class="py-2 pr-3 font-medium">Accuracy</th>
 								<th class="py-2 pr-3 font-medium">Match rate</th>
+								<th class="py-2 pr-3 font-medium">Clockwise rate</th>
+								<th class="py-2 pr-3 font-medium">Threshold</th>
 								<th class="py-2 pr-3 font-medium">Delayed</th>
 								<th class="py-2 pr-3 font-medium">Net gain</th>
 								<th class="py-2 pr-3 font-medium">Reward rate</th>
@@ -187,6 +202,10 @@
 									<td class="py-2 pr-3">
 										{formatPercent(run.matchResponseRate)} ({run.matchResponseCount ?? '-'})
 									</td>
+									<td class="py-2 pr-3">
+										{formatPercent(run.clockwiseResponseRate)} ({run.clockwiseResponseCount ?? '-'})
+									</td>
+									<td class="py-2 pr-3">{formatDegrees(run.estimatedThresholdDegrees)}</td>
 									<td class="py-2 pr-3">
 										{run.delayedChoiceCount} ({formatPercent(run.delayedChoiceRate)})
 									</td>

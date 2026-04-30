@@ -5,6 +5,7 @@ import {
 	type IntertemporalConfig,
 	type IntertemporalOption,
 	type IntertemporalOutcome,
+	type IntertemporalPolicyChoice,
 	type IntertemporalResult,
 	type IntertemporalRunState,
 	type IntertemporalSubmitResult,
@@ -52,6 +53,10 @@ type IntertemporalChoiceScore = {
 	netValue: number;
 	wealthAfter: number;
 	delayed: boolean;
+};
+
+type IntertemporalChoiceSubmissionMetadata = {
+	policyScenario?: (IntertemporalPolicyChoice & { responseTimeMs: number }) | null;
 };
 
 function parseJson<T>(value: string): T {
@@ -252,7 +257,8 @@ export async function submitIntertemporalChoice(
 	trialId: string,
 	optionId: string,
 	timing: TrialSubmissionTiming = {},
-	participantSessionId?: string
+	participantSessionId?: string,
+	submissionMetadata: IntertemporalChoiceSubmissionMetadata = {}
 ): Promise<IntertemporalSubmitResult> {
 	const run = await getExperimentRun(runId, intertemporalVersionId, participantSessionId);
 
@@ -317,6 +323,7 @@ export async function submitIntertemporalChoice(
 	const createdAt = Date.now();
 	const serverTrialStartedAt = await getTrialStartedAt(runId, trialIndex);
 	const timingMetadata = createTimingMetadata(timing, serverTrialStartedAt, createdAt);
+	const policyScenarioMetadata = submissionMetadata.policyScenario ?? null;
 	const outcome: IntertemporalOutcome = {
 		trialIndex,
 		trialId,
@@ -347,7 +354,8 @@ export async function submitIntertemporalChoice(
 			timeCostPerSecond: context.config.timeCostPerSecond,
 			sooner: trial.sooner,
 			later: trial.later,
-			timing: timingMetadata
+			timing: timingMetadata,
+			...(policyScenarioMetadata ? { policyScenario: policyScenarioMetadata } : {})
 		},
 		createdAt
 	});
@@ -365,7 +373,8 @@ export async function submitIntertemporalChoice(
 			timeCost: scored.timeCost,
 			netValue: scored.netValue,
 			wealthAfter: scored.wealth,
-			timing: timingMetadata
+			timing: timingMetadata,
+			...(policyScenarioMetadata ? { policyScenario: policyScenarioMetadata } : {})
 		},
 		createdAt
 	});

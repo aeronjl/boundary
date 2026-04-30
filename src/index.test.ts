@@ -4,7 +4,13 @@ import {
 	bestBanditArmSelectionRate,
 	createBanditInterpretation
 } from '$lib/experiments/bandit-interpretation';
-import type { IntertemporalResult } from '$lib/experiments/intertemporal';
+import {
+	defaultIntertemporalConfig,
+	intertemporalPolicyScenarios,
+	selectIntertemporalPolicyChoice,
+	type IntertemporalResult,
+	type IntertemporalTrial
+} from '$lib/experiments/intertemporal';
 import {
 	createIntertemporalInterpretation,
 	intertemporalDelayedChoiceRate
@@ -169,6 +175,16 @@ describe('bandit interpretation helpers', () => {
 });
 
 describe('intertemporal interpretation helpers', () => {
+	function intertemporalTrial(id: string): IntertemporalTrial {
+		const trial = defaultIntertemporalConfig.trials.find((candidate) => candidate.id === id);
+
+		if (!trial) {
+			throw new Error(`Missing intertemporal test trial: ${id}`);
+		}
+
+		return trial;
+	}
+
 	it('summarizes delay choice and net value', () => {
 		const result: IntertemporalResult = {
 			runId: 'run-1',
@@ -191,6 +207,48 @@ describe('intertemporal interpretation helpers', () => {
 		expect(interpretation.references.map((reference) => reference.id)).toEqual(
 			expect.arrayContaining(['green-myerson-2004', 'sutton-barto-2018', 'gosling-2003'])
 		);
+	});
+
+	it('defines explicit policy scenarios for quick result runs', () => {
+		expect(intertemporalPolicyScenarios.map((scenario) => scenario.id)).toEqual([
+			'always-sooner',
+			'always-later',
+			'net-value-maximizer',
+			'epoch-sensitive'
+		]);
+	});
+
+	it('applies epoch-sensitive thresholds to delayed choices', () => {
+		const choose = (trialId: string) =>
+			selectIntertemporalPolicyChoice('epoch-sensitive', {
+				trial: intertemporalTrial(trialId),
+				trialIndex: 0,
+				timeCostPerSecond: defaultIntertemporalConfig.timeCostPerSecond
+			});
+
+		expect(choose('choice-1')).toMatchObject({
+			epoch: 'short',
+			optionId: 'later',
+			minimumLaterAdvantage: 0
+		});
+		expect(choose('choice-8')).toMatchObject({
+			epoch: 'medium',
+			optionId: 'later',
+			minimumLaterAdvantage: 25
+		});
+		expect(choose('choice-6')).toMatchObject({
+			epoch: 'long',
+			optionId: 'sooner',
+			laterNetAdvantage: 20,
+			minimumLaterAdvantage: 50
+		});
+		expect(
+			selectIntertemporalPolicyChoice('net-value-maximizer', {
+				trial: intertemporalTrial('choice-6'),
+				trialIndex: 0,
+				timeCostPerSecond: defaultIntertemporalConfig.timeCostPerSecond
+			}).optionId
+		).toBe('later');
 	});
 });
 

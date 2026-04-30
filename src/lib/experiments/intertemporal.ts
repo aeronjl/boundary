@@ -16,6 +16,8 @@ export type IntertemporalTrial = {
 	later: IntertemporalOption;
 };
 
+export type IntertemporalEpoch = 'short' | 'medium' | 'long';
+
 export type IntertemporalConfig = {
 	initialWealth: number;
 	timeCostPerSecond: number;
@@ -66,6 +68,49 @@ export type IntertemporalSubmitResult =
 			result: IntertemporalResult;
 			lastOutcome: IntertemporalOutcome;
 	  };
+
+export type IntertemporalPolicyScenarioId =
+	| 'always-sooner'
+	| 'always-later'
+	| 'net-value-maximizer'
+	| 'epoch-sensitive';
+
+type IntertemporalPolicyDecisionInput = {
+	trial: IntertemporalTrial;
+	trialIndex: number;
+	epoch: IntertemporalEpoch;
+	timeCostPerSecond: number;
+	soonerNetValue: number;
+	laterNetValue: number;
+	laterNetAdvantage: number;
+};
+
+type IntertemporalPolicyDecision = {
+	optionId: string;
+	minimumLaterAdvantage: number | null;
+};
+
+export type IntertemporalPolicyScenario = {
+	id: IntertemporalPolicyScenarioId;
+	label: string;
+	description: string;
+	chooseOption: (input: IntertemporalPolicyDecisionInput) => IntertemporalPolicyDecision;
+};
+
+export type IntertemporalPolicyChoice = {
+	scenarioId: IntertemporalPolicyScenarioId;
+	scenarioLabel: string;
+	trialIndex: number;
+	trialId: string;
+	optionId: string;
+	optionLabel: string;
+	epoch: IntertemporalEpoch;
+	timeCostPerSecond: number;
+	soonerNetValue: number;
+	laterNetValue: number;
+	laterNetAdvantage: number;
+	minimumLaterAdvantage: number | null;
+};
 
 export const defaultIntertemporalConfig: IntertemporalConfig = {
 	initialWealth: 1000,
@@ -121,6 +166,131 @@ export const defaultIntertemporalConfig: IntertemporalConfig = {
 		}
 	]
 };
+
+const epochLaterAdvantageThresholds: Record<IntertemporalEpoch, number> = {
+	short: 0,
+	medium: 25,
+	long: 50
+};
+
+function chooseLaterWithThreshold(
+	trial: IntertemporalTrial,
+	laterNetAdvantage: number,
+	threshold: number
+): IntertemporalPolicyDecision {
+	return {
+		optionId: laterNetAdvantage >= threshold ? trial.later.id : trial.sooner.id,
+		minimumLaterAdvantage: threshold
+	};
+}
+
+export function intertemporalTrialEpoch(trial: IntertemporalTrial): IntertemporalEpoch {
+	const longestDelaySeconds = Math.max(trial.sooner.delaySeconds, trial.later.delaySeconds);
+
+	if (longestDelaySeconds <= 4) return 'short';
+	if (longestDelaySeconds <= 6) return 'medium';
+	return 'long';
+}
+
+export function intertemporalOptionNetValue(
+	option: IntertemporalOption,
+	timeCostPerSecond: number
+): number {
+	return option.amount - option.delaySeconds * timeCostPerSecond;
+}
+
+export const intertemporalPolicyScenarios: IntertemporalPolicyScenario[] = [
+	{
+		id: 'always-sooner',
+		label: 'Always sooner',
+		description: 'Immediate income on every trial.',
+		chooseOption: ({ trial }) => ({
+			optionId: trial.sooner.id,
+			minimumLaterAdvantage: null
+		})
+	},
+	{
+		id: 'always-later',
+		label: 'Always later',
+		description: 'Delayed income on every trial.',
+		chooseOption: ({ trial }) => ({
+			optionId: trial.later.id,
+			minimumLaterAdvantage: null
+		})
+	},
+	{
+		id: 'net-value-maximizer',
+		label: 'Net maximizer',
+		description: 'Chooses the higher value after delay cost.',
+		chooseOption: ({ trial, laterNetAdvantage }) =>
+			chooseLaterWithThreshold(trial, laterNetAdvantage, 1)
+	},
+	{
+		id: 'epoch-sensitive',
+		label: 'Epoch-sensitive',
+		description: 'Requires a larger delayed premium as the wait gets longer.',
+		chooseOption: ({ trial, epoch, laterNetAdvantage }) =>
+			chooseLaterWithThreshold(trial, laterNetAdvantage, epochLaterAdvantageThresholds[epoch])
+	}
+];
+
+export function getIntertemporalPolicyScenario(
+	scenarioId: string
+): IntertemporalPolicyScenario | null {
+	return intertemporalPolicyScenarios.find((scenario) => scenario.id === scenarioId) ?? null;
+}
+
+export function selectIntertemporalPolicyChoice(
+	scenarioId: string,
+	input: {
+		trial: IntertemporalTrial;
+		trialIndex: number;
+		timeCostPerSecond: number;
+	}
+): IntertemporalPolicyChoice {
+	const scenario = getIntertemporalPolicyScenario(scenarioId);
+
+	if (!scenario) {
+		throw new Error(`Unknown intertemporal policy scenario: ${scenarioId}`);
+	}
+
+	const epoch = intertemporalTrialEpoch(input.trial);
+	const soonerNetValue = intertemporalOptionNetValue(input.trial.sooner, input.timeCostPerSecond);
+	const laterNetValue = intertemporalOptionNetValue(input.trial.later, input.timeCostPerSecond);
+	const laterNetAdvantage = laterNetValue - soonerNetValue;
+	const decision = scenario.chooseOption({
+		...input,
+		epoch,
+		soonerNetValue,
+		laterNetValue,
+		laterNetAdvantage
+	});
+	const option =
+		decision.optionId === input.trial.sooner.id
+			? input.trial.sooner
+			: decision.optionId === input.trial.later.id
+				? input.trial.later
+				: null;
+
+	if (!option) {
+		throw new Error(`Policy scenario chose an invalid option: ${scenario.id}`);
+	}
+
+	return {
+		scenarioId: scenario.id,
+		scenarioLabel: scenario.label,
+		trialIndex: input.trialIndex,
+		trialId: input.trial.id,
+		optionId: option.id,
+		optionLabel: option.label,
+		epoch,
+		timeCostPerSecond: input.timeCostPerSecond,
+		soonerNetValue,
+		laterNetValue,
+		laterNetAdvantage,
+		minimumLaterAdvantage: decision.minimumLaterAdvantage
+	};
+}
 
 function isFiniteNumber(value: unknown): value is number {
 	return typeof value === 'number' && Number.isFinite(value);

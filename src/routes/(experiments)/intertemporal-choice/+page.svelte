@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { dev } from '$app/environment';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
@@ -15,12 +16,14 @@
 		getStoredExperimentRunId,
 		storeExperimentRunId
 	} from '$lib/experiments/run-storage';
-	import type {
-		IntertemporalOption,
-		IntertemporalOutcome,
-		IntertemporalResult,
-		IntertemporalRunState,
-		IntertemporalSubmitResult
+	import {
+		intertemporalPolicyScenarios,
+		type IntertemporalOption,
+		type IntertemporalOutcome,
+		type IntertemporalPolicyScenarioId,
+		type IntertemporalResult,
+		type IntertemporalRunState,
+		type IntertemporalSubmitResult
 	} from '$lib/experiments/intertemporal';
 
 	const experiment = getExperimentCatalogEntry('intertemporal-choice');
@@ -31,6 +34,7 @@
 	let pending = false;
 	let errorMessage = '';
 	let resumeChecked = false;
+	let scenarioPendingId: IntertemporalPolicyScenarioId | null = null;
 
 	$: studySessionId = $page.url.searchParams.get('study') ?? '';
 	$: trial = state?.trial ?? null;
@@ -141,6 +145,45 @@
 		}
 	}
 
+	async function acceptDevConsent() {
+		const response = await fetch('/api/consent', { method: 'POST' });
+
+		if (!response.ok) {
+			const body = (await response.json().catch(() => null)) as { message?: string } | null;
+			throw new Error(body?.message ?? 'Could not record consent.');
+		}
+	}
+
+	async function runPolicyScenario(scenarioId: IntertemporalPolicyScenarioId) {
+		if (pending) return;
+
+		pending = true;
+		scenarioPendingId = scenarioId;
+		errorMessage = '';
+		state = null;
+		result = null;
+		lastOutcome = null;
+
+		try {
+			await acceptDevConsent();
+			const response = await fetch(
+				`/api/experiments/intertemporal-choice/scenarios/${encodeURIComponent(scenarioId)}/runs`,
+				{
+					method: 'POST',
+					headers: studySessionId ? { 'content-type': 'application/json' } : undefined,
+					body: studySessionId ? JSON.stringify({ studySessionId }) : undefined
+				}
+			);
+
+			applyRunUpdate(await parseJsonResponse<IntertemporalSubmitResult>(response));
+		} catch (error) {
+			errorMessage = error instanceof Error ? error.message : 'Could not run the policy scenario.';
+		} finally {
+			pending = false;
+			scenarioPendingId = null;
+		}
+	}
+
 	async function choose(optionId: string) {
 		if (pending || !state || !trial) return;
 
@@ -196,6 +239,31 @@
 		<p class="border-t border-gray-200 pt-4 text-gray-500">Checking for saved run...</p>
 	{:else if !state && !result}
 		<ExperimentStartGate {experiment} busy={pending} on:start={startRun} />
+		{#if dev}
+			<div class="border-t border-gray-200 pt-4">
+				<div class="flex flex-col gap-1">
+					<h2 class="font-serif text-2xl">Policy scenarios</h2>
+					<p class="max-w-2xl text-gray-500">
+						Development shortcuts that complete the task through explicit choice policies.
+					</p>
+				</div>
+				<div class="mt-3 grid gap-3 md:grid-cols-2">
+					{#each intertemporalPolicyScenarios as scenario (scenario.id)}
+						<button
+							class="rounded-sm border border-gray-200 p-3 text-left disabled:bg-gray-50 disabled:text-gray-400"
+							disabled={pending}
+							on:click={() => runPolicyScenario(scenario.id)}
+						>
+							<span class="block font-medium">{scenario.label}</span>
+							<span class="mt-1 block text-xs text-gray-500">{scenario.description}</span>
+							<span class="mt-3 block text-xs">
+								{scenarioPendingId === scenario.id ? 'Building...' : 'Run scenario'}
+							</span>
+						</button>
+					{/each}
+				</div>
+			</div>
+		{/if}
 	{/if}
 
 	{#if state && trial}

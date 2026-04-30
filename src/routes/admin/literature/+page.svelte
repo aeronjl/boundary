@@ -2,6 +2,7 @@
 	import { resolve } from '$app/paths';
 
 	export let data;
+	export let form;
 
 	const formatNumber = (value: number | null) =>
 		value === null
@@ -73,6 +74,17 @@
 		</a>
 	</div>
 
+	{#if data.message || form?.message}
+		<p
+			role="status"
+			class="rounded-sm border {form?.message
+				? 'border-red-200 bg-red-50 text-red-800'
+				: 'border-green-200 bg-green-50 text-green-800'} p-3"
+		>
+			{form?.message ?? data.message}
+		</p>
+	{/if}
+
 	{#if data.validations.length > 0}
 		<div class="rounded-sm border border-red-200 bg-red-50 p-3 text-red-800">
 			<p class="font-medium">Validation issues</p>
@@ -94,11 +106,10 @@
 				</p>
 			</div>
 			<div class="text-xs text-gray-500">
-				<p>Promote locally after the queue shows no blockers.</p>
-				<code class="mt-1 block rounded-sm bg-gray-100 p-2 break-words">
-					bun run literature:promote &lt;claim-id&gt; --status reviewed --participant-use
-					public_prompt_ready --write
-				</code>
+				<p>
+					Use the review actions to update the source JSON locally, then commit the changed
+					literature file.
+				</p>
 			</div>
 		</div>
 
@@ -164,9 +175,23 @@
 							<td class="max-w-xs py-2 pr-3 text-gray-600">
 								<p>{item.nextAction}</p>
 								{#if item.canPromoteToPublic}
-									<code class="mt-2 block rounded-sm bg-gray-100 p-2 break-words">
-										{item.promotionCommand}
-									</code>
+									<form method="POST" action="?/claimReview" class="mt-2">
+										<input type="hidden" name="claimId" value={item.id} />
+										<input type="hidden" name="status" value="reviewed" />
+										<input type="hidden" name="participantUse" value="public_prompt_ready" />
+										<button class="rounded-sm bg-black px-3 py-2 text-xs text-white">
+											Promote to public
+										</button>
+									</form>
+								{:else if item.participantExposure === 'public'}
+									<form method="POST" action="?/claimReview" class="mt-2">
+										<input type="hidden" name="claimId" value={item.id} />
+										<input type="hidden" name="status" value="reviewed" />
+										<input type="hidden" name="participantUse" value="internal_review" />
+										<button class="rounded-sm bg-gray-100 px-3 py-2 text-xs">
+											Move to internal review
+										</button>
+									</form>
 								{/if}
 							</td>
 						</tr>

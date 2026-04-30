@@ -862,7 +862,7 @@ function literatureClaimNextAction(
 ): string {
 	if (reviewState === 'public_ready') return 'Visible to participants.';
 	if (reviewState === 'ready_to_promote') {
-		return `Run bun run literature:promote ${claim.id} --status reviewed --participant-use public_prompt_ready --write after final human review.`;
+		return 'Use the admin Promote to public action after final human review.';
 	}
 
 	return 'Resolve blocker(s) before public promotion.';

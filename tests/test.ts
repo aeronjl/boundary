@@ -787,6 +787,8 @@ test('admin can inspect and export ten item personality inventory data', async (
 	).toBeVisible();
 	await expect(page.getByText('Evidence: blocked').first()).toBeVisible();
 	await expect(page.getByText('candidate comparison claim').first()).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Promote to public' })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Move to internal review' })).toBeVisible();
 
 	const literatureJsonResponse = await page.request.get('/admin/literature/export.json');
 	expect(literatureJsonResponse.status()).toBe(200);

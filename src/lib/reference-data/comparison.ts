@@ -1,5 +1,6 @@
 import type { ExperimentRoutePath } from '../experiments/interpretation';
 import type { ReferenceMetricUnit } from './catalog';
+import type { ParticipantLiteratureClaim } from './literature';
 import { crossTaskRelationshipsForMetric, type CrossTaskRelationshipKind } from './relationships';
 import { formatReferenceValue, type ReferenceMetricValue } from './summary';
 
@@ -71,6 +72,7 @@ export type ReferenceComparisonResponse = {
 	comparisons: ReferenceComparison[];
 	prompts: ReferenceInterpretationPrompt[];
 	recommendations: ReferenceTaskRecommendation[];
+	literatureClaims: ParticipantLiteratureClaim[];
 	datasets: ReferenceComparisonDataset[];
 	candidateDatasetCount: number;
 	validatedDatasetCount: number;

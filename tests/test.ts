@@ -943,6 +943,7 @@ test('admin can inspect and export ten item personality inventory data', async (
 		referenceStandardDeviation: 0.1884581684338786
 	});
 	expect(importedAccuracyComparison.zScore).toBeCloseTo(-0.11, 2);
+	expect(importedReferenceContext.literatureClaims).toEqual([]);
 	expect(importedReferenceContext.prompts).toEqual(
 		expect.arrayContaining([
 			expect.objectContaining({

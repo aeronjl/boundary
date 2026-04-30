@@ -14,6 +14,7 @@ import {
 	type ReferenceComparisonResponse,
 	type ReferenceComparisonState
 } from '$lib/reference-data/comparison';
+import { participantLiteratureClaimsForExperiment } from '$lib/reference-data/literature';
 import { db } from '$lib/server/db';
 import {
 	referenceCohorts,
@@ -346,6 +347,7 @@ export async function getReferenceComparisonContext(
 		comparisons,
 		prompts,
 		recommendations,
+		literatureClaims: participantLiteratureClaimsForExperiment(experimentSlug),
 		datasets: datasets.map(datasetSummary),
 		candidateDatasetCount: datasets.filter((dataset) => dataset.status === 'candidate').length,
 		validatedDatasetCount: datasets.filter((dataset) => dataset.status === 'validated').length,

@@ -3,6 +3,7 @@ import {
 	getLiteratureExtractionExportFor,
 	literatureExtractionsForExperimentFrom,
 	literatureMetricSummariesForExperimentFrom,
+	participantLiteratureClaimsForExperimentFrom,
 	parseLiteratureExtraction,
 	summarizeLiteratureExtractions,
 	validateLiteratureExtractions,
@@ -24,6 +25,7 @@ export type {
 	LiteratureSource,
 	LiteratureStudy,
 	LiteratureTask,
+	ParticipantLiteratureClaim,
 	StructuredLiteratureExtraction
 } from './literature-schema';
 
@@ -53,6 +55,10 @@ export function literatureExtractionsForExperiment(
 
 export function literatureMetricSummariesForExperiment(experimentSlug: string) {
 	return literatureMetricSummariesForExperimentFrom(literatureExtractions, experimentSlug);
+}
+
+export function participantLiteratureClaimsForExperiment(experimentSlug: string) {
+	return participantLiteratureClaimsForExperimentFrom(literatureExtractions, experimentSlug);
 }
 
 export function getLiteratureExtractionExport() {

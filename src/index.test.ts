@@ -25,8 +25,10 @@ import {
 	literatureExtractionFilePaths,
 	literatureExtractionValidations,
 	literatureExtractions,
-	literatureMetricSummariesForExperiment
+	literatureMetricSummariesForExperiment,
+	participantLiteratureClaimsForExperiment
 } from '$lib/reference-data/literature';
+import { participantLiteratureClaimsForExperimentFrom } from '$lib/reference-data/literature-schema';
 import { crossTaskRelationshipsForMetric } from '$lib/reference-data/relationships';
 import { createReferenceContext } from '$lib/reference-data/summary';
 import { calculateNBackSignalDetectionMetrics, type NBackResult } from '$lib/experiments/n-back';
@@ -325,6 +327,35 @@ describe('reference data contracts', () => {
 			mean: 0.8508194948622451,
 			comparisonReadiness: 'candidate'
 		});
+	});
+
+	it('only exposes reviewed public-ready literature claims to participants', () => {
+		const adhdExtraction = literatureExtractions.find(
+			(candidate) => candidate.id === 'marx-2011-adhd-emotional-nback'
+		);
+
+		expect(participantLiteratureClaimsForExperiment('n-back')).toEqual([]);
+		expect(adhdExtraction).toBeTruthy();
+		if (!adhdExtraction) throw new Error('ADHD extraction fixture is missing.');
+
+		const reviewedExtraction = {
+			...adhdExtraction,
+			comparisonClaims: adhdExtraction.comparisonClaims.map((claim) => ({
+				...claim,
+				status: 'reviewed' as const,
+				participantUse: 'public_prompt_ready' as const
+			}))
+		};
+		const claims = participantLiteratureClaimsForExperimentFrom([reviewedExtraction], 'n-back');
+
+		expect(claims).toEqual([
+			expect.objectContaining({
+				id: 'marx-2011-adhd-nback-clinical-context',
+				sourceCitation: 'Marx et al., 2011',
+				sourceUrl: 'https://pubmed.ncbi.nlm.nih.gov/21905999/'
+			})
+		]);
+		expect(claims[0].caveat).toContain('Do not use this source to classify');
 	});
 });
 

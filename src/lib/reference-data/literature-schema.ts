@@ -175,6 +175,19 @@ export type LiteratureMetricSummary = {
 	guardrail: string;
 };
 
+export type ParticipantLiteratureClaim = {
+	id: string;
+	extractionId: string;
+	experimentSlug: string;
+	metricKey: string;
+	title: string;
+	body: string;
+	caveat: string;
+	sourceCitation: string;
+	sourceUrl: string;
+	evidenceIds: string[];
+};
+
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -609,6 +622,44 @@ export function literatureMetricSummariesForExperimentFrom(
 				];
 			});
 		}
+	);
+}
+
+function literatureClaimTitle(claim: LiteratureComparisonClaim): string {
+	if (claim.claimType === 'cohort_distribution') return 'Reviewed cohort comparison';
+	if (claim.claimType === 'group_similarity') return 'Reviewed group comparison';
+	return 'Reviewed task context';
+}
+
+export function participantLiteratureClaimsForExperimentFrom(
+	extractions: StructuredLiteratureExtraction[],
+	experimentSlug: string
+): ParticipantLiteratureClaim[] {
+	return literatureExtractionsForExperimentFrom(extractions, experimentSlug).flatMap((extraction) =>
+		extraction.comparisonClaims.flatMap((claim) => {
+			if (
+				claim.experimentSlug !== experimentSlug ||
+				claim.status !== 'reviewed' ||
+				claim.participantUse !== 'public_prompt_ready'
+			) {
+				return [];
+			}
+
+			return [
+				{
+					id: claim.id,
+					extractionId: extraction.id,
+					experimentSlug: claim.experimentSlug,
+					metricKey: claim.metricKey,
+					title: literatureClaimTitle(claim),
+					body: claim.claim,
+					caveat: claim.guardrail,
+					sourceCitation: extraction.source.shortCitation,
+					sourceUrl: extraction.source.url,
+					evidenceIds: claim.citationIds
+				}
+			];
+		})
 	);
 }
 

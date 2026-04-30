@@ -36,6 +36,7 @@
 	$: displayDatasets = serverContext?.datasets ?? context.datasets;
 	$: interpretationPrompts = serverContext?.prompts ?? [];
 	$: taskRecommendations = serverContext?.recommendations ?? [];
+	$: literatureClaims = serverContext?.literatureClaims ?? [];
 	$: if (mounted) {
 		void loadComparison(metricsRequestKey);
 	}
@@ -207,6 +208,31 @@
 							</a>
 							<!-- eslint-enable svelte/no-navigation-without-resolve -->
 						{/if}
+					</li>
+				{/each}
+			</ul>
+		</div>
+	{/if}
+
+	{#if literatureClaims.length > 0}
+		<div class="mt-4 border-t border-gray-200 pt-3">
+			<h4 class="font-medium">Reviewed literature comparisons</h4>
+			<ul class="mt-2 space-y-2">
+				{#each literatureClaims as claim (claim.id)}
+					<li class="border-l-2 border-gray-200 py-1 pl-3">
+						<p class="font-medium">{claim.title}</p>
+						<p class="mt-1 text-gray-600">{claim.body}</p>
+						<p class="mt-1 text-xs text-gray-500">{claim.caveat}</p>
+						<!-- eslint-disable svelte/no-navigation-without-resolve -->
+						<a
+							class="mt-1 inline-block text-xs underline"
+							href={claim.sourceUrl}
+							rel="noreferrer"
+							target="_blank"
+						>
+							{claim.sourceCitation}
+						</a>
+						<!-- eslint-enable svelte/no-navigation-without-resolve -->
 					</li>
 				{/each}
 			</ul>

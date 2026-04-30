@@ -946,9 +946,28 @@ test('admin can inspect and export ten item personality inventory data', async (
 		mappingSourceColumns: ['pilot_nont', 'pilot_targ'],
 		mappingExtractionStatus: 'reviewed',
 		referenceMean: 0.8508194948622451,
-		referenceStandardDeviation: 0.1884581684338786
+		referenceStandardDeviation: 0.1884581684338786,
+		referenceMinimum: 0.1833333335,
+		referenceMaximum: 1
 	});
 	expect(importedAccuracyComparison.zScore).toBeCloseTo(-0.11, 2);
+	expect(importedReferenceContext.figures).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				id: 'accuracy-reference-distribution',
+				metricKey: 'accuracy',
+				sourceCitation,
+				currentValue: 0.83,
+				referenceMean: 0.8508194948622451,
+				bins: expect.any(Array)
+			})
+		])
+	);
+	const importedAccuracyFigure = importedReferenceContext.figures.find(
+		(figure: { metricKey: string }) => figure.metricKey === 'accuracy'
+	);
+	expect(importedAccuracyFigure.bins).toHaveLength(17);
+	expect(importedAccuracyFigure.caveat).toContain('summary statistics');
 	expect(importedReferenceContext.literatureClaims).toEqual([]);
 	expect(importedReferenceContext.prompts).toEqual(
 		expect.arrayContaining([
@@ -1015,6 +1034,15 @@ test('admin can inspect and export ten item personality inventory data', async (
 	});
 	expect(accuracyComparison.zScore).toBeCloseTo(1);
 	expect(accuracyComparison.summary).toContain('above the reference mean');
+	const accuracyFigure = referenceContext.figures.find(
+		(figure: { metricKey: string }) => figure.metricKey === 'accuracy'
+	);
+	expect(accuracyFigure).toMatchObject({
+		metricKey: 'accuracy',
+		referenceMean: 0.72,
+		currentValue: 0.83
+	});
+	expect(accuracyFigure.currentMarkerPosition).toBeGreaterThan(accuracyFigure.meanMarkerPosition);
 
 	await page.getByRole('button', { name: 'Revert to candidate' }).click();
 	await expect(page.getByText('Reference dataset reverted to candidate.')).toBeVisible();
@@ -1039,6 +1067,7 @@ test('admin can inspect and export ten item personality inventory data', async (
 		state: 'candidate_only',
 		zScore: null
 	});
+	expect(revertedReferenceContext.figures).toEqual([]);
 	await page.goto('/admin');
 
 	const csvResponse = await page.request.get('/admin/tipi/export.csv');

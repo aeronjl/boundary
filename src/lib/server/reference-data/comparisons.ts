@@ -6,6 +6,7 @@ import {
 import {
 	calculateReferenceZScore,
 	createComparisonSummary,
+	createReferenceDistributionFigure,
 	createReferenceInterpretationPrompt,
 	createReferenceTaskRecommendation,
 	percentileFromZScore,
@@ -141,6 +142,8 @@ function emptyComparison(
 		mappingExtractionStatus: reference?.mapping?.extractionStatus ?? null,
 		referenceMean: reference?.metric.mean ?? null,
 		referenceStandardDeviation: reference?.metric.standardDeviation ?? null,
+		referenceMinimum: reference?.metric.minimum ?? null,
+		referenceMaximum: reference?.metric.maximum ?? null,
 		zScore: null,
 		percentile: null,
 		summary: ''
@@ -214,6 +217,8 @@ function createMetricComparison(
 		mappingExtractionStatus: reference.mapping?.extractionStatus ?? null,
 		referenceMean: reference.metric.mean,
 		referenceStandardDeviation: reference.metric.standardDeviation,
+		referenceMinimum: reference.metric.minimum,
+		referenceMaximum: reference.metric.maximum,
 		zScore,
 		percentile,
 		summary: ''
@@ -335,6 +340,10 @@ export async function getReferenceComparisonContext(
 		const prompt = createReferenceInterpretationPrompt(comparison);
 		return prompt ? [prompt] : [];
 	});
+	const figures = comparisons.flatMap((comparison) => {
+		const figure = createReferenceDistributionFigure(comparison);
+		return figure ? [figure] : [];
+	});
 	const recommendations = uniqueRecommendations(
 		comparisons.flatMap((comparison) => {
 			const recommendation = createReferenceTaskRecommendation(experimentSlug, comparison);
@@ -345,6 +354,7 @@ export async function getReferenceComparisonContext(
 	return {
 		experimentSlug,
 		comparisons,
+		figures,
 		prompts,
 		recommendations,
 		literatureClaims: participantLiteratureClaimsForExperiment(experimentSlug),

@@ -1,9 +1,11 @@
 <script lang="ts">
 	import { base, resolve } from '$app/paths';
 	import { onMount } from 'svelte';
-	import type {
-		ReferenceComparison,
-		ReferenceComparisonResponse
+	import {
+		formatPercentile,
+		type ReferenceComparison,
+		type ReferenceDistributionFigure,
+		type ReferenceComparisonResponse
 	} from '$lib/reference-data/comparison';
 	import {
 		createReferenceContext,
@@ -35,6 +37,7 @@
 	$: validatedDatasetCount = serverContext?.validatedDatasetCount ?? context.validatedDatasetCount;
 	$: displayDatasets = serverContext?.datasets ?? context.datasets;
 	$: interpretationPrompts = serverContext?.prompts ?? [];
+	$: distributionFigures = serverContext?.figures ?? [];
 	$: taskRecommendations = serverContext?.recommendations ?? [];
 	$: literatureClaims = serverContext?.literatureClaims ?? [];
 	$: if (mounted) {
@@ -114,6 +117,21 @@
 
 		return [source, cohort, mapping].filter(Boolean).join(' | ') || '-';
 	}
+
+	function binX(
+		bin: ReferenceDistributionFigure['bins'][number],
+		figure: ReferenceDistributionFigure
+	) {
+		return (bin.index / figure.bins.length) * 100;
+	}
+
+	function binWidth(figure: ReferenceDistributionFigure) {
+		return Math.max(1, 100 / figure.bins.length - 0.5);
+	}
+
+	function formatZScore(value: number) {
+		return `${value >= 0 ? '+' : ''}${value.toFixed(2)} SD`;
+	}
 </script>
 
 <section class="mt-6">
@@ -184,6 +202,105 @@
 					{/each}
 				</tbody>
 			</table>
+		</div>
+	{/if}
+
+	{#if distributionFigures.length > 0}
+		<div class="mt-4 border-t border-gray-200 pt-3">
+			<h4 class="font-medium">Reference distributions</h4>
+			<ul class="mt-2 space-y-3">
+				{#each distributionFigures as figure (figure.id)}
+					<li class="border-l-2 border-gray-200 py-1 pl-3">
+						<div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
+							<div>
+								<p class="font-medium">{figure.title}</p>
+								<p class="mt-1 text-gray-600">{figure.description}</p>
+								<p class="mt-1 text-xs text-gray-500">{figure.caveat}</p>
+								{#if figure.sourceCitation && figure.sourceUrl}
+									<!-- eslint-disable svelte/no-navigation-without-resolve -->
+									<a
+										class="mt-1 inline-block text-xs underline"
+										href={figure.sourceUrl}
+										rel="noreferrer"
+										target="_blank"
+									>
+										{figure.sourceCitation}
+									</a>
+									<!-- eslint-enable svelte/no-navigation-without-resolve -->
+								{/if}
+							</div>
+							<div>
+								<div class="relative h-28 border-b border-l border-gray-200">
+									<svg
+										aria-label={`${figure.label} approximate reference distribution`}
+										class="h-full w-full overflow-visible"
+										preserveAspectRatio="none"
+										role="img"
+										viewBox="0 0 100 52"
+									>
+										<title>{figure.title}</title>
+										{#each figure.bins as bin (bin.index)}
+											<rect
+												class="text-gray-300"
+												fill="currentColor"
+												height={bin.height * 42}
+												width={binWidth(figure)}
+												x={binX(bin, figure)}
+												y={48 - bin.height * 42}
+											/>
+										{/each}
+										<line
+											class="text-gray-500"
+											stroke="currentColor"
+											stroke-dasharray="2 2"
+											stroke-width="0.8"
+											x1={figure.meanMarkerPosition * 100}
+											x2={figure.meanMarkerPosition * 100}
+											y1="5"
+											y2="50"
+										/>
+										<line
+											class="text-black"
+											stroke="currentColor"
+											stroke-width="1.2"
+											x1={figure.currentMarkerPosition * 100}
+											x2={figure.currentMarkerPosition * 100}
+											y1="0"
+											y2="50"
+										/>
+									</svg>
+								</div>
+								<div class="mt-2 grid grid-cols-2 gap-2 text-[11px] text-gray-600">
+									<div>
+										<p class="text-gray-500">This run</p>
+										<p class="font-medium text-gray-800">
+											{formatReferenceValue(figure.currentValue, figure.unit)}
+										</p>
+									</div>
+									<div>
+										<p class="text-gray-500">Reference mean</p>
+										<p class="font-medium text-gray-800">
+											{formatReferenceValue(figure.referenceMean, figure.unit)}
+										</p>
+									</div>
+									<div>
+										<p class="text-gray-500">Position</p>
+										<p class="font-medium text-gray-800">
+											{formatPercentile(figure.percentile)}
+										</p>
+									</div>
+									<div>
+										<p class="text-gray-500">Distance</p>
+										<p class="font-medium text-gray-800">
+											{formatZScore(figure.zScore)}
+										</p>
+									</div>
+								</div>
+							</div>
+						</div>
+					</li>
+				{/each}
+			</ul>
 		</div>
 	{/if}
 

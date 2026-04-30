@@ -29,9 +29,43 @@ export type ReferenceComparison = {
 	mappingExtractionStatus: string | null;
 	referenceMean: number | null;
 	referenceStandardDeviation: number | null;
+	referenceMinimum: number | null;
+	referenceMaximum: number | null;
 	zScore: number | null;
 	percentile: number | null;
 	summary: string;
+};
+
+export type ReferenceDistributionFigureBin = {
+	index: number;
+	xStart: number;
+	xEnd: number;
+	label: string;
+	density: number;
+	height: number;
+};
+
+export type ReferenceDistributionFigure = {
+	id: string;
+	metricKey: string;
+	label: string;
+	unit: ReferenceMetricUnit;
+	title: string;
+	description: string;
+	caveat: string;
+	sourceCitation: string | null;
+	sourceUrl: string | null;
+	cohortLabel: string | null;
+	currentValue: number;
+	referenceMean: number;
+	referenceStandardDeviation: number;
+	rangeMinimum: number;
+	rangeMaximum: number;
+	zScore: number;
+	percentile: number;
+	currentMarkerPosition: number;
+	meanMarkerPosition: number;
+	bins: ReferenceDistributionFigureBin[];
 };
 
 export type ReferenceComparisonDataset = {
@@ -70,6 +104,7 @@ export type ReferenceTaskRecommendation = {
 export type ReferenceComparisonResponse = {
 	experimentSlug: string;
 	comparisons: ReferenceComparison[];
+	figures: ReferenceDistributionFigure[];
 	prompts: ReferenceInterpretationPrompt[];
 	recommendations: ReferenceTaskRecommendation[];
 	literatureClaims: ParticipantLiteratureClaim[];
@@ -102,6 +137,15 @@ function normalCdf(value: number): number {
 			Math.exp(-x * x);
 
 	return Math.min(1, Math.max(0, 0.5 * (1 + sign * erf)));
+}
+
+function normalDensity(value: number, mean: number, standardDeviation: number): number {
+	const scaled = (value - mean) / standardDeviation;
+	return Math.exp(-0.5 * scaled * scaled) / (standardDeviation * Math.sqrt(2 * Math.PI));
+}
+
+function clamp01(value: number): number {
+	return Math.min(1, Math.max(0, value));
 }
 
 function percentileSuffix(rank: number): string {
@@ -254,5 +298,103 @@ export function createReferenceTaskRecommendation(
 		relationshipCitation: relationship.sources[0]?.shortCitation ?? null,
 		relationshipUrl: relationship.sources[0]?.url ?? null,
 		evidenceIds: relationship.sources.map((source) => source.evidenceId)
+	};
+}
+
+export function createReferenceDistributionFigure(
+	comparison: ReferenceComparison,
+	binCount = 17
+): ReferenceDistributionFigure | null {
+	if (
+		comparison.state !== 'comparable' ||
+		comparison.currentValue === null ||
+		comparison.referenceMean === null ||
+		comparison.referenceStandardDeviation === null ||
+		comparison.zScore === null ||
+		comparison.percentile === null ||
+		!Number.isFinite(comparison.currentValue) ||
+		!Number.isFinite(comparison.referenceMean) ||
+		!Number.isFinite(comparison.referenceStandardDeviation) ||
+		comparison.referenceStandardDeviation <= 0
+	) {
+		return null;
+	}
+
+	const currentValue = comparison.currentValue;
+	const referenceMean = comparison.referenceMean;
+	const referenceStandardDeviation = comparison.referenceStandardDeviation;
+	const zScore = comparison.zScore;
+	const percentile = comparison.percentile;
+	const distributionMinimum =
+		comparison.referenceMinimum !== null && Number.isFinite(comparison.referenceMinimum)
+			? comparison.referenceMinimum
+			: referenceMean - referenceStandardDeviation * 3;
+	const distributionMaximum =
+		comparison.referenceMaximum !== null && Number.isFinite(comparison.referenceMaximum)
+			? comparison.referenceMaximum
+			: referenceMean + referenceStandardDeviation * 3;
+	const rangeMinimum = Math.min(
+		distributionMinimum,
+		currentValue,
+		referenceMean - referenceStandardDeviation * 3
+	);
+	const rangeMaximum = Math.max(
+		distributionMaximum,
+		currentValue,
+		referenceMean + referenceStandardDeviation * 3
+	);
+	const span = rangeMaximum - rangeMinimum;
+
+	if (!Number.isFinite(span) || span <= 0) return null;
+
+	const bins = Array.from({ length: binCount }, (_, index) => {
+		const xStart = rangeMinimum + (span * index) / binCount;
+		const xEnd = rangeMinimum + (span * (index + 1)) / binCount;
+		const midpoint = (xStart + xEnd) / 2;
+		const density = normalDensity(midpoint, referenceMean, referenceStandardDeviation);
+
+		return {
+			index,
+			xStart,
+			xEnd,
+			label: `${formatReferenceValue(xStart, comparison.unit)} to ${formatReferenceValue(xEnd, comparison.unit)}`,
+			density,
+			height: 0
+		};
+	});
+	const maxDensity = Math.max(...bins.map((bin) => bin.density));
+
+	if (!Number.isFinite(maxDensity) || maxDensity <= 0) return null;
+
+	const currentMarkerPosition = clamp01((currentValue - rangeMinimum) / span);
+	const meanMarkerPosition = clamp01((referenceMean - rangeMinimum) / span);
+	const cohort = comparison.referenceCohortLabel ?? comparison.datasetName ?? 'validated reference';
+	const direction = Math.abs(zScore) < 0.25 ? 'near' : zScore > 0 ? 'above' : 'below';
+
+	return {
+		id: `${comparison.metricKey}-reference-distribution`,
+		metricKey: comparison.metricKey,
+		label: comparison.label,
+		unit: comparison.unit,
+		title: `${comparison.label} reference distribution`,
+		description: `This run is ${direction} ${cohort}, around the ${formatPercentile(percentile)} for the validated reference distribution.`,
+		caveat:
+			'This figure is an approximate normal curve from reviewed summary statistics, not a raw participant-level histogram.',
+		sourceCitation: comparison.referenceSourceCitation,
+		sourceUrl: comparison.referenceSourceUrl,
+		cohortLabel: comparison.referenceCohortLabel,
+		currentValue,
+		referenceMean,
+		referenceStandardDeviation,
+		rangeMinimum,
+		rangeMaximum,
+		zScore,
+		percentile,
+		currentMarkerPosition,
+		meanMarkerPosition,
+		bins: bins.map((bin) => ({
+			...bin,
+			height: bin.density / maxDensity
+		}))
 	};
 }

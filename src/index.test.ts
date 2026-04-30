@@ -13,6 +13,7 @@ import { referenceMetricContracts } from '$lib/reference-data/catalog';
 import {
 	calculateReferenceZScore,
 	createComparisonSummary,
+	createReferenceDistributionFigure,
 	createReferenceInterpretationPrompt,
 	createReferenceTaskRecommendation,
 	formatPercentile,
@@ -255,14 +256,27 @@ describe('reference data contracts', () => {
 			mappingExtractionStatus: 'reviewed',
 			referenceMean: 0.72,
 			referenceStandardDeviation: 0.11,
+			referenceMinimum: 0.4,
+			referenceMaximum: 0.95,
 			zScore,
 			percentile,
 			summary: ''
 		};
+		const figure = createReferenceDistributionFigure(comparison);
 		const prompt = createReferenceInterpretationPrompt(comparison);
 		const recommendation = createReferenceTaskRecommendation('n-back', comparison);
 		const relationships = crossTaskRelationshipsForMetric('n-back', 'accuracy');
 
+		expect(figure).toMatchObject({
+			id: 'accuracy-reference-distribution',
+			metricKey: 'accuracy',
+			referenceMean: 0.72,
+			currentValue: 0.83
+		});
+		expect(figure?.bins).toHaveLength(17);
+		expect(figure?.currentMarkerPosition).toBeGreaterThan(figure?.meanMarkerPosition ?? 0);
+		expect(figure?.description).toContain('84th percentile');
+		expect(figure?.caveat).toContain('summary statistics');
 		expect(prompt?.body).toContain('around the 84th percentile');
 		expect(prompt?.caveat).toContain('not a diagnosis');
 		expect(relationships[0]?.id).toBe('n-back-to-orientation-perceptual-control');

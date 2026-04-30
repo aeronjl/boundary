@@ -140,6 +140,9 @@ async function completeNBackRun(page: Page) {
 	await expect(page.getByText('Reference interpretation')).toBeVisible();
 	await expect(page.getByText('Reviewed comparison')).toBeVisible();
 	await expect(page.getByText('healthy-control 2-back accuracy distribution')).toBeVisible();
+	await expect(page.getByText('Related task')).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Try orientation next', exact: true })).toBeVisible();
+	await expect(page.getByText('This relationship supports follow-up task selection')).toBeVisible();
 	await expect(
 		page.getByText('Black marker: this run. Dashed marker: reference mean.')
 	).toBeVisible();

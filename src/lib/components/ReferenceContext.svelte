@@ -52,6 +52,9 @@
 	$: remainingLiteratureClaims = literatureClaims.filter(
 		(claim) => !storyMetricKeys.has(claim.metricKey)
 	);
+	$: remainingTaskRecommendations = taskRecommendations.filter(
+		(recommendation) => !storyMetricKeys.has(recommendation.metricKey)
+	);
 	$: if (mounted) {
 		void loadComparison(metricsRequestKey);
 	}
@@ -191,6 +194,10 @@
 	function promptForMetric(metricKey: string) {
 		return interpretationPrompts.find((prompt) => prompt.metricKey === metricKey);
 	}
+
+	function recommendationForMetric(metricKey: string) {
+		return taskRecommendations.find((recommendation) => recommendation.metricKey === metricKey);
+	}
 </script>
 
 <section class="mt-6">
@@ -242,6 +249,7 @@
 					{@const comparison = comparisonByKey.get(figure.metricKey)}
 					{@const claim = claimForMetric(figure.metricKey)}
 					{@const prompt = promptForMetric(figure.metricKey)}
+					{@const recommendation = recommendationForMetric(figure.metricKey)}
 					<li class="border-l-2 border-green-500 py-1 pl-3">
 						<div class="grid gap-4 md:grid-cols-[minmax(0,1fr)_240px]">
 							<div>
@@ -297,6 +305,31 @@
 										{figure.sourceCitation}
 									</a>
 									<!-- eslint-enable svelte/no-navigation-without-resolve -->
+								{/if}
+								{#if recommendation}
+									<div class="mt-3 border-t border-gray-100 pt-3">
+										<p class="text-xs text-gray-500">Related task</p>
+										<a
+											class="mt-1 inline-block font-medium underline"
+											href={resolve(recommendation.href)}
+										>
+											{recommendation.title}
+										</a>
+										<p class="mt-1 text-gray-600">{recommendation.body}</p>
+										<p class="mt-1 text-xs text-gray-500">{recommendation.caveat}</p>
+										{#if recommendation.relationshipCitation && recommendation.relationshipUrl}
+											<!-- eslint-disable svelte/no-navigation-without-resolve -->
+											<a
+												class="mt-1 inline-block text-xs underline"
+												href={recommendation.relationshipUrl}
+												rel="noreferrer"
+												target="_blank"
+											>
+												{recommendation.relationshipCitation}
+											</a>
+											<!-- eslint-enable svelte/no-navigation-without-resolve -->
+										{/if}
+									</div>
 								{/if}
 							</div>
 							<div>
@@ -552,11 +585,11 @@
 		</div>
 	{/if}
 
-	{#if taskRecommendations.length > 0}
+	{#if remainingTaskRecommendations.length > 0}
 		<div class="mt-4 border-t border-gray-200 pt-3">
 			<h4 class="font-medium">Evidence-linked next task</h4>
 			<ul class="mt-2 space-y-2">
-				{#each taskRecommendations as recommendation (`${recommendation.metricKey}:${recommendation.href}`)}
+				{#each remainingTaskRecommendations as recommendation (`${recommendation.metricKey}:${recommendation.href}`)}
 					<li class="border-l-2 border-gray-200 py-1 pl-3">
 						<a class="font-medium underline" href={resolve(recommendation.href)}>
 							{recommendation.title}

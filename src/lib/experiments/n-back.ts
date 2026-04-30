@@ -77,6 +77,50 @@ export type NBackSubmitResult =
 			lastOutcome: NBackOutcome;
 	  };
 
+export type NBackPolicyScenarioId =
+	| 'perfect-responder'
+	| 'all-no-match'
+	| 'target-biased'
+	| 'lapse-noisy';
+
+export type NBackPolicyHistoryItem = Pick<
+	NBackOutcome,
+	'trialIndex' | 'expectedMatch' | 'response' | 'correct'
+>;
+
+type NBackPolicyDecisionInput = {
+	trial: NBackTrial;
+	trialIndex: number;
+	n: number;
+	history: NBackPolicyHistoryItem[];
+};
+
+type NBackPolicyDecision = {
+	response: NBackResponseChoice;
+	phase: string;
+};
+
+export type NBackPolicyScenario = {
+	id: NBackPolicyScenarioId;
+	label: string;
+	description: string;
+	chooseResponse: (input: NBackPolicyDecisionInput) => NBackPolicyDecision;
+};
+
+export type NBackPolicyChoice = {
+	scenarioId: NBackPolicyScenarioId;
+	scenarioLabel: string;
+	trialIndex: number;
+	trialId: string;
+	response: NBackResponseChoice;
+	phase: string;
+	expectedMatch: boolean;
+	target: boolean;
+	correctResponse: NBackResponseChoice;
+	historyResponseCount: number;
+	priorAccuracy: number | null;
+};
+
 export const defaultNBackConfig: NBackConfig = {
 	n: 2,
 	gridSize: 3,
@@ -84,6 +128,95 @@ export const defaultNBackConfig: NBackConfig = {
 	targetRatio: 0.35,
 	stimulusSizePx: 220
 };
+
+function correctResponseForTrial(trial: NBackTrial): NBackResponseChoice {
+	return trial.expectedMatch ? 'match' : 'no_match';
+}
+
+function oppositeResponse(response: NBackResponseChoice): NBackResponseChoice {
+	return response === 'match' ? 'no_match' : 'match';
+}
+
+function priorAccuracy(history: NBackPolicyHistoryItem[]): number | null {
+	if (history.length === 0) return null;
+	return history.filter((outcome) => outcome.correct).length / history.length;
+}
+
+export const nBackPolicyScenarios: NBackPolicyScenario[] = [
+	{
+		id: 'perfect-responder',
+		label: 'Perfect responder',
+		description: 'Answers every target and non-target correctly.',
+		chooseResponse: ({ trial }) => ({
+			response: correctResponseForTrial(trial),
+			phase: 'correct-signal'
+		})
+	},
+	{
+		id: 'all-no-match',
+		label: 'All no-match',
+		description: 'Always rejects matches, producing conservative target misses.',
+		chooseResponse: () => ({
+			response: 'no_match',
+			phase: 'conservative-no-match'
+		})
+	},
+	{
+		id: 'target-biased',
+		label: 'Target biased',
+		description: 'Always reports a match, producing liberal false alarms.',
+		chooseResponse: () => ({
+			response: 'match',
+			phase: 'target-biased'
+		})
+	},
+	{
+		id: 'lapse-noisy',
+		label: 'Lapse noisy',
+		description: 'Follows the task with scheduled lapses every fifth trial.',
+		chooseResponse: ({ trial, trialIndex }) => {
+			const correctResponse = correctResponseForTrial(trial);
+			const shouldLapse = (trialIndex + 1) % 5 === 0;
+
+			return {
+				response: shouldLapse ? oppositeResponse(correctResponse) : correctResponse,
+				phase: shouldLapse ? 'lapse' : 'task-following'
+			};
+		}
+	}
+];
+
+export function getNBackPolicyScenario(scenarioId: string): NBackPolicyScenario | null {
+	return nBackPolicyScenarios.find((scenario) => scenario.id === scenarioId) ?? null;
+}
+
+export function selectNBackPolicyChoice(
+	scenarioId: string,
+	input: NBackPolicyDecisionInput
+): NBackPolicyChoice {
+	const scenario = getNBackPolicyScenario(scenarioId);
+
+	if (!scenario) {
+		throw new Error(`Unknown n-back policy scenario: ${scenarioId}`);
+	}
+
+	const decision = scenario.chooseResponse(input);
+	const correctResponse = correctResponseForTrial(input.trial);
+
+	return {
+		scenarioId: scenario.id,
+		scenarioLabel: scenario.label,
+		trialIndex: input.trialIndex,
+		trialId: input.trial.id,
+		response: decision.response,
+		phase: decision.phase,
+		expectedMatch: input.trial.expectedMatch,
+		target: input.trial.expectedMatch,
+		correctResponse,
+		historyResponseCount: input.history.length,
+		priorAccuracy: priorAccuracy(input.history)
+	};
+}
 
 export function isNBackResponseChoice(value: unknown): value is NBackResponseChoice {
 	return typeof value === 'string' && nBackResponseChoices.includes(value as NBackResponseChoice);

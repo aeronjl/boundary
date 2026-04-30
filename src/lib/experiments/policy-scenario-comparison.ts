@@ -34,6 +34,10 @@ export type PolicyScenarioPhaseSummary = {
 	bestArmSelectionRate: number | null;
 	totalReward: number | null;
 	rewardRate: number | null;
+	correctCount: number | null;
+	accuracy: number | null;
+	matchResponseCount: number | null;
+	matchResponseRate: number | null;
 	meanLaterNetAdvantage: number | null;
 	meanMinimumLaterAdvantage: number | null;
 	meanResponseTimeMs: number | null;
@@ -58,6 +62,10 @@ export type PolicyScenarioRunSummary = {
 	bestArmSelectionCount: number | null;
 	bestArmSelectionRate: number | null;
 	sampledArmCount: number | null;
+	correctCount: number | null;
+	accuracy: number | null;
+	matchResponseCount: number | null;
+	matchResponseRate: number | null;
 	meanResponseTimeMs: number | null;
 };
 
@@ -75,6 +83,8 @@ export type PolicyScenarioSummary = {
 	meanRewardRate: number | null;
 	meanBestArmSelectionRate: number | null;
 	meanSampledArmCount: number | null;
+	meanAccuracy: number | null;
+	meanMatchResponseRate: number | null;
 	meanResponseTimeMs: number | null;
 	epochSummaries: PolicyScenarioEpochSummary[];
 	phaseSummaries: PolicyScenarioPhaseSummary[];
@@ -103,6 +113,8 @@ type PolicyScenarioChoice = {
 	reward: number | null;
 	bestArmSelected: boolean | null;
 	armId: string | null;
+	correct: boolean | null;
+	matchResponse: boolean | null;
 	laterNetAdvantage: number | null;
 	minimumLaterAdvantage: number | null;
 	responseTimeMs: number | null;
@@ -156,6 +168,9 @@ function scenarioChoice(
 	const selectedArmId = stringValue(policyScenario?.armId);
 	const knownBestArmId = stringValue(policyScenario?.knownBestArmId);
 	const netValue = numberValue(score?.netValue);
+	const policyResponse = stringValue(policyScenario?.response);
+	const matchResponse =
+		policyResponse === 'match' ? true : policyResponse === 'no_match' ? false : null;
 
 	return {
 		scenarioId,
@@ -170,6 +185,8 @@ function scenarioChoice(
 		reward,
 		bestArmSelected: selectedArmId && knownBestArmId ? selectedArmId === knownBestArmId : null,
 		armId: selectedArmId,
+		correct: typeof score?.correct === 'boolean' ? score.correct : null,
+		matchResponse,
 		laterNetAdvantage: numberValue(policyScenario?.laterNetAdvantage),
 		minimumLaterAdvantage: numberValue(policyScenario?.minimumLaterAdvantage),
 		responseTimeMs: numberValue(policyScenario?.responseTimeMs)
@@ -191,6 +208,10 @@ function createRunSummary(
 	const sampledArmIds = new Set(
 		choices.flatMap((choice) => (choice.armId === null ? [] : [choice.armId]))
 	);
+	const correctChoices = choices.filter((choice) => choice.correct !== null);
+	const correctCount = correctChoices.filter((choice) => choice.correct).length;
+	const matchResponseChoices = choices.filter((choice) => choice.matchResponse !== null);
+	const matchResponseCount = matchResponseChoices.filter((choice) => choice.matchResponse).length;
 	const responseTimes = choices.flatMap((choice) =>
 		choice.responseTimeMs === null ? [] : [choice.responseTimeMs]
 	);
@@ -221,6 +242,10 @@ function createRunSummary(
 		bestArmSelectionCount: bestArmChoices.length > 0 ? bestArmSelectionCount : null,
 		bestArmSelectionRate: ratio(bestArmSelectionCount, bestArmChoices.length),
 		sampledArmCount: sampledArmIds.size > 0 ? sampledArmIds.size : null,
+		correctCount: correctChoices.length > 0 ? correctCount : null,
+		accuracy: ratio(correctCount, correctChoices.length),
+		matchResponseCount: matchResponseChoices.length > 0 ? matchResponseCount : null,
+		matchResponseRate: ratio(matchResponseCount, matchResponseChoices.length),
 		meanResponseTimeMs: mean(responseTimes)
 	};
 }
@@ -267,6 +292,10 @@ function createPhaseSummary(
 	const bestArmSelectionCount = bestArmChoices.filter((choice) => choice.bestArmSelected).length;
 	const rewards = phaseChoices.flatMap((choice) => (choice.reward === null ? [] : [choice.reward]));
 	const totalReward = rewards.reduce((total, reward) => total + reward, 0);
+	const correctChoices = phaseChoices.filter((choice) => choice.correct !== null);
+	const correctCount = correctChoices.filter((choice) => choice.correct).length;
+	const matchResponseChoices = phaseChoices.filter((choice) => choice.matchResponse !== null);
+	const matchResponseCount = matchResponseChoices.filter((choice) => choice.matchResponse).length;
 
 	return {
 		phase,
@@ -277,6 +306,10 @@ function createPhaseSummary(
 		bestArmSelectionRate: ratio(bestArmSelectionCount, bestArmChoices.length),
 		totalReward: rewards.length > 0 ? totalReward : null,
 		rewardRate: ratio(totalReward, rewards.length),
+		correctCount: correctChoices.length > 0 ? correctCount : null,
+		accuracy: ratio(correctCount, correctChoices.length),
+		matchResponseCount: matchResponseChoices.length > 0 ? matchResponseCount : null,
+		matchResponseRate: ratio(matchResponseCount, matchResponseChoices.length),
 		meanLaterNetAdvantage: mean(
 			phaseChoices.flatMap((choice) =>
 				choice.laterNetAdvantage === null ? [] : [choice.laterNetAdvantage]
@@ -356,6 +389,14 @@ export function createPolicyScenarioComparison(
 				meanSampledArmCount: mean(
 					runsForScenario.flatMap((run) =>
 						run.sampledArmCount === null ? [] : [run.sampledArmCount]
+					)
+				),
+				meanAccuracy: mean(
+					runsForScenario.flatMap((run) => (run.accuracy === null ? [] : [run.accuracy]))
+				),
+				meanMatchResponseRate: mean(
+					runsForScenario.flatMap((run) =>
+						run.matchResponseRate === null ? [] : [run.matchResponseRate]
 					)
 				),
 				meanResponseTimeMs: mean(

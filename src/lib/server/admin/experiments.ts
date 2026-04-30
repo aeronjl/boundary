@@ -349,6 +349,8 @@ export const adminExperimentDictionary: AdminExperimentDictionaryEntry[] = [
 			'score.expectedMatch',
 			'score.positionIndex',
 			'score.matchPositionIndex',
+			'metadata.policyScenario.scenarioId',
+			'metadata.policyScenario.phase',
 			'metadata.timing.responseTimeMs'
 		]
 	}

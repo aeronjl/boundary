@@ -6,6 +6,7 @@ import {
 	parseNBackConfig,
 	type NBackConfig,
 	type NBackOutcome,
+	type NBackPolicyChoice,
 	type NBackResponseChoice,
 	type NBackResult,
 	type NBackRunState,
@@ -52,6 +53,10 @@ type NBackScore = {
 	expectedMatch: boolean;
 	positionIndex: number;
 	matchPositionIndex: number | null;
+};
+
+type NBackResponseSubmissionMetadata = {
+	policyScenario?: (NBackPolicyChoice & { responseTimeMs: number }) | null;
 };
 
 function parseJson<T>(value: string): T {
@@ -308,7 +313,8 @@ export async function submitNBackResponse(
 	trialId: string,
 	response: NBackResponseChoice,
 	timing: TrialSubmissionTiming = {},
-	participantSessionId?: string
+	participantSessionId?: string,
+	submissionMetadata: NBackResponseSubmissionMetadata = {}
 ): Promise<NBackSubmitResult> {
 	const run = await getExperimentRun(runId, nBackVersionId, participantSessionId);
 
@@ -366,6 +372,7 @@ export async function submitNBackResponse(
 	const createdAt = Date.now();
 	const serverTrialStartedAt = await getTrialStartedAt(runId, trialIndex);
 	const timingMetadata = createTimingMetadata(timing, serverTrialStartedAt, createdAt);
+	const policyScenarioMetadata = submissionMetadata.policyScenario ?? null;
 	const outcome: NBackOutcome = {
 		trialIndex,
 		trialId,
@@ -393,7 +400,8 @@ export async function submitNBackResponse(
 		metadata: {
 			n: context.config.n,
 			gridSize: context.config.gridSize,
-			timing: timingMetadata
+			timing: timingMetadata,
+			...(policyScenarioMetadata ? { policyScenario: policyScenarioMetadata } : {})
 		},
 		createdAt
 	});
@@ -409,7 +417,8 @@ export async function submitNBackResponse(
 			expectedMatch: trial.expectedMatch,
 			positionIndex: trial.positionIndex,
 			matchPositionIndex: trial.matchPositionIndex,
-			timing: timingMetadata
+			timing: timingMetadata,
+			...(policyScenarioMetadata ? { policyScenario: policyScenarioMetadata } : {})
 		},
 		createdAt
 	});

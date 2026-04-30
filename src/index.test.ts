@@ -57,7 +57,13 @@ import {
 	referenceComparisonBlockers
 } from '$lib/reference-data/readiness';
 import { createReferenceContext } from '$lib/reference-data/summary';
-import { calculateNBackSignalDetectionMetrics, type NBackResult } from '$lib/experiments/n-back';
+import {
+	calculateNBackSignalDetectionMetrics,
+	nBackPolicyScenarios,
+	selectNBackPolicyChoice,
+	type NBackResult,
+	type NBackTrial
+} from '$lib/experiments/n-back';
 import { createNBackInterpretation } from '$lib/experiments/n-back-interpretation';
 import {
 	estimateOrientationThresholdDegrees,
@@ -82,6 +88,82 @@ describe('n-back interpretation helpers', () => {
 		expect(metrics.falseAlarmRate).toBe(0.125);
 		expect(metrics.sensitivityIndex).toBeGreaterThan(1);
 		expect(metrics.responseBias).toEqual(expect.any(Number));
+	});
+
+	it('defines explicit n-back policy scenarios', () => {
+		expect(nBackPolicyScenarios.map((scenario) => scenario.id)).toEqual([
+			'perfect-responder',
+			'all-no-match',
+			'target-biased',
+			'lapse-noisy'
+		]);
+	});
+
+	it('selects n-back responses from trial targets', () => {
+		const targetTrial: NBackTrial = {
+			id: 'trial-target',
+			positionIndex: 1,
+			expectedMatch: true,
+			matchPositionIndex: 1
+		};
+		const nonTargetTrial: NBackTrial = {
+			id: 'trial-non-target',
+			positionIndex: 2,
+			expectedMatch: false,
+			matchPositionIndex: 1
+		};
+		const history = [
+			{ trialIndex: 0, expectedMatch: false, response: 'no_match' as const, correct: true },
+			{ trialIndex: 1, expectedMatch: true, response: 'match' as const, correct: true }
+		];
+
+		expect(
+			selectNBackPolicyChoice('perfect-responder', {
+				trial: targetTrial,
+				trialIndex: 2,
+				n: 2,
+				history
+			})
+		).toMatchObject({
+			response: 'match',
+			phase: 'correct-signal',
+			priorAccuracy: 1
+		});
+		expect(
+			selectNBackPolicyChoice('perfect-responder', {
+				trial: nonTargetTrial,
+				trialIndex: 3,
+				n: 2,
+				history
+			}).response
+		).toBe('no_match');
+		expect(
+			selectNBackPolicyChoice('all-no-match', {
+				trial: targetTrial,
+				trialIndex: 0,
+				n: 2,
+				history: []
+			}).response
+		).toBe('no_match');
+		expect(
+			selectNBackPolicyChoice('target-biased', {
+				trial: nonTargetTrial,
+				trialIndex: 0,
+				n: 2,
+				history: []
+			}).response
+		).toBe('match');
+		expect(
+			selectNBackPolicyChoice('lapse-noisy', {
+				trial: targetTrial,
+				trialIndex: 4,
+				n: 2,
+				history
+			})
+		).toMatchObject({
+			response: 'no_match',
+			phase: 'lapse'
+		});
 	});
 
 	it('creates cautious source-backed interpretation cards', () => {
@@ -330,7 +412,7 @@ describe('intertemporal interpretation helpers', () => {
 });
 
 describe('policy scenario comparison helpers', () => {
-	it('groups generated intertemporal runs by scenario and epoch', () => {
+	it('groups generated task runs by scenario, epoch, and phase', () => {
 		const comparison = createPolicyScenarioComparison(
 			[
 				{
@@ -443,16 +525,50 @@ describe('policy scenario comparison helpers', () => {
 							}
 						}
 					]
+				},
+				{
+					runId: 'run-n-back',
+					experimentSlug: 'n-back',
+					status: 'completed',
+					startedAt: 6,
+					completedAt: 7,
+					responses: [
+						{
+							trialIndex: 0,
+							score: {
+								correct: true,
+								expectedMatch: true,
+								positionIndex: 1,
+								matchPositionIndex: 1
+							},
+							metadata: {
+								policyScenario: {
+									scenarioId: 'perfect-responder',
+									scenarioLabel: 'Perfect responder',
+									trialIndex: 0,
+									trialId: 'trial-1',
+									response: 'match',
+									phase: 'correct-signal',
+									expectedMatch: true,
+									target: true,
+									correctResponse: 'match',
+									historyResponseCount: 0,
+									priorAccuracy: null,
+									responseTimeMs: 720
+								}
+							}
+						}
+					]
 				}
 			],
 			new Date(0).toISOString()
 		);
 
 		expect(comparison).toMatchObject({
-			scenarioCount: 3,
-			runCount: 3,
-			completedRunCount: 3,
-			choiceCount: 4
+			scenarioCount: 4,
+			runCount: 4,
+			completedRunCount: 4,
+			choiceCount: 5
 		});
 
 		const epochSensitive = comparison.summaries.find(
@@ -498,6 +614,24 @@ describe('policy scenario comparison helpers', () => {
 				choiceCount: 1,
 				rewardRate: 1,
 				bestArmSelectionRate: 1
+			})
+		]);
+
+		const perfectResponder = comparison.summaries.find(
+			(summary) => summary.scenarioId === 'perfect-responder'
+		);
+		expect(perfectResponder).toMatchObject({
+			runCount: 1,
+			totalChoiceCount: 1,
+			meanAccuracy: 1,
+			meanMatchResponseRate: 1
+		});
+		expect(perfectResponder?.phaseSummaries).toEqual([
+			expect.objectContaining({
+				phase: 'correct-signal',
+				choiceCount: 1,
+				accuracy: 1,
+				matchResponseRate: 1
 			})
 		]);
 	});

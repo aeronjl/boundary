@@ -63,13 +63,15 @@
 		</p>
 	{:else}
 		<div class="overflow-x-auto border-t border-gray-200">
-			<table class="w-full min-w-[1160px] text-left text-xs">
+			<table class="w-full min-w-[1320px] text-left text-xs">
 				<thead class="text-gray-500">
 					<tr>
 						<th class="py-2 pr-3 font-medium">Scenario</th>
 						<th class="py-2 pr-3 font-medium">Experiment</th>
 						<th class="py-2 pr-3 font-medium">Runs</th>
 						<th class="py-2 pr-3 font-medium">Choices</th>
+						<th class="py-2 pr-3 font-medium">Accuracy</th>
+						<th class="py-2 pr-3 font-medium">Match rate</th>
 						<th class="py-2 pr-3 font-medium">Delayed rate</th>
 						<th class="py-2 pr-3 font-medium">Best-arm rate</th>
 						<th class="py-2 pr-3 font-medium">Reward rate</th>
@@ -90,6 +92,8 @@
 							<td class="py-2 pr-3">{summary.experimentSlug}</td>
 							<td class="py-2 pr-3">{summary.completedRunCount} of {summary.runCount}</td>
 							<td class="py-2 pr-3">{summary.totalChoiceCount}</td>
+							<td class="py-2 pr-3">{formatPercent(summary.meanAccuracy)}</td>
+							<td class="py-2 pr-3">{formatPercent(summary.meanMatchResponseRate)}</td>
 							<td class="py-2 pr-3">{formatPercent(summary.meanDelayedChoiceRate)}</td>
 							<td class="py-2 pr-3">{formatPercent(summary.meanBestArmSelectionRate)}</td>
 							<td class="py-2 pr-3">{formatPercent(summary.meanRewardRate)}</td>
@@ -108,11 +112,13 @@
 			<div class="border-t border-gray-200 pt-4">
 				<h2 class="font-serif text-xl">{summary.scenarioLabel}</h2>
 				<div class="mt-3 overflow-x-auto">
-					<table class="w-full min-w-[920px] text-left text-xs">
+					<table class="w-full min-w-[1080px] text-left text-xs">
 						<thead class="text-gray-500">
 							<tr>
 								<th class="py-2 pr-3 font-medium">Epoch / phase</th>
 								<th class="py-2 pr-3 font-medium">Choices</th>
+								<th class="py-2 pr-3 font-medium">Accuracy</th>
+								<th class="py-2 pr-3 font-medium">Match rate</th>
 								<th class="py-2 pr-3 font-medium">Delayed rate</th>
 								<th class="py-2 pr-3 font-medium">Best-arm rate</th>
 								<th class="py-2 pr-3 font-medium">Reward rate</th>
@@ -126,6 +132,12 @@
 								<tr class="border-t border-gray-100">
 									<td class="py-2 pr-3 capitalize">{formatLabel(phase.phase)}</td>
 									<td class="py-2 pr-3">{phase.choiceCount}</td>
+									<td class="py-2 pr-3">
+										{formatPercent(phase.accuracy)} ({phase.correctCount ?? '-'})
+									</td>
+									<td class="py-2 pr-3">
+										{formatPercent(phase.matchResponseRate)} ({phase.matchResponseCount ?? '-'})
+									</td>
 									<td class="py-2 pr-3">{formatPercent(phase.delayedChoiceRate)}</td>
 									<td class="py-2 pr-3">{formatPercent(phase.bestArmSelectionRate)}</td>
 									<td class="py-2 pr-3">{formatPercent(phase.rewardRate)}</td>
@@ -139,13 +151,15 @@
 				</div>
 
 				<div class="mt-4 overflow-x-auto">
-					<table class="w-full min-w-[1120px] text-left text-xs">
+					<table class="w-full min-w-[1280px] text-left text-xs">
 						<thead class="text-gray-500">
 							<tr>
 								<th class="py-2 pr-3 font-medium">Run</th>
 								<th class="py-2 pr-3 font-medium">Started</th>
 								<th class="py-2 pr-3 font-medium">Status</th>
 								<th class="py-2 pr-3 font-medium">Trials</th>
+								<th class="py-2 pr-3 font-medium">Accuracy</th>
+								<th class="py-2 pr-3 font-medium">Match rate</th>
 								<th class="py-2 pr-3 font-medium">Delayed</th>
 								<th class="py-2 pr-3 font-medium">Net gain</th>
 								<th class="py-2 pr-3 font-medium">Reward rate</th>
@@ -167,6 +181,12 @@
 									<td class="py-2 pr-3">{formatDate(run.startedAt)}</td>
 									<td class="py-2 pr-3">{run.status}</td>
 									<td class="py-2 pr-3">{run.totalTrials}</td>
+									<td class="py-2 pr-3">
+										{formatPercent(run.accuracy)} ({run.correctCount ?? '-'})
+									</td>
+									<td class="py-2 pr-3">
+										{formatPercent(run.matchResponseRate)} ({run.matchResponseCount ?? '-'})
+									</td>
 									<td class="py-2 pr-3">
 										{run.delayedChoiceCount} ({formatPercent(run.delayedChoiceRate)})
 									</td>

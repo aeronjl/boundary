@@ -28,7 +28,13 @@ export async function getAdminPolicyScenarioComparison(): Promise<PolicyScenario
 		.innerJoin(experimentRuns, eq(experimentResponses.runId, experimentRuns.id))
 		.innerJoin(experimentVersions, eq(experimentRuns.experimentVersionId, experimentVersions.id))
 		.innerJoin(experiments, eq(experimentVersions.experimentId, experiments.id))
-		.where(inArray(experimentResponses.responseType, ['intertemporal_choice', 'bandit_arm_pull']))
+		.where(
+			inArray(experimentResponses.responseType, [
+				'intertemporal_choice',
+				'bandit_arm_pull',
+				'n_back_response'
+			])
+		)
 		.orderBy(desc(experimentRuns.startedAt), asc(experimentResponses.trialIndex));
 	const runsById = new Map<string, PolicyScenarioComparisonRunInput>();
 
